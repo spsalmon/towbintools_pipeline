@@ -1,0 +1,9 @@
+temp_files/*
+sbatch_output/*
+
+*.pkl
+*.csv
+*.log
+*.err
+*.out
+*.sh

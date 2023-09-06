@@ -1,0 +1,25 @@
+experiment_dir: "/mnt/external.data/TowbinLab/kstojanovski/20220629_Ti2_20x_160-182-190_pumping_25C_20220629_154238_325/"
+# experiment_dir: "/mnt/external.data/TowbinLab/kstojanovski/20220401_Ti2_20x_160-182-190_pumping_25C_20220401_173300_429/"
+# experiment_dir : "/mnt/external.data/TowbinLab/plenart/20221020_Ti2_10x_green_bacteria_wbt150_small_chambers_good/"
+# features_to_compute: ['volume', "molts", "len_at_molts", "volume_at_molts", "classify"]
+features_to_compute: ["volume"]
+
+rerun_segmentation: False
+rerun_straightening: False
+rerun_volume: False
+rerun_worm_type_classification: True
+
+segmentation_method: "edge_based"
+segmentation_channels: [1]
+augment_contrast: False
+pixelsize: 0.325
+segmentation_backbone: "skimage"
+sigma_canny: 1
+
+worm_type_classifier: "./models/worm_type_classifier.json"
+
+# sbatch parameters
+sbatch_memory: 128G
+sbatch_time: 0-12:00:00
+sbatch_cpus: 32
+sbatch_gpus: 0
