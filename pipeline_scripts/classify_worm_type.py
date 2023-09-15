@@ -7,7 +7,7 @@ import os
 from joblib import Parallel, delayed
 import re
 import pandas as pd
-from .utils import load_pickles, basic_get_args
+import utils
 import xgboost as xgb
 import yaml
 
@@ -31,7 +31,7 @@ def main(input_pickle, output_file, config_file, n_jobs):
     with open(config_file) as f:
         config = yaml.load(f, Loader=yaml.FullLoader)
 
-    input_files = load_pickles(input_pickle)[0]
+    input_files = utils.load_pickles(input_pickle)[0]
     
     classifier_path = config['worm_type_classifier']
     classifier = xgb.XGBClassifier()
@@ -43,5 +43,5 @@ def main(input_pickle, output_file, config_file, n_jobs):
     worm_types_dataframe.to_csv(output_file, index=False)
 
 if __name__ == '__main__':
-    args = basic_get_args()
-    main(args.input_pickle, args.output_file, args.config_file, args.n_jobs)
+    args = utils.basic_get_args()
+    main(args.input, args.output, args.config_file, args.n_jobs)

@@ -110,13 +110,16 @@ run_segmentation(experiment_filemap, segmentation_subdir,
 experiment_filemap = add_dir_to_experiment_filemap(
     experiment_filemap, segmentation_subdir, f'analysis/{segmentation_subdir.split("analysis/")[-1]}')
 
+experiment_filemap.to_csv(os.path.join(report_subdir, 'analysis_filemap.csv'), index=False)
+
 print(f'#### Running straightening ####')
 run_straightening(experiment_filemap, f'analysis/{segmentation_subdir.split("analysis/")[-1]}',
                   segmentation_subdir, straightening_subdir, config_file=config_file, config=config)
 
 experiment_filemap = add_dir_to_experiment_filemap(
     experiment_filemap, straightening_subdir, f'analysis/{straightening_subdir.split("analysis/")[-1]}')
-experiment_filemap.to_csv("filemap.csv", index=False)
+
+experiment_filemap.to_csv(os.path.join(report_subdir, 'analysis_filemap.csv'), index=False)
 
 print(f'#### Running volume computation ####')
 run_compute_volume(experiment_filemap,
@@ -125,10 +128,14 @@ run_compute_volume(experiment_filemap,
 volume_csv = pd.read_csv(os.path.join(report_subdir, 'volume.csv'))
 experiment_filemap = experiment_filemap.merge(volume_csv, on=['Time', 'Point'], how='left')
 
+experiment_filemap.to_csv(os.path.join(report_subdir, 'analysis_filemap.csv'), index=False)
+
 print(f'#### Running worm type classification ####')
 run_classify_worm_type(experiment_filemap, f'analysis/{straightening_subdir.split("analysis/")[-1]}', report_subdir, config_file=config_file, config=config)
 worm_types_csv = pd.read_csv(os.path.join(report_subdir, 'worm_types.csv'))
 experiment_filemap = experiment_filemap.merge(worm_types_csv, on=['Time', 'Point'], how='left')
+
+experiment_filemap.to_csv(os.path.join(report_subdir, 'analysis_filemap.csv'), index=False)
 
 print(f'#### Running molt detection ####')
 run_detect_molts(experiment_filemap, report_subdir, config_file=config_file, config=config)

@@ -8,7 +8,7 @@ from joblib import Parallel, delayed
 from scipy.ndimage import binary_fill_holes
 import argparse
 import yaml
-from .utils import load_pickles
+import utils
 
 # ----BOILERPLATE CODE FOR COMMAND LINE INTERFACE----
 
@@ -53,7 +53,7 @@ def main(source_pickle, mask_pickle, output_pickle, config_file, n_jobs):
     with open(config_file) as f:
         config = yaml.load(f, Loader=yaml.FullLoader)
     
-    source_files, mask_files, output_files = load_pickles(source_pickle, mask_pickle, output_pickle)
+    source_files, mask_files, output_files = utils.load_pickles(source_pickle, mask_pickle, output_pickle)
     os.makedirs(os.path.dirname(output_files[0]), exist_ok=True)
 
     Parallel(n_jobs=n_jobs)(delayed(straighten_and_save)(source_image, input_mask, output_path) for source_image, input_mask, output_path in zip(source_files, mask_files, output_files))

@@ -6,7 +6,7 @@ import numpy as np
 from tifffile import imwrite
 import os
 from joblib import Parallel, delayed
-from .utils import load_pickles, basic_get_args
+import utils
 
 def segment_and_save(image_path, output_path, method, augment_contrast=False, channels=[], pixelsize=None, edge_based_backbone="skimage", sigma_canny=1,):
     """Segment image and save to output_path."""
@@ -31,7 +31,7 @@ def main(input_pickle, output_pickle, config_file, n_jobs):
     with open(config_file) as f:
         config = yaml.load(f, Loader=yaml.FullLoader)
     
-    input_files, output_files = load_pickles(input_pickle, output_pickle)
+    input_files, output_files = utils.load_pickles(input_pickle, output_pickle)
     os.makedirs(os.path.dirname(output_files[0]), exist_ok=True)
 
 
@@ -39,5 +39,5 @@ def main(input_pickle, output_pickle, config_file, n_jobs):
         'segmentation_channels'], pixelsize=config['pixelsize'], edge_based_backbone=config['segmentation_backbone'], sigma_canny=config['sigma_canny']) for input_file, output_path in zip(input_files, output_files))
 
 if __name__ == '__main__':
-    args = basic_get_args()
-    main(args.input_pickle, args.output_pickle, args.config_file, args.n_jobs)
+    args = utils.basic_get_args()
+    main(args.input, args.output, args.config_file, args.n_jobs)
