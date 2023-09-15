@@ -44,11 +44,11 @@ def get_input_and_output_files(experiment_filemap, columns, output_dir, rerun=Tr
         output_file = os.path.join(
             output_dir, os.path.basename(row[columns[0]]))
         if output_report is None:
-            if (rerun or not os.path.exists(output_file)) and all([inp is not None for inp in input_file]) :
+            if (rerun or not os.path.exists(output_file)) and all([((inp is not None) & (inp != '')) for inp in input_file]) :
                 input_files.append(input_file)
                 output_files.append(output_file)
         else:
-            if (rerun or not os.path.exists(output_report)) and all([inp is not None for inp in input_file]):
+            if (rerun or not os.path.exists(output_report)) and all([((inp is not None) & (inp != '')) for inp in input_file]):
                 input_files.append(input_file)
                 output_files.append(output_file)
     return input_files, output_files
@@ -109,9 +109,9 @@ def basic_get_args() -> argparse.Namespace:
         argparse.Namespace: The namespace object containing the parsed arguments.
     """
     # Create a parser and set the formatter class to ArgumentDefaultsHelpFormatter
-    parser = argparse.ArgumentParser(description='Segment image and save.')
-    parser.add_argument('-i', '--input_pickle', help='Input file paths (saved in a pickle file).')
-    parser.add_argument('-o', '--output_file', help='Output file path.')
+    parser = argparse.ArgumentParser(description='Read args for a piece of the pipeline.')
+    parser.add_argument('-i', '--input', help='Input file paths (saved in a pickle file) or single filepath (CSV file for example).')
+    parser.add_argument('-o', '--output', help='Output file path or pickle.')
     parser.add_argument('-c', '--config_file', help='Path to JSON config file.')
     parser.add_argument('-j', '--n_jobs', type=int, help='Number of jobs for parallel execution.')
     
