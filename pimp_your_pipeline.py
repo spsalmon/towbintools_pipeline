@@ -4,7 +4,7 @@ import subprocess
 import pickle
 from towbintools.foundation import file_handling as file_handling
 import pandas as pd
-from pipeline_scripts.utils import pickle_objects, create_sbatch_file, get_and_create_folders, get_input_and_output_files, add_dir_to_experiment_filemap
+from pipeline_scripts.utils import pickle_objects, create_sbatch_file, get_and_create_folders, get_input_and_output_files, add_dir_to_experiment_filemap, create_temp_folders
 
 def run_segmentation(experiment_filemap, segmentation_subdir, config_file, config):
 
@@ -94,6 +94,8 @@ def run_detect_molts(experiment_filemap, report_subdir, config_file, config):
 config_file = "./config.yaml"
 with open(config_file) as f:
     config = yaml.load(f, Loader=yaml.FullLoader)
+
+create_temp_folders()
 
 experiment_dir, raw_subdir, analysis_subdir, report_subdir, segmentation_subdir, straightening_subdir = get_and_create_folders(
     config)
