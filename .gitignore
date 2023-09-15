@@ -6,4 +6,3 @@ sbatch_output/*
 *.log
 *.err
 *.out
-*.sh

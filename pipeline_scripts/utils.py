@@ -27,6 +27,13 @@ def get_and_create_folders(config):
 
     return experiment_dir, raw_subdir, analysis_subdir, report_subdir, segmentation_subdir, straightening_subdir
 
+def create_temp_folders():
+    temp_dir = "./temp_files"
+    os.makedirs(temp_dir, exist_ok=True)
+    os.makedirs(os.path.join(temp_dir, "pickles"), exist_ok=True)
+    os.makedirs(os.path.join(temp_dir, "batch"), exist_ok=True)
+    os.makedirs(os.path.join(temp_dir, "sbatch_output"), exist_ok=True)
+
 
 def get_input_and_output_files(experiment_filemap, columns, output_dir, rerun=True, output_report = None):
     input_files = []
@@ -79,8 +86,8 @@ def pickle_objects(*objects):
 def create_sbatch_file(job_name, cores, time_limit, memory, command):
     content = f"""#!/bin/bash
 #SBATCH -J {job_name}
-#SBATCH -o ./sbatch_output/{job_name}.out
-#SBATCH -e ./sbatch_output/{job_name}.err
+#SBATCH -o ./temp_files/sbatch_output/{job_name}.out
+#SBATCH -e ./temp_files/sbatch_output/{job_name}.err
 #SBATCH -c {cores}
 #SBATCH -t {time_limit}
 #SBATCH --mem={memory}
