@@ -13,19 +13,19 @@ def get_and_create_folders(config):
     report_subdir = os.path.join(analysis_subdir, "report")
     os.makedirs(report_subdir, exist_ok=True)
 
-    segmentation_subdir_name = "ch"
-    for channel in config['segmentation_channels']:
-        segmentation_subdir_name += str(channel+1) + "_"
-    segmentation_subdir_name += "seg"
-    segmentation_subdir = os.path.join(
-        analysis_subdir, segmentation_subdir_name)
-    os.makedirs(segmentation_subdir, exist_ok=True)
+    # segmentation_subdir_name = "ch"
+    # for channel in config['segmentation_channels']:
+    #     segmentation_subdir_name += str(channel+1) + "_"
+    # segmentation_subdir_name += "seg"
+    # segmentation_subdir = os.path.join(
+    #     analysis_subdir, segmentation_subdir_name)
+    # os.makedirs(segmentation_subdir, exist_ok=True)
 
-    straightening_subdir = os.path.join(
-        analysis_subdir, f'{segmentation_subdir_name}_str')
-    os.makedirs(straightening_subdir, exist_ok=True)
+    # straightening_subdir = os.path.join(
+    #     analysis_subdir, f'{segmentation_subdir_name}_str')
+    # os.makedirs(straightening_subdir, exist_ok=True)
 
-    return experiment_dir, raw_subdir, analysis_subdir, report_subdir, segmentation_subdir, straightening_subdir
+    return experiment_dir, raw_subdir, analysis_subdir, report_subdir
 
 def create_temp_folders():
     temp_dir = "./temp_files"
@@ -40,6 +40,7 @@ def get_input_and_output_files(experiment_filemap, columns, output_dir, rerun=Tr
     output_files = []
 
     for _, row in experiment_filemap.iterrows():
+
         input_file = [row[column] for column in columns]
         output_file = os.path.join(
             output_dir, os.path.basename(row[columns[0]]))
@@ -56,6 +57,9 @@ def get_input_and_output_files(experiment_filemap, columns, output_dir, rerun=Tr
 def add_dir_to_experiment_filemap(experiment_filemap, dir_path, subdir_name):
     subdir_filemap = file_handling.get_dir_filemap(dir_path)
     subdir_filemap.rename(columns={'ImagePath': subdir_name}, inplace=True)
+    # check if column already exists
+    if subdir_name in experiment_filemap.columns:
+        experiment_filemap.drop(columns=[subdir_name], inplace=True)
     experiment_filemap = experiment_filemap.merge(
         subdir_filemap, on=['Time', 'Point'], how='left')
     return experiment_filemap
@@ -112,7 +116,7 @@ def basic_get_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description='Read args for a piece of the pipeline.')
     parser.add_argument('-i', '--input', help='Input file paths (saved in a pickle file) or single filepath (CSV file for example).')
     parser.add_argument('-o', '--output', help='Output file path or pickle.')
-    parser.add_argument('-c', '--config_file', help='Path to JSON config file.')
+    parser.add_argument('-c', '--config', help='Pickled config dictionary.')
     parser.add_argument('-j', '--n_jobs', type=int, help='Number of jobs for parallel execution.')
     
     return parser.parse_args()
