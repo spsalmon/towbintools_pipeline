@@ -26,11 +26,10 @@ def segment_and_save(image_path, output_path, method, augment_contrast=False, ch
             "Invalid segmentation method. Use 'edge_based' or 'threshold_based'.")
     imwrite(output_path, mask.astype(np.uint8), compression="zlib")
 
-def main(input_pickle, output_pickle, config_file, n_jobs):
+def main(input_pickle, output_pickle, config, n_jobs):
     """Main function."""
-    with open(config_file) as f:
-        config = yaml.load(f, Loader=yaml.FullLoader)
-    
+    config = utils.load_pickles(config)[0]
+    print(config)
     input_files, output_files = utils.load_pickles(input_pickle, output_pickle)
     os.makedirs(os.path.dirname(output_files[0]), exist_ok=True)
 
@@ -40,4 +39,4 @@ def main(input_pickle, output_pickle, config_file, n_jobs):
 
 if __name__ == '__main__':
     args = utils.basic_get_args()
-    main(args.input, args.output, args.config_file, args.n_jobs)
+    main(args.input, args.output, args.config, args.n_jobs)
