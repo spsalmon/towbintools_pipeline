@@ -26,10 +26,9 @@ def compute_volume_from_file_path(straightened_mask_path, pixelsize):
     else:
         raise ValueError("Could not extract time and point from file name.")
 
-def main(input_pickle, output_file, config_file, n_jobs):
+def main(input_pickle, output_file, config, n_jobs):
     """Main function."""
-    with open(config_file) as f:
-        config = yaml.load(f, Loader=yaml.FullLoader)
+    config = utils.load_pickles(config)[0]
 
     input_files = utils.load_pickles(input_pickle)[0]
     logging.info(f"Computing volume for {len(input_files)} files.")
@@ -41,4 +40,4 @@ def main(input_pickle, output_file, config_file, n_jobs):
 
 if __name__ == '__main__':
     args = utils.basic_get_args()
-    main(args.input, args.output, args.config_file, args.n_jobs)
+    main(args.input, args.output, args.config, args.n_jobs)

@@ -23,7 +23,7 @@ def get_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description='Segment image and save.')
     parser.add_argument('-i', '--source_pickle', help='Input source images paths (saved in a pickle file).')
     parser.add_argument('-m', '--mask_pickle', help='Input mask images paths (saved in a pickle file).')
-    parser.add_argument('-o', '--output_pickle', help='Output file paths (saved in a pickle file).')
+    parser.add_argument('-o', '--output', help='Output file paths (saved in a pickle file).')
     parser.add_argument('-c', '--config', help='Pickled config dictionary.')
     parser.add_argument('-j', '--n_jobs', type=int, help='Number of jobs for parallel execution.')
     
@@ -34,7 +34,7 @@ def get_args() -> argparse.Namespace:
 def straighten_and_save(source_image_path, source_image_channel, mask_path, output_path):
     """Straighten image and save to output_path."""
     mask = image_handling.read_tiff_file(mask_path)
-    if source_image_path == mask_path:
+    if source_image_path is None:
         image = mask
     else:
         image = image_handling.read_tiff_file(source_image_path, channels_to_keep=[source_image_channel])
@@ -42,11 +42,16 @@ def straighten_and_save(source_image_path, source_image_channel, mask_path, outp
         mask = binary_image.get_biggest_object(mask)
         transformer = straightening.Warper.from_img(image, mask)
         straightened_image = transformer.warp_2D_img(image, 0)
-        straightened_image = binary_fill_holes(straightened_image)
+
+        if np.max(straightened_image) == 1 and np.min(straightened_image) == 0:
+            straightened_image = binary_fill_holes(straightened_image)
+            straightened_image = straightened_image.astype(np.uint8)
+        else:
+            straightened_image = straightened_image.astype(np.uint16)
     except:
-        straightened_image = np.zeros_like(mask)
+        straightened_image = np.zeros_like(mask).astype(np.uint8)
     
-    imwrite(output_path, straightened_image.astype(np.uint8), compression="zlib")
+    imwrite(output_path, straightened_image, compression="zlib")
 
 def main(source_pickle, mask_pickle, output_pickle, config, n_jobs):
     config = utils.load_pickles(config)[0]
@@ -58,4 +63,4 @@ def main(source_pickle, mask_pickle, output_pickle, config, n_jobs):
 
 if __name__ == '__main__':
     args = get_args()
-    main(args.source_pickle, args.mask_pickle, args.output_pickle, args.config, args.n_jobs)
+    main(args.source_pickle, args.mask_pickle, args.output, args.config, args.n_jobs)
