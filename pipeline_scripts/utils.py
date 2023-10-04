@@ -35,7 +35,7 @@ def create_temp_folders():
     os.makedirs(os.path.join(temp_dir, "sbatch_output"), exist_ok=True)
 
 
-def get_input_and_output_files(experiment_filemap, columns, output_dir, rerun=True, output_report = None):
+def get_input_and_output_files(experiment_filemap, columns, output_dir, rerun=True):
     input_files = []
     output_files = []
 
@@ -44,14 +44,9 @@ def get_input_and_output_files(experiment_filemap, columns, output_dir, rerun=Tr
         input_file = [row[column] for column in columns]
         output_file = os.path.join(
             output_dir, os.path.basename(row[columns[0]]))
-        if output_report is None:
-            if (rerun or not os.path.exists(output_file)) and all([((inp is not None) & (inp != '')) for inp in input_file]) :
-                input_files.append(input_file)
-                output_files.append(output_file)
-        else:
-            if (rerun or not os.path.exists(output_report)) and all([((inp is not None) & (inp != '')) for inp in input_file]):
-                input_files.append(input_file)
-                output_files.append(output_file)
+        if (rerun or not os.path.exists(output_file)) and all([((inp is not None) & (inp != '')) for inp in input_file]) :
+            input_files.append(input_file)
+            output_files.append(output_file)
     return input_files, output_files
 
 def add_dir_to_experiment_filemap(experiment_filemap, dir_path, subdir_name):
