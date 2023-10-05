@@ -38,6 +38,9 @@ fluorescence_quantification_source: [['raw', 0]]
 fluorescence_quantification_masks: ['analysis/ch1_seg']
 fluorescence_quantification_normalization: ['area']
 
+# custom parameters
+custom_script_path : [null]
+custom_script_parameters : [null]
 
 # sbatch parameters
 sbatch_memory: 128G
