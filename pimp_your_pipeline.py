@@ -7,18 +7,37 @@ import pandas as pd
 from pipeline_scripts.utils import pickle_objects, create_sbatch_file, get_and_create_folders, get_input_and_output_files, add_dir_to_experiment_filemap, create_temp_folders
 import numpy as np
 
+def get_output_name(experiment_dir, input_name, task_name, channels = None, return_subdir = True, add_raw = False, suffix = None):
+
+    analysis_subdir = os.path.join(experiment_dir, "analysis")
+    report_subdir = os.path.join(analysis_subdir, "report")
+
+    output_name = ""
+    if channels is not None:
+        if type(channels) == list:
+            for channel in channels:
+                output_name += f'ch{channel+1}_'
+        else:
+            output_name += f'ch{channels+1}_'
+    if input_name != 'raw' or add_raw:
+        output_name += os.path.basename(os.path.normpath(input_name)) + "_"
+    output_name += task_name
+    if suffix is not None:
+        output_name += f'_{suffix}'
+    
+    if return_subdir:
+        output_name = os.path.join(analysis_subdir, output_name)
+        os.makedirs(output_name, exist_ok=True)
+    else:
+        output_name = os.path.join(report_subdir, f'{output_name}.csv')
+    return output_name
+
 def run_segmentation(experiment_filemap, config, block_config):
 
     # create segmentation subdir
     experiment_dir = config['experiment_dir']
-    analysis_subdir = os.path.join(experiment_dir, "analysis")
-    segmentation_subdir_name = "ch"
-    for channel in block_config['segmentation_channels']:
-        segmentation_subdir_name += str(channel+1) + "_"
-    segmentation_subdir_name += "seg"
-    segmentation_subdir = os.path.join(
-        analysis_subdir, segmentation_subdir_name)
-    os.makedirs(segmentation_subdir, exist_ok=True)
+
+    segmentation_subdir = get_output_name(experiment_dir, block_config['segmentation_column'], 'seg', block_config['segmentation_channels'], return_subdir=True, add_raw = False)
 
     images_to_segment, segmentation_output_files = get_input_and_output_files(
         experiment_filemap, [block_config['segmentation_column']], segmentation_subdir, rerun=block_config['rerun_segmentation'])
@@ -42,20 +61,8 @@ def run_segmentation(experiment_filemap, config, block_config):
 
 
 def run_straightening(experiment_filemap, config, block_config):
-
-    # create straightening subdir
-    if block_config['straightening_source'][0] == 'raw':
-        straightening_subdir_name = "ch"
-        channel = block_config['straightening_source'][1]
-        straightening_subdir_name += str(channel+1) + "_"
-        straightening_subdir_name += "raw_str"
-    else:
-        straightening_subdir_name = os.path.basename(os.path.normpath(block_config['straightening_source'][0]))
-        straightening_subdir_name += "_str"
         
-    straightening_subdir = os.path.join(config['experiment_dir'], "analysis", straightening_subdir_name)
-    os.makedirs(straightening_subdir, exist_ok=True)
-    
+    straightening_subdir = get_output_name(config['experiment_dir'], block_config['straightening_source'][0], 'str', channels = block_config['straightening_source'][1], return_subdir=True, add_raw = True)
 
     columns = [block_config['straightening_source'][0], block_config['straightening_masks']]
     input_files, straightening_output_files = get_input_and_output_files(
@@ -83,10 +90,8 @@ def run_straightening(experiment_filemap, config, block_config):
 
 
 def run_compute_volume(experiment_filemap, config, block_config):
-    report_subdir = os.path.join(config['experiment_dir'], "analysis", "report")
     volume_computation_masks = [block_config['volume_computation_masks']]
-    volume_computation_masks_name = os.path.basename(os.path.normpath(volume_computation_masks[0]))
-    output_file = os.path.join(report_subdir, f'{volume_computation_masks_name}_volume.csv')
+    output_file = get_output_name(config['experiment_dir'], volume_computation_masks[0], 'volume', return_subdir=False, add_raw = False)
 
     rerun = ((block_config['rerun_volume_computation']) or (os.path.exists(output_file) == False))
 
@@ -112,13 +117,11 @@ def run_compute_volume(experiment_filemap, config, block_config):
     return output_file
 
 def run_classification(experiment_filemap, config, block_config):
-    report_subdir = os.path.join(config['experiment_dir'], "analysis", "report")
     model_name = os.path.basename(os.path.normpath(block_config['classifier']))
     model_name = model_name.split('_classifier')[0]
-
     classification_source = [block_config['classification_source']]
-    classification_source_name = os.path.basename(os.path.normpath(classification_source[0]))
-    output_file = os.path.join(report_subdir, f'{classification_source_name}_{model_name}.csv')
+
+    output_file = get_output_name(config['experiment_dir'], classification_source[0], model_name, return_subdir=False, add_raw = False)
 
     rerun = ((block_config['rerun_classification']) or (os.path.exists(output_file) == False))
 
@@ -164,23 +167,12 @@ def run_detect_molts(experiment_filemap, config, block_config):
     return output_file
 
 def run_fluorescence_quantification(experiment_filemap, config, block_config):
-    report_subdir = os.path.join(config['experiment_dir'], "analysis", "report")
 
     fluorescence_quantification_source = block_config['fluorescence_quantification_source'][0]
     fluorescence_quantification_channel = block_config['fluorescence_quantification_source'][1]
-    fluorescence_quantification_source_name = ""
-    if fluorescence_quantification_source != 'raw':
-        fluorescence_quantification_source_name = os.path.basename(os.path.normpath(fluorescence_quantification_source))+"_"
-
-    if fluorescence_quantification_channel is not None:
-        fluorescence_quantification_source_name += f'ch{fluorescence_quantification_channel+1}'
-    
-    fluorescence_quantification_source_name += '_fluo'
     normalization = block_config['fluorescence_quantification_normalization']
-    fluorescence_quantification_source_name += f'_{normalization}'
-    output_file = os.path.join(report_subdir, f'{fluorescence_quantification_source_name}.csv')
 
-
+    output_file = get_output_name(config['experiment_dir'], fluorescence_quantification_source,'fluo', channels=fluorescence_quantification_channel,return_subdir=False, add_raw = False, suffix = normalization)
 
     columns = [fluorescence_quantification_source, block_config['fluorescence_quantification_masks']]
 
@@ -206,6 +198,9 @@ def run_fluorescence_quantification(experiment_filemap, config, block_config):
         os.remove(pickled_block_config)
 
     return output_file
+
+def run_custom(experiment_filemap, config, block_config):
+    pass
 
 config_file = "./config.yaml"
 with open(config_file) as f:
@@ -238,178 +233,88 @@ def count_building_blocks_types(building_blocks):
 
 def build_config_of_building_blocks(building_blocks, config):
     building_block_counts = count_building_blocks_types(building_blocks)
-
-    segmentation_options = ['rerun_segmentation', 'segmentation_column', 'segmentation_method', 'segmentation_channels', 'augment_contrast', 'pixelsize', 'segmentation_backbone', 'sigma_canny']
-    straightening_options = ['rerun_straightening', 'straightening_source', 'straightening_masks']
-    volume_computation_options = ['rerun_volume_computation', 'volume_computation_masks', 'pixelsize']
-    classification_options = ['rerun_classification', 'classification_source', 'classifier', 'pixelsize']
-    molt_detection_options = ['rerun_molt_detection', 'molt_detection_volume', 'molt_detection_worm_type']
-    fluorescence_quantification_options = ['rerun_fluorescence_quantification', 'fluorescence_quantification_source', 'fluorescence_quantification_masks', 'fluorescence_quantification_normalization', 'pixelsize']
+    
+    options_map = {
+        "segmentation": ['rerun_segmentation', 'segmentation_column', 'segmentation_method', 'segmentation_channels', 'augment_contrast', 'pixelsize', 'segmentation_backbone', 'sigma_canny'],
+        "straightening": ['rerun_straightening', 'straightening_source', 'straightening_masks'],
+        "volume_computation": ['rerun_volume_computation', 'volume_computation_masks', 'pixelsize'],
+        "classification": ['rerun_classification', 'classification_source', 'classifier', 'pixelsize'],
+        "molt_detection": ['rerun_molt_detection', 'molt_detection_volume', 'molt_detection_worm_type'],
+        "fluorescence_quantification": ['rerun_fluorescence_quantification', 'fluorescence_quantification_source', 'fluorescence_quantification_masks', 'fluorescence_quantification_normalization', 'pixelsize'],
+        "custom" : ['custom_script_path', 'custom_script_parameters']
+    }
 
     blocks_config = {}
 
     for i, building_block in enumerate(building_blocks):
-        if building_block == "segmentation":
-            # assert that there are as many segmentation options as there are segmentation building blocks or that there is only one segmentation option
-            for option in segmentation_options:
-                assert len(config[option]) == len(building_block_counts[building_block]) or len(config[option]) == 1, f'The number of {option} options ({len(config[option])}) does not match the number of segmentation building blocks ({len(building_block_counts[building_block])})'
-            for option in segmentation_options:
-                if len(config[option]) == 1:
-                    config[option] = config[option] * len(building_block_counts[building_block])
-
-            # find the index of the segmentation building block
-            idx = np.argwhere(np.array(building_block_counts[building_block]) == i).squeeze()
+        if building_block in options_map:
+            options = options_map[building_block]
             
-            # set the options for the segmentation building block
-            options = {}
-            for option in segmentation_options:
-                options[option] = config[option][idx]
+            # assert options
+            for option in options:
+                assert len(config[option]) == len(building_block_counts[building_block]) or len(config[option]) == 1, f'The number of {option} options ({len(config[option])}) does not match the number of {building_block} building blocks ({len(building_block_counts[building_block])})'
             
-            blocks_config[i] = options
-        
-        elif building_block == "straightening":
-            # assert that there are as many straightening options as there are straightening building blocks or that there is only one straightening option
-            for option in straightening_options:
-                assert len(config[option]) == len(building_block_counts[building_block]) or len(config[option]) == 1, f'The number of {option} options ({len(config[option])}) does not match the number of straightening building blocks ({len(building_block_counts[building_block])})'
-            for option in straightening_options:
+            # expand single options to match the number of blocks
+            for option in options:
                 if len(config[option]) == 1:
                     config[option] = config[option] * len(building_block_counts[building_block])
             
-            # find the index of the straightening building block
+            # find the index of the building block
             idx = np.argwhere(np.array(building_block_counts[building_block]) == i).squeeze()
-
-            # set the options for the straightening building block
-            options = {}
-            for option in straightening_options:
-                options[option] = config[option][idx]
-
-            blocks_config[i] = options
-
-        elif building_block == "volume_computation":
-            # assert that there are as many volume computation options as there are volume computation building blocks or that there is only one volume computation option
-            for option in volume_computation_options:
-                assert len(config[option]) == len(building_block_counts[building_block]) or len(config[option]) == 1, f'The number of {option} options ({len(config[option])}) does not match the number of volume computation building blocks ({len(building_block_counts[building_block])})'
-            for option in volume_computation_options:
-                if len(config[option]) == 1:
-                    config[option] = config[option] * len(building_block_counts[building_block])
             
-            # find the index of the volume computation building block
-            idx = np.argwhere(np.array(building_block_counts[building_block]) == i).squeeze()
-
-            # set the options for the volume computation building block
-            options = {}
-            for option in volume_computation_options:
-                options[option] = config[option][idx]
-
-            blocks_config[i] = options
-
-        elif building_block == "classification":
-            # assert that there are as many worm type classification options as there are worm type classification building blocks or that there is only one worm type classification option
-            for option in classification_options:
-                assert len(config[option]) == len(building_block_counts[building_block]) or len(config[option]) == 1, f'The number of {option} options ({len(config[option])}) does not match the number of worm type classification building blocks ({len(building_block_counts[building_block])})'
-            for option in classification_options:
-                if len(config[option]) == 1:
-                    config[option] = config[option] * len(building_block_counts[building_block])
+            # set the options for the building block
+            block_options = {}
+            for option in options:
+                block_options[option] = config[option][idx]
             
-            # find the index of the worm type classification building block
-            idx = np.argwhere(np.array(building_block_counts[building_block]) == i).squeeze()
-
-            # set the options for the worm type classification building block
-            options = {}
-            for option in classification_options:
-                options[option] = config[option][idx]
-            
-            blocks_config[i] = options
-
-        elif building_block == "molt_detection":
-            # assert that there are as many molt detection options as there are molt detection building blocks or that there is only one molt detection option
-            for option in molt_detection_options:
-                assert len(config[option]) == len(building_block_counts[building_block]) or len(config[option]) == 1, f'The number of {option} options ({len(config[option])}) does not match the number of molt detection building blocks ({len(building_block_counts[building_block])})'
-            for option in molt_detection_options:
-                if len(config[option]) == 1:
-                    config[option] = config[option] * len(building_block_counts[building_block])
-            
-            # find the index of the molt detection building block
-            idx = np.argwhere(np.array(building_block_counts[building_block]) == i).squeeze()
-
-            # set the options for the molt detection building block
-            options = {}
-            for option in molt_detection_options:
-                options[option] = config[option][idx]
-            
-            blocks_config[i] = options
-
-        elif building_block == "fluorescence_quantification":
-            # assert that there are as many fluorescence quantification options as there are fluorescence quantification building blocks or that there is only one fluorescence quantification option
-            for option in fluorescence_quantification_options:
-                assert len(config[option]) == len(building_block_counts[building_block]) or len(config[option]) == 1, f'The number of {option} options ({len(config[option])}) does not match the number of fluorescence quantification building blocks ({len(building_block_counts[building_block])})'
-            for option in fluorescence_quantification_options:
-                if len(config[option]) == 1:
-                    config[option] = config[option] * len(building_block_counts[building_block])
-            
-            # find the index of the fluorescence quantification building block
-            idx = np.argwhere(np.array(building_block_counts[building_block]) == i).squeeze()
-
-            # set the options for the fluorescence quantification building block
-            options = {}
-            for option in fluorescence_quantification_options:
-                options[option] = config[option][idx]
-            
-            blocks_config[i] = options
+            blocks_config[i] = block_options
 
     return blocks_config
 
 blocks_config = build_config_of_building_blocks(building_blocks, config)
 
+def process_csv_results(experiment_filemap, report_subdir, csv_file, column_name_old, column_name_new, merge_cols=['Time', 'Point']):
+    dataframe = pd.read_csv(csv_file)
+    dataframe.rename(columns={column_name_old: column_name_new}, inplace=True)
+    if column_name_new in experiment_filemap.columns:
+        experiment_filemap.drop(columns=[column_name_new], inplace=True)
+    experiment_filemap = experiment_filemap.merge(dataframe, on=merge_cols, how='left')
+    experiment_filemap.to_csv(os.path.join(report_subdir, 'analysis_filemap.csv'), index=False)
+    return experiment_filemap
+
+blocks_config = build_config_of_building_blocks(building_blocks, config)
+
+building_block_functions = {
+    "segmentation": {"func": run_segmentation, "return_subdir": True},
+    "straightening": {"func": run_straightening, "return_subdir": True},
+    "volume_computation": {"func": run_compute_volume, "return_subdir": False, "column_name_old": 'Volume', "column_name_new_key": True},
+    "classification": {"func": run_classification, "return_subdir": False, "column_name_old": 'WormType', "column_name_new_key": True},
+    "molt_detection": {"func": run_detect_molts, "return_subdir":False, "process_molt": True},
+    "fluorescence_quantification": {"func": run_fluorescence_quantification, "return_subdir": False, "column_name_old": 'Fluo', "column_name_new_key": True},
+    "custom": {"func": run_custom, "return_subdir": False}
+}
+
 for i, building_block in enumerate(building_blocks):
     block_config = blocks_config[i]
-    if building_block == "segmentation":
-        segmentation_subdir = run_segmentation(experiment_filemap, config, block_config)
-        experiment_filemap = add_dir_to_experiment_filemap(
-            experiment_filemap, segmentation_subdir, f'analysis/{segmentation_subdir.split("analysis/")[-1]}')
-        experiment_filemap.to_csv(os.path.join(report_subdir, 'analysis_filemap.csv'), index=False)
-    elif building_block == "straightening":
-        straightening_subdir = run_straightening(experiment_filemap, config, block_config)
-        experiment_filemap = add_dir_to_experiment_filemap(
-            experiment_filemap, straightening_subdir, f'analysis/{straightening_subdir.split("analysis/")[-1]}')
-        experiment_filemap.to_csv(os.path.join(report_subdir, 'analysis_filemap.csv'), index=False)
-    elif building_block == "volume_computation":
-        volume_csv = run_compute_volume(experiment_filemap, config, block_config)
-        volume_dataframe = pd.read_csv(volume_csv)
-        column_name = os.path.splitext(os.path.basename(volume_csv))[0]
-        volume_dataframe.rename(columns={'Volume': f'{column_name}'}, inplace=True)
-        # check if column already exists
-        if column_name in experiment_filemap.columns:
-            experiment_filemap.drop(columns=[column_name], inplace=True)
-        experiment_filemap = experiment_filemap.merge(volume_dataframe, on=['Time', 'Point'], how='left')
-        experiment_filemap.to_csv(os.path.join(report_subdir, 'analysis_filemap.csv'), index=False)
-    elif building_block == "classification":
-        classification_csv = run_classification(experiment_filemap, config, block_config)
-        classification_dataframe = pd.read_csv(classification_csv)
-        column_name = os.path.splitext(os.path.basename(classification_csv))[0]
-        classification_dataframe.rename(columns={'WormType': f'{column_name}'}, inplace=True)
-        # check if column already exists
-        if column_name in experiment_filemap.columns:
-            experiment_filemap.drop(columns=[column_name], inplace=True)
-        experiment_filemap = experiment_filemap.merge(classification_dataframe, on=['Time', 'Point'], how='left')
-        experiment_filemap.to_csv(os.path.join(report_subdir, 'analysis_filemap.csv'), index=False)
-
-    elif building_block == "molt_detection":
-        run_detect_molts(experiment_filemap, config, block_config)
-        ecdysis_csv = pd.read_csv(os.path.join(report_subdir, 'ecdysis.csv'))
-        if 'M1' not in experiment_filemap.columns:
-            experiment_filemap = experiment_filemap.merge(ecdysis_csv, on=['Time', 'Point'], how='left')
+    if building_block in building_block_functions:
+        func_data = building_block_functions[building_block]
+        result = func_data["func"](experiment_filemap, config, block_config)
+        
+        if func_data.get("return_subdir"):
+            experiment_filemap = add_dir_to_experiment_filemap(
+                experiment_filemap, result, f'analysis/{result.split("analysis/")[-1]}'
+            )
             experiment_filemap.to_csv(os.path.join(report_subdir, 'analysis_filemap.csv'), index=False)
-
-    elif building_block == "fluorescence_quantification":
-        fluo_csv = run_fluorescence_quantification(experiment_filemap, config, block_config)
-        fluo_dataframe = pd.read_csv(fluo_csv)
-        column_name = os.path.splitext(os.path.basename(fluo_csv))[0]
-        fluo_dataframe.rename(columns={'Fluorescence': f'{column_name}'}, inplace=True)
-        # check if column already exists
-        if column_name in experiment_filemap.columns:
-            experiment_filemap.drop(columns=[column_name], inplace=True)
-        experiment_filemap = experiment_filemap.merge(fluo_dataframe, on=['Time', 'Point'], how='left')
-        experiment_filemap.to_csv(os.path.join(report_subdir, 'analysis_filemap.csv'), index=False)
+            
+        elif func_data.get("column_name_old") is not None:
+            column_name_new = os.path.splitext(os.path.basename(result))[0] if func_data.get("column_name_new_key") else func_data.get("column_name_new")
+            experiment_filemap = process_csv_results(experiment_filemap, report_subdir, result, func_data["column_name_old"], column_name_new)
+            
+        elif func_data.get("process_molt"):
+            ecdysis_csv = pd.read_csv(os.path.join(report_subdir, 'ecdysis.csv'))
+            if 'M1' not in experiment_filemap.columns:
+                experiment_filemap = experiment_filemap.merge(ecdysis_csv, on=['Time', 'Point'], how='left')
+                experiment_filemap.to_csv(os.path.join(report_subdir, 'analysis_filemap.csv'), index=False)
+        
     else:
-        print("Not implemented yet")
+        print(f"Functionality for {building_block} not implemented yet")
