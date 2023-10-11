@@ -4,33 +4,8 @@ import subprocess
 import pickle
 from towbintools.foundation import file_handling as file_handling
 import pandas as pd
-from pipeline_scripts.utils import pickle_objects, create_sbatch_file, get_and_create_folders, get_input_and_output_files, add_dir_to_experiment_filemap, create_temp_folders
+from pipeline_scripts.utils import pickle_objects, create_sbatch_file, get_and_create_folders, get_input_and_output_files, add_dir_to_experiment_filemap, create_temp_folders, get_output_name, run_command, cleanup_files
 import numpy as np
-
-def get_output_name(experiment_dir, input_name, task_name, channels = None, return_subdir = True, add_raw = False, suffix = None):
-
-    analysis_subdir = os.path.join(experiment_dir, "analysis")
-    report_subdir = os.path.join(analysis_subdir, "report")
-
-    output_name = ""
-    if channels is not None:
-        if type(channels) == list:
-            for channel in channels:
-                output_name += f'ch{channel+1}_'
-        else:
-            output_name += f'ch{channels+1}_'
-    if input_name != 'raw' or add_raw:
-        output_name += os.path.basename(os.path.normpath(input_name)) + "_"
-    output_name += task_name
-    if suffix is not None:
-        output_name += f'_{suffix}'
-    
-    if return_subdir:
-        output_name = os.path.join(analysis_subdir, output_name)
-        os.makedirs(output_name, exist_ok=True)
-    else:
-        output_name = os.path.join(report_subdir, f'{output_name}.csv')
-    return output_name
 
 def run_segmentation(experiment_filemap, config, block_config):
 
@@ -50,12 +25,10 @@ def run_segmentation(experiment_filemap, config, block_config):
         pickled_block_config = pickle_objects({'path': 'block_config', 'obj': block_config})[0]
 
         command = f"python3 ./pipeline_scripts/segment.py -i {input_pickle_path} -o {output_pickle_path} -c {pickled_block_config} -j {config['sbatch_cpus']}"
-        create_sbatch_file(
-            "seg", config['sbatch_cpus'], config['sbatch_time'], config['sbatch_memory'], command)
-        subprocess.run(["sbatch", f"./temp_files/batch/seg.sh"])
-        os.remove(input_pickle_path)
-        os.remove(output_pickle_path)
-        os.remove(pickled_block_config)
+
+        run_command(command, "seg", config)
+
+        cleanup_files(input_pickle_path, output_pickle_path, pickled_block_config)
     
     return segmentation_subdir
 
@@ -69,22 +42,14 @@ def run_straightening(experiment_filemap, config, block_config):
         experiment_filemap, columns, straightening_subdir, rerun=block_config['rerun_straightening'])
 
     if len(input_files) != 0:
-        input_source_images = [input_file[0] for input_file in input_files]
-        input_masks = [input_file[1] for input_file in input_files]
-        input_source_images_pickle_path, input_masks_pickle_path, straightening_output_files_pickle_path = pickle_objects({'path': 'input_source_images', 'obj': input_source_images}, {
-                                                                                                                        'path': 'input_masks', 'obj': input_masks}, {'path': 'straightening_output_files', 'obj': straightening_output_files})
+        input_files = [{'source_image_path': input_source_image, 'mask_path': input_mask} for input_source_image, input_mask in input_files]
+
+        input_pickle_path, output_pickle_path = pickle_objects({'path': 'input_files', 'obj': input_files}, {'path': 'straightening_output_files', 'obj': straightening_output_files})
 
         pickled_block_config = pickle_objects({'path': 'block_config', 'obj': block_config})[0]
-
-        command = f"python3 ./pipeline_scripts/straighten.py -i {input_source_images_pickle_path} -m {input_masks_pickle_path} -o {straightening_output_files_pickle_path} -c {pickled_block_config} -j {config['sbatch_cpus']}"
-        create_sbatch_file(
-            "str", config['sbatch_cpus'], config['sbatch_time'], config['sbatch_memory'], command)
-        subprocess.run(["sbatch", f"./temp_files/batch/str.sh"])
-
-        os.remove(input_source_images_pickle_path)
-        os.remove(input_masks_pickle_path)
-        os.remove(straightening_output_files_pickle_path)
-        os.remove(pickled_block_config)
+        command = f"python3 ./pipeline_scripts/straighten.py -i {input_pickle_path} -o {output_pickle_path} -c {pickled_block_config} -j {config['sbatch_cpus']}"
+        run_command(command, "str", config)
+        cleanup_files(input_pickle_path, output_pickle_path, pickled_block_config)
     
     return straightening_subdir
 
@@ -107,12 +72,8 @@ def run_compute_volume(experiment_filemap, config, block_config):
         pickled_block_config = pickle_objects({'path': 'block_config', 'obj': block_config})[0]
 
         command = f"python3 ./pipeline_scripts/compute_volume.py -i {input_files_pickle_path} -o {output_file} -c {pickled_block_config} -j {config['sbatch_cpus']}"
-        create_sbatch_file(
-            "vol", config['sbatch_cpus'], config['sbatch_time'], config['sbatch_memory'], command)
-        subprocess.run(["sbatch", f"./temp_files/batch/vol.sh"])
-
-        os.remove(input_files_pickle_path)
-        os.remove(pickled_block_config)
+        run_command(command, "vol", config)
+        cleanup_files(input_files_pickle_path, pickled_block_config)
     
     return output_file
 
@@ -138,12 +99,8 @@ def run_classification(experiment_filemap, config, block_config):
         pickled_block_config = pickle_objects({'path': 'block_config', 'obj': block_config})[0]
 
         command = f"python3 ./pipeline_scripts/classify.py -i {input_files_pickle_path} -o {output_file} -c {pickled_block_config} -j {config['sbatch_cpus']}"
-        create_sbatch_file(
-            "class", config['sbatch_cpus'], config['sbatch_time'], config['sbatch_memory'], command)
-        subprocess.run(["sbatch", f"./temp_files/batch/class.sh"])
-
-        os.remove(input_files_pickle_path)
-        os.remove(pickled_block_config)
+        run_command(command, "class", config)
+        cleanup_files(input_files_pickle_path, pickled_block_config)
     
     return output_file
 
@@ -158,11 +115,8 @@ def run_detect_molts(experiment_filemap, config, block_config):
     if rerun:
         pickled_block_config = pickle_objects({'path': 'block_config', 'obj': block_config})[0]
         command = f"python3 ./pipeline_scripts/detect_molts.py -i {experiment_filemap_pickle_path} -o {output_file} -c {pickled_block_config} -j {config['sbatch_cpus']}"
-        create_sbatch_file(
-            "molt", config['sbatch_cpus'], config['sbatch_time'], config['sbatch_memory'], command)
-        subprocess.run(["sbatch", f"./temp_files/batch/molt.sh"])
-        os.remove(experiment_filemap_pickle_path)
-        os.remove(pickled_block_config)
+        run_command(command, "molt", config)
+        cleanup_files(experiment_filemap_pickle_path, pickled_block_config)
 
     return output_file
 
@@ -181,21 +135,15 @@ def run_fluorescence_quantification(experiment_filemap, config, block_config):
     rerun = ((block_config['rerun_fluorescence_quantification']) or (os.path.exists(output_file) == False))
 
     if len(input_files) != 0 and rerun:
-        input_source_images = [input_file[0] for input_file in input_files]
-        input_masks = [input_file[1] for input_file in input_files]
-        input_source_images_pickle_path, input_masks_pickle_path = pickle_objects({'path': 'input_source_images', 'obj': input_source_images}, {'path': 'input_masks', 'obj': input_masks})
+
+        input_files = [{'source_image_path': input_source_image, 'mask_path': input_mask} for input_source_image, input_mask in input_files]
+        input_pickle_path = pickle_objects({'path': 'input_files', 'obj': input_files})[0]
         
         pickled_block_config = pickle_objects({'path': 'block_config', 'obj': block_config})[0]
 
-        command = f"python3 ./pipeline_scripts/quantify_fluorescence.py -i {input_source_images_pickle_path} -m {input_masks_pickle_path} -o {output_file} -c {pickled_block_config} -j {config['sbatch_cpus']}"
-
-        create_sbatch_file(
-            "fluo", config['sbatch_cpus'], config['sbatch_time'], config['sbatch_memory'], command)
-        subprocess.run(["sbatch", f"./temp_files/batch/fluo.sh"])
-
-        os.remove(input_source_images_pickle_path)
-        os.remove(input_masks_pickle_path)
-        os.remove(pickled_block_config)
+        command = f"python3 ./pipeline_scripts/quantify_fluorescence.py -i {input_pickle_path} -o {output_file} -c {pickled_block_config} -j {config['sbatch_cpus']}"
+        run_command(command, "fluo", config)
+        cleanup_files(input_pickle_path, pickled_block_config)
 
     return output_file
 
