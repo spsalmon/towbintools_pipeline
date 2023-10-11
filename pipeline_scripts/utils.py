@@ -2,6 +2,7 @@ import pickle
 import argparse
 from towbintools.foundation import file_handling as file_handling
 import os
+import subprocess
 
 # ----BOILERPLATE CODE FOR FILE HANDLING----
 
@@ -13,19 +14,32 @@ def get_and_create_folders(config):
     report_subdir = os.path.join(analysis_subdir, "report")
     os.makedirs(report_subdir, exist_ok=True)
 
-    # segmentation_subdir_name = "ch"
-    # for channel in config['segmentation_channels']:
-    #     segmentation_subdir_name += str(channel+1) + "_"
-    # segmentation_subdir_name += "seg"
-    # segmentation_subdir = os.path.join(
-    #     analysis_subdir, segmentation_subdir_name)
-    # os.makedirs(segmentation_subdir, exist_ok=True)
-
-    # straightening_subdir = os.path.join(
-    #     analysis_subdir, f'{segmentation_subdir_name}_str')
-    # os.makedirs(straightening_subdir, exist_ok=True)
-
     return experiment_dir, raw_subdir, analysis_subdir, report_subdir
+
+def get_output_name(experiment_dir, input_name, task_name, channels = None, return_subdir = True, add_raw = False, suffix = None):
+
+    analysis_subdir = os.path.join(experiment_dir, "analysis")
+    report_subdir = os.path.join(analysis_subdir, "report")
+
+    output_name = ""
+    if channels is not None:
+        if type(channels) == list:
+            for channel in channels:
+                output_name += f'ch{channel+1}_'
+        else:
+            output_name += f'ch{channels+1}_'
+    if input_name != 'raw' or add_raw:
+        output_name += os.path.basename(os.path.normpath(input_name)) + "_"
+    output_name += task_name
+    if suffix is not None:
+        output_name += f'_{suffix}'
+    
+    if return_subdir:
+        output_name = os.path.join(analysis_subdir, output_name)
+        os.makedirs(output_name, exist_ok=True)
+    else:
+        output_name = os.path.join(report_subdir, f'{output_name}.csv')
+    return output_name
 
 def create_temp_folders():
     temp_dir = "./temp_files"
@@ -80,7 +94,16 @@ def pickle_objects(*objects):
         pickled_paths.append(pickled_path)
     return pickled_paths
 
+def cleanup_files(*filepaths):
+    for filepath in filepaths:
+        os.remove(filepath)
+        
 # ----BOILERPLATE CODE FOR SLURM----
+
+def run_command(command, script_name, config):
+    create_sbatch_file(script_name, config['sbatch_cpus'], config['sbatch_time'], 
+                       config['sbatch_memory'], command)
+    subprocess.run(["sbatch", f"./temp_files/batch/{script_name}.sh"])
 
 def create_sbatch_file(job_name, cores, time_limit, memory, command):
     content = f"""#!/bin/bash
