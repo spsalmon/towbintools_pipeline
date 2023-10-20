@@ -1,6 +1,6 @@
-experiment_dir: "/mnt/external.data/TowbinLab/spsalmon/pipeline_test_folder/"
+experiment_dir: "/mnt/towbin.data/shared/ngerber/20230927_LIPSI_20x_348_297_20C_20230927_165930_303/pad2/"
 
-building_blocks: ["segmentation", "straightening", "straightening", "volume_computation", "classification", "molt_detection", "fluorescence_quantification"]
+building_blocks: ["segmentation", "straightening"]
 
 rerun_segmentation: [False]
 rerun_straightening: [False]
@@ -12,15 +12,15 @@ rerun_fluorescence_quantification: [False]
 # segmentation parameters
 segmentation_column: ['raw']
 segmentation_method: ["edge_based"]
-segmentation_channels: [[0]]
+segmentation_channels: [[2]]
 augment_contrast: [False]
 pixelsize: [0.65]
 segmentation_backbone: ["skimage"]
 sigma_canny: [1]
 
 # straightening parameters
-straightening_source: [['analysis/ch1_seg', null], ['raw', 0]]
-straightening_masks: ['analysis/ch1_seg']
+straightening_source: [['raw', 1]]
+straightening_masks: ['analysis/ch3_seg']
 
 # volume computation parameters
 volume_computation_masks: ['analysis/ch1_seg_str']
