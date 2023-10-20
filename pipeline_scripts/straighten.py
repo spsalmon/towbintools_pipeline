@@ -1,4 +1,4 @@
-from worm_tools import straightening
+from towbintools.straightening import Warper
 from towbintools.foundation import image_handling, binary_image
 
 import numpy as np
@@ -10,19 +10,26 @@ import argparse
 import yaml
 import utils
 
-# ----END BOILERPLATE CODE FOR COMMAND LINE INTERFACE----
-
-def straighten_and_save(source_image_path, source_image_channel, mask_path, output_path):
+def straighten_and_save(source_image_path, source_image_channels, mask_path, output_path, channel_to_allign=0):
     """Straighten image and save to output_path."""
     mask = image_handling.read_tiff_file(mask_path)
     if source_image_path is None:
         image = mask
     else:
-        image = image_handling.read_tiff_file(source_image_path, channels_to_keep=[source_image_channel])
+        image = image_handling.read_tiff_file(source_image_path)
+
+
+        image_to_allign = image[channel_to_allign]
+
     try:
         mask = binary_image.get_biggest_object(mask)
-        transformer = straightening.Warper.from_img(image, mask)
-        straightened_image = transformer.warp_2D_img(image, 0)
+        warper = Warper.from_img(image, mask)
+
+        straightened_channels = []
+        for channel in source_image_channels:
+            straightened_channels.append(warper.warp_2D_img(image[channel], 0))
+
+        straightened_image = np.stack(straightened_channels, axis=0)
 
         if np.max(straightened_image) == 1 and np.min(straightened_image) == 0:
             straightened_image = binary_fill_holes(straightened_image)
