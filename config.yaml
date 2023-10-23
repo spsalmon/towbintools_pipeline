@@ -15,8 +15,14 @@ segmentation_method: ["edge_based"]
 segmentation_channels: [[2]]
 augment_contrast: [False]
 pixelsize: [0.65]
-segmentation_backbone: ["skimage"]
 sigma_canny: [1]
+
+model_path: ["/home/spsalmon/towbintools/towbintools/deep_learning/unet_confocal/good_confocal.ckpt"]
+tiler_config: [[(512, 512), (256, 256)]]
+RGB: [True]
+activation_layer: [null]
+batch_size: [-1]
+
 
 # straightening parameters
 straightening_source: [['raw', 1]]
