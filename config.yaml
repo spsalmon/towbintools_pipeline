@@ -1,6 +1,6 @@
 experiment_dir: "/mnt/towbin.data/shared/ngerber/20230927_LIPSI_20x_348_297_20C_20230927_165930_303/pad2/"
 
-building_blocks: ["segmentation", "straightening"]
+building_blocks: ["straightening"]
 
 rerun_segmentation: [False]
 rerun_straightening: [False]
@@ -11,21 +11,26 @@ rerun_fluorescence_quantification: [False]
 
 # segmentation parameters
 segmentation_column: ['raw']
-segmentation_method: ["edge_based"]
+segmentation_method: ["deep_learning"]
 segmentation_channels: [[2]]
 augment_contrast: [False]
+
+# edge-based segmentation parameters
 pixelsize: [0.65]
 sigma_canny: [1]
 
-model_path: ["/home/spsalmon/towbintools/towbintools/deep_learning/unet_confocal/good_confocal.ckpt"]
-tiler_config: [[(512, 512), (256, 256)]]
+# deep learning segmentation parameters
+model_path: ["/home/spsalmon/towbintools/towbintools/deep_learning/unet_confocal/epoch=105-step=16854.ckpt"]
+tiler_config: [[[512, 512], [256, 256]]]
 RGB: [True]
 activation_layer: [null]
 batch_size: [-1]
 
+# ilastik segmentation parameters
+ilastik_project_path: [null]
 
 # straightening parameters
-straightening_source: [['raw', 1]]
+straightening_source: [['raw', [0,1]]]
 straightening_masks: ['analysis/ch3_seg']
 
 # volume computation parameters
@@ -50,6 +55,6 @@ custom_script_parameters : [null]
 
 # sbatch parameters
 sbatch_memory: 128G
-sbatch_time: 0-12:00:00
+sbatch_time: 0-48:00:00
 sbatch_cpus: 32
-sbatch_gpus: 0
+sbatch_gpus: 1
