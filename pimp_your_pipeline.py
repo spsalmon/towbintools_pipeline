@@ -24,7 +24,7 @@ def run_segmentation(experiment_filemap, config, block_config):
         
         pickled_block_config = pickle_objects({'path': 'block_config', 'obj': block_config})[0]
 
-        command = f"python3 ./pipeline_scripts/segment.py -i {input_pickle_path} -o {output_pickle_path} -c {pickled_block_config} -j {config['sbatch_cpus']}"
+        command = f"micromamba run -e towbintools python3 ./pipeline_scripts/segment.py -i {input_pickle_path} -o {output_pickle_path} -c {pickled_block_config} -j {config['sbatch_cpus']}"
 
         run_command(command, "seg", config)
 
@@ -38,6 +38,20 @@ def run_straightening(experiment_filemap, config, block_config):
     straightening_subdir = get_output_name(config['experiment_dir'], block_config['straightening_source'][0], 'str', channels = block_config['straightening_source'][1], return_subdir=True, add_raw = True)
 
     columns = [block_config['straightening_source'][0], block_config['straightening_masks']]
+
+    for column in columns:
+        if column not in experiment_filemap.columns:
+            try:
+                experiment_dir = config['experiment_dir']
+                report_subdir = os.path.join(experiment_dir, "analysis", "report")
+                column_subdir = os.path.join(experiment_dir, column)
+                experiment_filemap = add_dir_to_experiment_filemap(experiment_filemap, column_subdir, column)
+                experiment_filemap.to_csv(os.path.join(report_subdir, 'analysis_filemap.csv'), index=False)
+            except Exception as e:
+                print(e)
+                print(f'Could not find {column} in the experiment_filemap and could not infer the files that it would contain.')
+                return straightening_subdir
+
     input_files, straightening_output_files = get_input_and_output_files(
         experiment_filemap, columns, straightening_subdir, rerun=block_config['rerun_straightening'])
 
@@ -47,7 +61,7 @@ def run_straightening(experiment_filemap, config, block_config):
         input_pickle_path, output_pickle_path = pickle_objects({'path': 'input_files', 'obj': input_files}, {'path': 'straightening_output_files', 'obj': straightening_output_files})
 
         pickled_block_config = pickle_objects({'path': 'block_config', 'obj': block_config})[0]
-        command = f"python3 ./pipeline_scripts/straighten.py -i {input_pickle_path} -o {output_pickle_path} -c {pickled_block_config} -j {config['sbatch_cpus']}"
+        command = f"micromamba run -e towbintools python3 ./pipeline_scripts/straighten.py -i {input_pickle_path} -o {output_pickle_path} -c {pickled_block_config} -j {config['sbatch_cpus']}"
         run_command(command, "str", config)
         cleanup_files(input_pickle_path, output_pickle_path, pickled_block_config)
     
@@ -71,7 +85,7 @@ def run_compute_volume(experiment_filemap, config, block_config):
         
         pickled_block_config = pickle_objects({'path': 'block_config', 'obj': block_config})[0]
 
-        command = f"python3 ./pipeline_scripts/compute_volume.py -i {input_files_pickle_path} -o {output_file} -c {pickled_block_config} -j {config['sbatch_cpus']}"
+        command = f"micromamba run -e towbintools python3 ./pipeline_scripts/compute_volume.py -i {input_files_pickle_path} -o {output_file} -c {pickled_block_config} -j {config['sbatch_cpus']}"
         run_command(command, "vol", config)
         cleanup_files(input_files_pickle_path, pickled_block_config)
     
@@ -98,7 +112,7 @@ def run_classification(experiment_filemap, config, block_config):
         
         pickled_block_config = pickle_objects({'path': 'block_config', 'obj': block_config})[0]
 
-        command = f"python3 ./pipeline_scripts/classify.py -i {input_files_pickle_path} -o {output_file} -c {pickled_block_config} -j {config['sbatch_cpus']}"
+        command = f"micromamba run -e towbintools python3 ./pipeline_scripts/classify.py -i {input_files_pickle_path} -o {output_file} -c {pickled_block_config} -j {config['sbatch_cpus']}"
         run_command(command, "class", config)
         cleanup_files(input_files_pickle_path, pickled_block_config)
     
@@ -114,7 +128,7 @@ def run_detect_molts(experiment_filemap, config, block_config):
 
     if rerun:
         pickled_block_config = pickle_objects({'path': 'block_config', 'obj': block_config})[0]
-        command = f"python3 ./pipeline_scripts/detect_molts.py -i {experiment_filemap_pickle_path} -o {output_file} -c {pickled_block_config} -j {config['sbatch_cpus']}"
+        command = f"micromamba run -e towbintools python3 ./pipeline_scripts/detect_molts.py -i {experiment_filemap_pickle_path} -o {output_file} -c {pickled_block_config} -j {config['sbatch_cpus']}"
         run_command(command, "molt", config)
         cleanup_files(experiment_filemap_pickle_path, pickled_block_config)
 
@@ -141,7 +155,7 @@ def run_fluorescence_quantification(experiment_filemap, config, block_config):
         
         pickled_block_config = pickle_objects({'path': 'block_config', 'obj': block_config})[0]
 
-        command = f"python3 ./pipeline_scripts/quantify_fluorescence.py -i {input_pickle_path} -o {output_file} -c {pickled_block_config} -j {config['sbatch_cpus']}"
+        command = f"micromamba run -e towbintools python3 ./pipeline_scripts/quantify_fluorescence.py -i {input_pickle_path} -o {output_file} -c {pickled_block_config} -j {config['sbatch_cpus']}"
         run_command(command, "fluo", config)
         cleanup_files(input_pickle_path, pickled_block_config)
 
@@ -183,7 +197,7 @@ def build_config_of_building_blocks(building_blocks, config):
     building_block_counts = count_building_blocks_types(building_blocks)
     
     options_map = {
-        "segmentation": ['rerun_segmentation', 'segmentation_column', 'segmentation_method', 'segmentation_channels', 'augment_contrast', 'pixelsize', 'segmentation_backbone', 'sigma_canny'],
+        "segmentation": ['rerun_segmentation', 'segmentation_column', 'segmentation_method', 'segmentation_channels', 'augment_contrast', 'pixelsize', 'sigma_canny', 'model_path', 'tiler_config', 'RGB', 'activation_layer', 'batch_size', 'ilastik_project_path'],
         "straightening": ['rerun_straightening', 'straightening_source', 'straightening_masks'],
         "volume_computation": ['rerun_volume_computation', 'volume_computation_masks', 'pixelsize'],
         "classification": ['rerun_classification', 'classification_source', 'classifier', 'pixelsize'],

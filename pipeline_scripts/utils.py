@@ -55,6 +55,16 @@ def get_input_and_output_files(experiment_filemap, columns, output_dir, rerun=Tr
 
     for _, row in experiment_filemap.iterrows():
 
+        # input_file = []
+        # for column in columns:
+        #     try:
+        #         input_file.append(row[column])
+        #     except KeyError:
+        #         experiment_dir = experiment_filemap['raw'][0].split('raw')[0]
+        #         analysis_dir = os.path.join(experiment_dir, column)
+        #         experiment_filemap = add_dir_to_experiment_filemap(experiment_filemap, analysis_dir, column)
+                
+        #         input_file.append(row[column])
         input_file = [row[column] for column in columns]
         output_file = os.path.join(
             output_dir, os.path.basename(row[columns[0]]))
@@ -101,16 +111,20 @@ def cleanup_files(*filepaths):
 # ----BOILERPLATE CODE FOR SLURM----
 
 def run_command(command, script_name, config):
-    create_sbatch_file(script_name, config['sbatch_cpus'], config['sbatch_time'], 
-                       config['sbatch_memory'], command)
+    if config['sbatch_gpus'] == 0 or config['sbatch_gpus'] is None:
+        create_sbatch_file(script_name, config['sbatch_cpus'], config['sbatch_time'], config['sbatch_memory'], command)
+    else:
+        create_sbatch_file(script_name, config['sbatch_cpus'], config['sbatch_time'],
+                       config['sbatch_memory'], command, gpus= config['sbatch_gpus'])
     subprocess.run(["sbatch", f"./temp_files/batch/{script_name}.sh"])
 
-def create_sbatch_file(job_name, cores, time_limit, memory, command):
+def create_sbatch_file(job_name, cores, time_limit, memory, command, gpus=0):
     content = f"""#!/bin/bash
 #SBATCH -J {job_name}
 #SBATCH -o ./temp_files/sbatch_output/{job_name}.out
 #SBATCH -e ./temp_files/sbatch_output/{job_name}.err
 #SBATCH -c {cores}
+#SBATCH --gres=gpu:{gpus}
 #SBATCH -t {time_limit}
 #SBATCH --mem={memory}
 #SBATCH --wait
