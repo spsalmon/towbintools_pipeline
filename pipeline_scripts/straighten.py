@@ -16,7 +16,7 @@ def mask_preprocessing(mask):
     if mask.ndim == 2:
         mask = binary_image.get_biggest_object(mask)
         mask = binary_fill_holes(mask)
-        mask = cv2.medianBlur(mask, 7)
+        mask = cv2.medianBlur(mask.astype(np.uint8), 7)
         return mask
 
     # find mean mask size for each plane
@@ -51,10 +51,20 @@ def straighten_and_save(source_image_path, source_image_channels, mask_path, out
     except Exception as e:
         print(e)
         straightened_image = np.zeros_like(mask).astype(np.uint8)
-        # add empty channel dimension
-        straightened_image = straightened_image[:, np.newaxis, ...]
+        # add empty channel dimension if is_zstack is True
+        if is_zstack:
+            straightened_image = straightened_image[:, np.newaxis, ...]
 
-    imwrite(output_path, straightened_image, imagej=True, compression='zlib', metadata={'axes': 'ZCYX'})
+    if straightened_image.ndim == 2:
+        print(straightened_image.shape)
+        imwrite(output_path, straightened_image, imagej=True, compression='zlib', metadata={'axes': 'YX'})
+
+    elif straightened_image.ndim == 3:
+        print(straightened_image.shape)
+        imwrite(output_path, straightened_image, imagej=True, compression='zlib', metadata={'axes': 'ZYX'})
+    else:
+        print(straightened_image.shape)
+        imwrite(output_path, straightened_image, imagej=True, compression='zlib', metadata={'axes': 'ZCYX'})
 
 def get_image(source_image_path, mask, is_zstack, channel_to_allign, source_image_channels):
     """Get the image to be straightened."""
@@ -81,8 +91,13 @@ def straighten_zstack_image(image, mask):
 
 def straighten_2D_image(image, mask):
     """Straighten a 2D image."""
-    warper = Warper.from_img(image, mask)
-    return warper.warp_2D_img(image)
+    if image.ndim == 3:
+        warper = Warper.from_img(image[0], mask)
+        straightened_channels = [warper.warp_2D_img(image[channel, ...], 0) for channel in range(image.shape[0])]
+        return np.stack(straightened_channels, axis=0).astype(np.uint16)
+    else:
+        warper = Warper.from_img(image, mask)
+        return warper.warp_2D_img(image, 0).astype(np.uint16)
 
 
 def main(input_pickle, output_pickle, config, n_jobs):
