@@ -1,4 +1,5 @@
 pyyaml
+"pretrained-microscopy-models@git+https://github.com/nasa/pretrained-microscopy-models"
 shiny
 shinywidgets
 plotly
