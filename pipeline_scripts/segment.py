@@ -7,6 +7,7 @@ import numpy as np
 from tifffile import imwrite
 import os
 from joblib import Parallel, delayed
+from joblib import wrap_non_picklable_objects
 import utils
 import torch
 from towbintools.deep_learning.architectures import models
@@ -32,11 +33,12 @@ def segment_and_save(image_path, output_path, method, augment_contrast=False, cl
 def segment_image_ilastik(image, pipeline):
     """Segment image using ilastik pipeline."""
     image = DataArray(image, dims=['y', 'x'])
-    mask = pipeline.get_probabilities(image)>0.5
+    mask = pipeline.get_probabilities(image)[..., 0]>0.5
     return mask
 
-def segment_and_save_ilastik(image_path, output_path, pipeline, augment_contrast=False, clip_limit=5, channels=[], is_zstack=False):
+def segment_and_save_ilastik(image_path, output_path, ilastik_project_path, augment_contrast=False, clip_limit=5, channels=[], is_zstack=False):
     """Segment image using ilastik and save to output_path."""
+    pipeline = PixelClassificationPipeline.from_ilp_file(ilastik_project_path)
     image = image_handling.read_tiff_file(image_path, channels_to_keep=channels).squeeze()
 
     if (image.ndim > 2) and (is_zstack == False):
@@ -51,6 +53,8 @@ def segment_and_save_ilastik(image_path, output_path, pipeline, augment_contrast
             mask[i] = segment_image_ilastik(plane, pipeline)
     else:
         mask = segment_image_ilastik(image, pipeline)
+
+    print(mask.shape)
 
     imwrite(output_path, mask.astype(np.uint8), compression="zlib", ome=True)
     
@@ -100,8 +104,7 @@ def main(input_pickle, output_pickle, config, n_jobs):
             'segmentation_channels'], model=model, tiler=tiler, RGB=config['RGB'], preprocessing_fn=preprocessing_fn,activation=config['activation_layer'], device = device, batch_size=config['batch_size'], is_zstack=is_zstack) for input_file, output_path in zip(input_files, output_files)]
         
     elif config['segmentation_method'] == 'ilastik':
-        pipeline = PixelClassificationPipeline.from_ilp_file(config['ilastik_project_path'])
-        Parallel(n_jobs=n_jobs)(delayed(segment_and_save_ilastik)(input_file, output_path, pipeline, augment_contrast=config['augment_contrast'], channels=config[
+        Parallel(n_jobs=n_jobs)(delayed(segment_and_save_ilastik)(input_file, output_path, ilastik_project_path = config['ilastik_project_path'], augment_contrast=config['augment_contrast'], channels=config[
             'segmentation_channels'], is_zstack=is_zstack) for input_file, output_path in zip(input_files, output_files))
 
 if __name__ == '__main__':

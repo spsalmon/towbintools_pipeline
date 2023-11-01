@@ -24,7 +24,7 @@ def run_segmentation(experiment_filemap, config, block_config):
         
         pickled_block_config = pickle_objects({'path': 'block_config', 'obj': block_config})[0]
 
-        command = f"micromamba run -e towbintools python3 ./pipeline_scripts/segment.py -i {input_pickle_path} -o {output_pickle_path} -c {pickled_block_config} -j {config['sbatch_cpus']}"
+        command = f"~/.local/bin/micromamba run -n towbintools python3 ./pipeline_scripts/segment.py -i {input_pickle_path} -o {output_pickle_path} -c {pickled_block_config} -j {config['sbatch_cpus']}"
 
         run_command(command, "seg", config)
 
@@ -61,7 +61,7 @@ def run_straightening(experiment_filemap, config, block_config):
         input_pickle_path, output_pickle_path = pickle_objects({'path': 'input_files', 'obj': input_files}, {'path': 'straightening_output_files', 'obj': straightening_output_files})
 
         pickled_block_config = pickle_objects({'path': 'block_config', 'obj': block_config})[0]
-        command = f"micromamba run -e towbintools python3 ./pipeline_scripts/straighten.py -i {input_pickle_path} -o {output_pickle_path} -c {pickled_block_config} -j {config['sbatch_cpus']}"
+        command = f"~/.local/bin/micromamba run -n towbintools python3 ./pipeline_scripts/straighten.py -i {input_pickle_path} -o {output_pickle_path} -c {pickled_block_config} -j {config['sbatch_cpus']}"
         run_command(command, "str", config)
         cleanup_files(input_pickle_path, output_pickle_path, pickled_block_config)
     
@@ -85,7 +85,7 @@ def run_compute_volume(experiment_filemap, config, block_config):
         
         pickled_block_config = pickle_objects({'path': 'block_config', 'obj': block_config})[0]
 
-        command = f"micromamba run -e towbintools python3 ./pipeline_scripts/compute_volume.py -i {input_files_pickle_path} -o {output_file} -c {pickled_block_config} -j {config['sbatch_cpus']}"
+        command = f"~/.local/bin/micromamba run -n towbintools python3 ./pipeline_scripts/compute_volume.py -i {input_files_pickle_path} -o {output_file} -c {pickled_block_config} -j {config['sbatch_cpus']}"
         run_command(command, "vol", config)
         cleanup_files(input_files_pickle_path, pickled_block_config)
     
@@ -112,7 +112,7 @@ def run_classification(experiment_filemap, config, block_config):
         
         pickled_block_config = pickle_objects({'path': 'block_config', 'obj': block_config})[0]
 
-        command = f"micromamba run -e towbintools python3 ./pipeline_scripts/classify.py -i {input_files_pickle_path} -o {output_file} -c {pickled_block_config} -j {config['sbatch_cpus']}"
+        command = f"~/.local/bin/micromamba run -n towbintools python3 ./pipeline_scripts/classify.py -i {input_files_pickle_path} -o {output_file} -c {pickled_block_config} -j {config['sbatch_cpus']}"
         run_command(command, "class", config)
         cleanup_files(input_files_pickle_path, pickled_block_config)
     
@@ -128,7 +128,7 @@ def run_detect_molts(experiment_filemap, config, block_config):
 
     if rerun:
         pickled_block_config = pickle_objects({'path': 'block_config', 'obj': block_config})[0]
-        command = f"micromamba run -e towbintools python3 ./pipeline_scripts/detect_molts.py -i {experiment_filemap_pickle_path} -o {output_file} -c {pickled_block_config} -j {config['sbatch_cpus']}"
+        command = f"~/.local/bin/micromamba run -n towbintools python3 ./pipeline_scripts/detect_molts.py -i {experiment_filemap_pickle_path} -o {output_file} -c {pickled_block_config} -j {config['sbatch_cpus']}"
         run_command(command, "molt", config)
         cleanup_files(experiment_filemap_pickle_path, pickled_block_config)
 
@@ -155,7 +155,7 @@ def run_fluorescence_quantification(experiment_filemap, config, block_config):
         
         pickled_block_config = pickle_objects({'path': 'block_config', 'obj': block_config})[0]
 
-        command = f"micromamba run -e towbintools python3 ./pipeline_scripts/quantify_fluorescence.py -i {input_pickle_path} -o {output_file} -c {pickled_block_config} -j {config['sbatch_cpus']}"
+        command = f"~/.local/bin/micromamba run -n towbintools python3 ./pipeline_scripts/quantify_fluorescence.py -i {input_pickle_path} -o {output_file} -c {pickled_block_config} -j {config['sbatch_cpus']}"
         run_command(command, "fluo", config)
         cleanup_files(input_pickle_path, pickled_block_config)
 

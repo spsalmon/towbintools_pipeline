@@ -1,6 +1,6 @@
-experiment_dir: "/mnt/towbin.data/shared/ngerber/20230927_LIPSI_20x_348_297_20C_20230927_165930_303/pad2/"
+experiment_dir: "/mnt/external.data/TowbinLab/spsalmon/pipeline_test_folder/"
 
-building_blocks: ["straightening"]
+building_blocks: ["segmentation", "straightening"]
 
 rerun_segmentation: [False]
 rerun_straightening: [False]
@@ -11,8 +11,8 @@ rerun_fluorescence_quantification: [False]
 
 # segmentation parameters
 segmentation_column: ['raw']
-segmentation_method: ["deep_learning"]
-segmentation_channels: [[2]]
+segmentation_method: ["ilastik"]
+segmentation_channels: [[0]]
 augment_contrast: [False]
 
 # edge-based segmentation parameters
@@ -27,11 +27,11 @@ activation_layer: [null]
 batch_size: [-1]
 
 # ilastik segmentation parameters
-ilastik_project_path: [null]
+ilastik_project_path: ["/mnt/external.data/TowbinLab/kstojanovski/20230602_Orca_10x_16hIAA_wBT160-182-186-190_20230603_091744_737/doc/ilastikProjectFiles/pharynx_str_noCPR.ilp"]
 
 # straightening parameters
 straightening_source: [['raw', [0,1]]]
-straightening_masks: ['analysis/ch3_seg']
+straightening_masks: ['analysis/ch1_seg']
 
 # volume computation parameters
 volume_computation_masks: ['analysis/ch1_seg_str']
