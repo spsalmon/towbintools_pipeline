@@ -1,9 +1,5 @@
 #!/bin/bash
 
-# Install micromamba
-
-"${SHELL}" <(curl -L micro.mamba.pm/install.sh)
-
 # Update micromamba
 
 micromamba self-update

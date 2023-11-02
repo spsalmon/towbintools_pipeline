@@ -73,6 +73,16 @@ cd
 git clone https://github.com/spsalmon/towbintools_pipeline.git
 ```
 
+- Install micromamba and restart your shell :
+
+```bash
+"${SHELL}" <(curl -L micro.mamba.pm/install.sh)
+```
+
+```bash
+source ~/.bashrc
+```
+
 - Run the installation script :
 
 ```bash
@@ -80,7 +90,7 @@ chmod +x ~/towbintools_pipeline/pipeline_instalation_script.sh
 ```
 
 ```bash
-./~/towbintools_pipeline/pipeline_instalation_script.sh
+~/towbintools_pipeline/pipeline_instalation_script.sh
 ```
 
 Follow the directions given, so basically, push enter a bunch of times and type yes (you want to answer yes everytime) when asked to. 
