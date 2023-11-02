@@ -71,7 +71,7 @@ timepoint_selector = ui.column(5,
                           "next_point", "next point")),
                   ),
                   ui.row(ui.input_selectize("channel", 'Select channel', choices=list_channels)),
-                  ui.row(ui.input_selectize("column_to_plot", 'Select column to plot', choices=filemap.columns.tolist())))
+                  ui.row(ui.input_selectize("column_to_plot", 'Select column to plot', selected='Volume', choices=filemap.columns.tolist())))
 
 app_ui = ui.page_fluid(
     ui.row(
