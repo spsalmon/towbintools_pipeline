@@ -23,3 +23,5 @@ python -m pip install -r ~/towbintools_pipeline/requirements.txt
 # Add the environment to the jupyter notebook kernel
 
 python -m ipykernel install --user --name=towbintools
+
+mkdir -p ~/towbintools_pipeline/sbatch_output

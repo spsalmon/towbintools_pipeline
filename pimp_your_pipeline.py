@@ -209,25 +209,25 @@ def build_config_of_building_blocks(building_blocks, config):
     blocks_config = {}
 
     for i, building_block in enumerate(building_blocks):
+        config_copy = config.copy()
         if building_block in options_map:
             options = options_map[building_block]
-            
             # assert options
             for option in options:
-                assert len(config[option]) == len(building_block_counts[building_block]) or len(config[option]) == 1, f'The number of {option} options ({len(config[option])}) does not match the number of {building_block} building blocks ({len(building_block_counts[building_block])})'
+                assert len(config[option]) == len(building_block_counts[building_block]) or len(config[option]) == 1, f'{config[option]} The number of {option} options ({len(config[option])}) does not match the number of {building_block} building blocks ({len(building_block_counts[building_block])})'
             
             # expand single options to match the number of blocks
             for option in options:
-                if len(config[option]) == 1:
-                    config[option] = config[option] * len(building_block_counts[building_block])
-            
+                if len(config_copy[option]) == 1:
+                    config_copy[option] = config[option] * len(building_block_counts[building_block])
+
             # find the index of the building block
             idx = np.argwhere(np.array(building_block_counts[building_block]) == i).squeeze()
             
             # set the options for the building block
             block_options = {}
             for option in options:
-                block_options[option] = config[option][idx]
+                block_options[option] = config_copy[option][idx]
             
             blocks_config[i] = block_options
 

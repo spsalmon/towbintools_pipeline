@@ -82,22 +82,33 @@ def get_image(source_image_path, mask, is_zstack, channel_to_allign, source_imag
 
 def straighten_zstack_image(image, mask):
     """Straighten each plane of a zstack image."""
+    if np.unique(image).size == 2:
+        interpolation_order = 0
+    else:
+        interpolation_order = 1
     warper = Warper.from_img(image["allign"], mask)
     if image["straighten"].ndim > 3:
-        straightened_channels = [warper.warp_3D_img(image["straighten"][:, channel, ...], preserve_range=True, preserve_dtype=np.uint16) for channel in range(image["straighten"].shape[1])]
+        straightened_channels = [warper.warp_3D_img(image["straighten"][:, channel, ...], interpolation_order=interpolation_order, preserve_range=True, preserve_dtype=True) for channel in range(image["straighten"].shape[1])]
     else:
-        straightened_channels = [warper.warp_3D_img(image["straighten"], preserve_range=True, preserve_dtype=np.uint16)]
+        straightened_channels = [warper.warp_3D_img(image["straighten"], interpolation_order=interpolation_order, preserve_range=True, preserve_dtype=True)]
     return np.stack(straightened_channels, axis=1).astype(np.uint16)
 
 def straighten_2D_image(image, mask):
     """Straighten a 2D image."""
+    # set interpolation order to 0 if the image is binary
+    if np.unique(image).size == 2:
+        interpolation_order = 0
+    else:
+        interpolation_order = 1
+
+    print(interpolation_order)
     if image.ndim == 3:
         warper = Warper.from_img(image[0], mask)
-        straightened_channels = [warper.warp_2D_img(image[channel, ...], 0) for channel in range(image.shape[0])]
+        straightened_channels = [warper.warp_2D_img(image[channel, ...], 0, interpolation_order=interpolation_order, preserve_range=True, preserve_dtype=True) for channel in range(image.shape[0])]
         return np.stack(straightened_channels, axis=0).astype(np.uint16)
     else:
         warper = Warper.from_img(image, mask)
-        return warper.warp_2D_img(image, 0).astype(np.uint16)
+        return warper.warp_2D_img(image, 0, interpolation_order=interpolation_order, preserve_range=True, preserve_dtype=True).astype(np.uint16)
 
 
 def main(input_pickle, output_pickle, config, n_jobs):
