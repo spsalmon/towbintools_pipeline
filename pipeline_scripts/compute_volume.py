@@ -17,12 +17,13 @@ def compute_volume_from_file_path(straightened_mask_path, pixelsize):
     logging.info(straightened_mask_path)
     str_mask = image_handling.read_tiff_file(straightened_mask_path)
     volume = worm_features.compute_worm_volume(str_mask, pixelsize)
+    length = worm_features.compute_worm_length(str_mask, pixelsize)
     pattern = re.compile(r'Time(\d+)_Point(\d+)')
     match = pattern.search(straightened_mask_path)
     if match:
         time = int(match.group(1))
         point = int(match.group(2))
-        return {'Time': time, 'Point': point, 'Volume': volume}
+        return {'Time': time, 'Point': point, 'Volume': volume, 'Length': length}
     else:
         raise ValueError("Could not extract time and point from file name.")
 
