@@ -100,8 +100,7 @@ def straighten_2D_image(image, mask):
         interpolation_order = 0
     else:
         interpolation_order = 1
-
-    print(interpolation_order)
+        
     if image.ndim == 3:
         warper = Warper.from_img(image[0], mask)
         straightened_channels = [warper.warp_2D_img(image[channel, ...], 0, interpolation_order=interpolation_order, preserve_range=True, preserve_dtype=True) for channel in range(image.shape[0])]

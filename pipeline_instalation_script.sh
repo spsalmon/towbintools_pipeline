@@ -2,19 +2,19 @@
 
 # Update micromamba
 
-micromamba self-update
+~/.local/bin/micromamba self-update
 
 # Create environment
 
-micromamba create -n towbintools --override-channels -c pytorch -c ilastik-forge -c conda-forge ilastik
+~/.local/bin/micromamba create -n towbintools --override-channels -c pytorch -c ilastik-forge -c conda-forge ilastik
 
 # Activate environment
 
-micromamba activate towbintools
+~/.local/bin/micromamba activate towbintools
 
 # Install pip in the environment
 
-micromamba install pip
+~/.local/bin/micromamba install pip
 
 # Install the required packages 
 

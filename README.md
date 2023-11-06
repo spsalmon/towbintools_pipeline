@@ -94,3 +94,17 @@ chmod +x ~/towbintools_pipeline/pipeline_instalation_script.sh
 ```
 
 Follow the directions given, so basically, push enter a bunch of times and type yes (you want to answer yes everytime) when asked to. 
+
+To run the pipeline :
+
+1. Read the WIKI !!!!!
+2. Modify your config.yaml file according to what you want to do
+3. run the following command
+
+```bash
+cd ~/towintools_pipeline
+```
+
+```bash
+sbatch run_pipeline.sh
+```

@@ -12,7 +12,7 @@ import numpy as np
 
 from time import perf_counter
 
-filemap_path = '/mnt/external.data/TowbinLab/kstojanovski/20220401_Ti2_20x_160-182-190_pumping_25C_20220401_173300_429/analysis/report/analysis_filemap.csv'
+filemap_path = '/mnt/external.data/TowbinLab/igheor/20231027_Ti2_10x_rpl22_AID_356_369_20231027_182159_936//analysis/report/analysis_filemap.csv'
 filemap = pd.read_csv(filemap_path)
 
 times = filemap['Time'].unique().tolist()
@@ -21,7 +21,7 @@ points = filemap['Point'].unique().tolist()
 channels = image_handling.read_tiff_file(filemap['raw'].iloc[0]).shape[0]
 list_channels = [f'Channel {i+1}' for i in range(channels)]
 
-usual_columns = ['Time', 'Point', 'raw', 'analysis/ch2_seg', 'analysis/ch2_seg_str','Volume', 'WormType', 'HatchTime', 'VolumeAtHatch', 'M1', 'VolumeAtM1','M2', 'VolumeAtM2', 'M3', 'VolumeAtM3', 'M4', 'VolumeAtM4']
+usual_columns = ['Time', 'Point', 'raw', 'analysis/ch2_seg', 'analysis/ch2_seg_str','Volume', 'ch2_seg_str_worm_type', 'HatchTime', 'VolumeAtHatch', 'M1', 'VolumeAtM1','M2', 'VolumeAtM2', 'M3', 'VolumeAtM3', 'M4', 'VolumeAtM4']
 list_custom_columns = [column for column in filemap.columns.tolist() if column not in usual_columns]
 
 molt_annotator = ui.column(7,
@@ -197,10 +197,10 @@ def server(input, output, session):
     @ render_widget
     def volume_plot():
         data_of_point = filemap.loc[filemap['Point'] == int(
-            input.point()), ['Time', input.column_to_plot(), 'WormType', 'HatchTime', 'M1', 'M2', 'M3', 'M4']]
+            input.point()), ['Time', input.column_to_plot(), 'ch2_seg_str_worm_type', 'HatchTime', 'M1', 'M2', 'M3', 'M4']]
         data_of_point[input.column_to_plot()] = np.log10(data_of_point[input.column_to_plot()])
         markers = set_marker_shape(input.time(),
-                                   data_of_point['WormType'], hatch(), m1(), m2(), m3(), m4(), custom_annotations=get_custom_annotations())
+                                   data_of_point['ch2_seg_str_worm_type'], hatch(), m1(), m2(), m3(), m4(), custom_annotations=get_custom_annotations())
         fig = go.FigureWidget()
         fig.add_trace(go.Scatter(
             x=data_of_point['Time'], y=data_of_point[input.column_to_plot()], mode="markers", marker=markers))
@@ -251,9 +251,9 @@ def server(input, output, session):
     def set_hatch():
         print("set_hatch") 
         data_of_point = filemap.loc[filemap['Point'] == int(
-            input.point()), [input.column_to_plot(), 'WormType']]
+            input.point()), [input.column_to_plot(), 'ch2_seg_str_worm_type']]
         volume = data_of_point[input.column_to_plot()].values
-        worm_types = data_of_point['WormType'].values
+        worm_types = data_of_point['ch2_seg_str_worm_type'].values
         new_hatch = float(input.time())
         filemap.loc[filemap['Point'] == int(input.point()), ['HatchTime']] = new_hatch
         volume_at_hatch = compute_volume_at_time(volume, worm_types, new_hatch)
@@ -266,9 +266,9 @@ def server(input, output, session):
     def set_m1():
         print("set_m1")
         data_of_point = filemap.loc[filemap['Point'] == int(
-            input.point()), [input.column_to_plot(), 'WormType']]
+            input.point()), [input.column_to_plot(), 'ch2_seg_str_worm_type']]
         volume = data_of_point[input.column_to_plot()].values
-        worm_types = data_of_point['WormType'].values
+        worm_types = data_of_point['ch2_seg_str_worm_type'].values
         new_m1 = float(input.time())
         filemap.loc[filemap['Point'] == int(input.point()), ['M1']] = new_m1
         volume_at_new_m1 = compute_volume_at_time(volume, worm_types, new_m1)
@@ -281,9 +281,9 @@ def server(input, output, session):
     def set_m2():
         print("set_m2")
         data_of_point = filemap.loc[filemap['Point'] == int(
-            input.point()), [input.column_to_plot(), 'WormType']]
+            input.point()), [input.column_to_plot(), 'ch2_seg_str_worm_type']]
         volume = data_of_point[input.column_to_plot()].values
-        worm_types = data_of_point['WormType'].values
+        worm_types = data_of_point['ch2_seg_str_worm_type'].values
         new_m2 = float(input.time())
         filemap.loc[filemap['Point'] == int(input.point()), ['M2']] = new_m2
         volume_at_new_m2 = compute_volume_at_time(volume, worm_types, new_m2)
@@ -296,9 +296,9 @@ def server(input, output, session):
     def set_m3():
         print("set_m3")
         data_of_point = filemap.loc[filemap['Point'] == int(
-            input.point()), [input.column_to_plot(), 'WormType']]
+            input.point()), [input.column_to_plot(), 'ch2_seg_str_worm_type']]
         volume = data_of_point[input.column_to_plot()].values
-        worm_types = data_of_point['WormType'].values
+        worm_types = data_of_point['ch2_seg_str_worm_type'].values
         new_m3 = float(input.time())
         filemap.loc[filemap['Point'] == int(input.point()), ['M3']] = new_m3
         volume_at_new_m3 = compute_volume_at_time(volume, worm_types, new_m3)
@@ -311,9 +311,9 @@ def server(input, output, session):
     def set_m4():
         print("set_m4")
         data_of_point = filemap.loc[filemap['Point'] == int(
-            input.point()), [input.column_to_plot(), 'WormType']]
+            input.point()), [input.column_to_plot(), 'ch2_seg_str_worm_type']]
         volume = data_of_point[input.column_to_plot()].values
-        worm_types = data_of_point['WormType'].values
+        worm_types = data_of_point['ch2_seg_str_worm_type'].values
         new_m4 = float(input.time())
         filemap.loc[filemap['Point'] == int(input.point()), ['M4']] = new_m4
         volume_at_new_m4 = compute_volume_at_time(volume, worm_types, new_m4)
