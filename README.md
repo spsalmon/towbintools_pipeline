@@ -93,9 +93,9 @@ chmod +x ~/towbintools_pipeline/pipeline_instalation_script.sh
 ~/towbintools_pipeline/pipeline_instalation_script.sh
 ```
 
-Follow the directions given, so basically, push enter a bunch of times and type yes (you want to answer yes everytime) when asked to. 
+Follow the directions given, so basically, push enter a bunch of times and type yes (you want to answer yes everytime) when asked to.
 
-To run the pipeline :
+## Running the pipeline
 
 1. Read the WIKI !!!!!
 2. Modify your config.yaml file according to what you want to do
@@ -107,4 +107,40 @@ cd ~/towintools_pipeline
 
 ```bash
 sbatch run_pipeline.sh
+```
+
+## Updating the pipeline
+
+I will update the pipeline frequently, so please try to keep up to date by running the following commands on a regular basis.
+
+If you made any significant changes to anything, you want to commit them so that git can track them, you do so by running
+
+```bash
+git add .
+```
+
+This adds all the files of the directory into the next commit
+
+```bash
+git commit -m 'MESSAGE'
+```
+
+This commits the changes to your git branch. Please try to change MESSAGE into something meaningfull, this will help you later if you wanna track bugs etc ...
+
+```bash
+git pull
+```
+
+This will go fetch all the updates directly from my git repository.
+
+In most cases, you will not modify any part of the pipeline yourself, in this case, run these commands : 
+
+```bash
+git restore .
+```
+
+This restore all the files to how they were at the last commit. This will reset your config file ! So you should probably back it up somewhere else.
+
+```bash
+git pull
 ```
