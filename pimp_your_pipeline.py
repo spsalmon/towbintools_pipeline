@@ -235,11 +235,17 @@ def build_config_of_building_blocks(building_blocks, config):
 
 blocks_config = build_config_of_building_blocks(building_blocks, config)
 
-def process_csv_results(experiment_filemap, report_subdir, csv_file, column_name_old, column_name_new, merge_cols=['Time', 'Point']):
+def rename_merge_and_save_csv(experiment_filemap, report_subdir, csv_file, column_name_old, column_name_new, merge_cols=['Time', 'Point']):
     dataframe = pd.read_csv(csv_file)
     dataframe.rename(columns={column_name_old: column_name_new}, inplace=True)
     if column_name_new in experiment_filemap.columns:
         experiment_filemap.drop(columns=[column_name_new], inplace=True)
+    experiment_filemap = experiment_filemap.merge(dataframe, on=merge_cols, how='left')
+    experiment_filemap.to_csv(os.path.join(report_subdir, 'analysis_filemap.csv'), index=False)
+    return experiment_filemap
+
+def merge_and_save_csv(experiment_filemap, report_subdir, csv_file, merge_cols=['Time', 'Point']):
+    dataframe = pd.read_csv(csv_file)
     experiment_filemap = experiment_filemap.merge(dataframe, on=merge_cols, how='left')
     experiment_filemap.to_csv(os.path.join(report_subdir, 'analysis_filemap.csv'), index=False)
     return experiment_filemap
@@ -249,7 +255,7 @@ blocks_config = build_config_of_building_blocks(building_blocks, config)
 building_block_functions = {
     "segmentation": {"func": run_segmentation, "return_subdir": True},
     "straightening": {"func": run_straightening, "return_subdir": True},
-    "volume_computation": {"func": run_compute_volume, "return_subdir": False, "column_name_old": 'Volume', "column_name_new_key": True},
+    "volume_computation": {"func": run_compute_volume, "return_subdir": False},
     "classification": {"func": run_classification, "return_subdir": False, "column_name_old": 'WormType', "column_name_new_key": True},
     "molt_detection": {"func": run_detect_molts, "return_subdir":False, "process_molt": True},
     "fluorescence_quantification": {"func": run_fluorescence_quantification, "return_subdir": False, "column_name_old": 'Fluo', "column_name_new_key": True},
@@ -268,9 +274,12 @@ for i, building_block in enumerate(building_blocks):
             )
             experiment_filemap.to_csv(os.path.join(report_subdir, 'analysis_filemap.csv'), index=False)
             
-        elif func_data.get("column_name_old") is not None:
-            column_name_new = os.path.splitext(os.path.basename(result))[0] if func_data.get("column_name_new_key") else func_data.get("column_name_new")
-            experiment_filemap = process_csv_results(experiment_filemap, report_subdir, result, func_data["column_name_old"], column_name_new)
+        elif not func_data.get("process_molt"):
+            if func_data.get("column_name_old") is not None:
+                column_name_new = os.path.splitext(os.path.basename(result))[0] if func_data.get("column_name_new_key") else func_data.get("column_name_new")
+                experiment_filemap = rename_merge_and_save_csv(experiment_filemap, report_subdir, result, func_data["column_name_old"], column_name_new)
+            else:
+                experiment_filemap = merge_and_save_csv(experiment_filemap, report_subdir, result)
             
         elif func_data.get("process_molt"):
             ecdysis_csv = pd.read_csv(os.path.join(report_subdir, 'ecdysis.csv'))

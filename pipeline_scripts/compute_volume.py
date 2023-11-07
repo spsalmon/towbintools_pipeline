@@ -24,7 +24,7 @@ def compute_volume_from_file_path(straightened_mask_path, pixelsize):
         volume = np.nan
     if length == 0:
         length = np.nan
-        
+
     pattern = re.compile(r'Time(\d+)_Point(\d+)')
     match = pattern.search(straightened_mask_path)
     if match:
@@ -44,6 +44,10 @@ def main(input_pickle, output_file, config, n_jobs):
     os.makedirs(os.path.dirname(output_file), exist_ok=True)
     volumes = Parallel(n_jobs=n_jobs)(delayed(compute_volume_from_file_path)(input_file, config['pixelsize']) for input_file in input_files)
     volume_dataframe = pd.DataFrame(volumes)
+
+    # rename columns to match the rest of the pipeline
+    output_file_basename = os.path.basename(output_file).split('_volume.csv')[0]
+    volume_dataframe.rename(columns={'Volume': f'{output_file_basename}_volume', 'Length': f'{output_file_basename}_length'}, inplace=True)
     volume_dataframe.to_csv(output_file, index=False)
 
 if __name__ == '__main__':
