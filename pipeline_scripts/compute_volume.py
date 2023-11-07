@@ -18,6 +18,13 @@ def compute_volume_from_file_path(straightened_mask_path, pixelsize):
     str_mask = image_handling.read_tiff_file(straightened_mask_path)
     volume = worm_features.compute_worm_volume(str_mask, pixelsize)
     length = worm_features.compute_worm_length(str_mask, pixelsize)
+
+    # replace volume and length with NaN if it is 0
+    if volume == 0:
+        volume = np.nan
+    if length == 0:
+        length = np.nan
+        
     pattern = re.compile(r'Time(\d+)_Point(\d+)')
     match = pattern.search(straightened_mask_path)
     if match:
