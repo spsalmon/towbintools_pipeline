@@ -30,10 +30,10 @@ ssh-keygen
 ```
 
 - Select all the default options, except if you are extremely paranoid and want to set a passphrase.
-Go into the folder where the file was saved, it should be something like Users/username/.ssh/
+  Go into the folder where the file was saved, it should be something like Users/username/.ssh/
 
 - Open the file **id_rsa.pub** using the notepad or any text editing software.
-Copy the entire content of the file.
+  Copy the entire content of the file.
 
 - In VS Code, go to your home folder : /home/username/
 
@@ -113,39 +113,34 @@ sbatch run_pipeline.sh
 
 I will update the pipeline frequently, so please try to keep up to date by running the following commands on a regular basis.
 
-If you made any significant changes to anything, you want to commit them so that git can track them, you do so by running
+### If you want to reset the folder completely
+
+First, fetch the repository
 
 ```bash
-git add .
+git fetch origin
 ```
 
-This adds all the files of the directory into the next commit
+Then, run :
 
 ```bash
-git commit -m 'MESSAGE'
+git reset --hard origin/master
 ```
 
-This commits the changes to your git branch. Please try to change MESSAGE into something meaningfull, this will help you later if you wanna track bugs etc ...
+### If you want to save some changes you made
+
+Run those commands before resetting the folder :
 
 ```bash
-git pull
+git commit -a -m "Saving my work, just in case"
+git branch my-saved-work
 ```
 
-This will go fetch all the updates directly from my git repository.
+This way, your changes will be changed into a new branch. Note that this branch will to be updated. Overall, I would advise to not modify anything directly. Copy your config file(s) to a backup folder and just reset the folder everytime you want to update it.
 
-In most cases, you will not modify any part of the pipeline yourself, in this case, run these commands : 
+### Updating the package
 
-```bash
-git restore .
-```
-
-This restore all the files to how they were at the last commit. This will reset your config file ! So you should probably back it up somewhere else.
-
-```bash
-git pull
-```
-
-It's also good to update the towbintools package from time to time, to do so :
+It's also good to update the towbintools package from time to time even if the bugs and changes will be less frequent as it is more stable, to do so :
 
 First activate the environment :
 
