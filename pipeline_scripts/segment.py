@@ -30,13 +30,13 @@ def segment_and_save(image_path, output_path, method, augment_contrast=False, cl
 
     imwrite(output_path, mask.astype(np.uint8), compression="zlib", ome=True)
 
-def segment_image_ilastik(image, pipeline):
+def segment_image_ilastik(image, pipeline, result_channel=0):
     """Segment image using ilastik pipeline."""
     image = DataArray(image, dims=['y', 'x'])
-    mask = pipeline.get_probabilities(image)[..., 0]>0.5
+    mask = pipeline.get_probabilities(image)[..., result_channel]>0.5
     return mask
 
-def segment_and_save_ilastik(image_path, output_path, ilastik_project_path, augment_contrast=False, clip_limit=5, channels=[], is_zstack=False):
+def segment_and_save_ilastik(image_path, output_path, ilastik_project_path, augment_contrast=False, clip_limit=5, channels=[], is_zstack=False, result_channel=0):
     """Segment image using ilastik and save to output_path."""
     pipeline = PixelClassificationPipeline.from_ilp_file(ilastik_project_path)
     image = image_handling.read_tiff_file(image_path, channels_to_keep=channels).squeeze()
@@ -52,9 +52,7 @@ def segment_and_save_ilastik(image_path, output_path, ilastik_project_path, augm
         for i, plane in enumerate(image):
             mask[i] = segment_image_ilastik(plane, pipeline)
     else:
-        mask = segment_image_ilastik(image, pipeline)
-
-    print(mask.shape)
+        mask = segment_image_ilastik(image, pipeline, result_channel=result_channel)
 
     imwrite(output_path, mask.astype(np.uint8), compression="zlib", ome=True)
     
@@ -105,7 +103,7 @@ def main(input_pickle, output_pickle, config, n_jobs):
         
     elif config['segmentation_method'] == 'ilastik':
         Parallel(n_jobs=n_jobs)(delayed(segment_and_save_ilastik)(input_file, output_path, ilastik_project_path = config['ilastik_project_path'], augment_contrast=config['augment_contrast'], channels=config[
-            'segmentation_channels'], is_zstack=is_zstack) for input_file, output_path in zip(input_files, output_files))
+            'segmentation_channels'], is_zstack=is_zstack, result_channel = config['ilastik_result_channel']) for input_file, output_path in zip(input_files, output_files))
 
 if __name__ == '__main__':
     args = utils.basic_get_args()

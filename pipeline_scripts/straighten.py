@@ -16,7 +16,7 @@ def mask_preprocessing(mask):
     if mask.ndim == 2:
         mask = binary_image.get_biggest_object(mask)
         mask = binary_fill_holes(mask)
-        mask = cv2.medianBlur(mask.astype(np.uint8), 7)
+        mask = cv2.medianBlur(mask.astype(np.uint8), 5)
         return mask
 
     # find mean mask size for each plane

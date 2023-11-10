@@ -144,3 +144,17 @@ This restore all the files to how they were at the last commit. This will reset 
 ```bash
 git pull
 ```
+
+It's also good to update the towbintools package from time to time, to do so :
+
+First activate the environment :
+
+```bash
+micromamba activate towbintools
+```
+
+Then upgrade the package :
+
+```bash
+pip install --upgrade towbintools
+```

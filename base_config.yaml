@@ -29,6 +29,7 @@ batch_size: [-1]
 
 # ilastik segmentation parameters
 ilastik_project_path: ["/home/igheor/towbintools_pipeline/models/pharynx_str_noCPR.ilp"]
+ilastik_result_channel: [0]
 
 # straightening parameters
 straightening_source: [['raw', [0,1]], ['analysis/ch1_seg', null], ['analysis/ch2_seg', null]]

@@ -197,7 +197,7 @@ def build_config_of_building_blocks(building_blocks, config):
     building_block_counts = count_building_blocks_types(building_blocks)
     
     options_map = {
-        "segmentation": ['rerun_segmentation', 'segmentation_column', 'segmentation_method', 'segmentation_channels', 'augment_contrast', 'pixelsize', 'sigma_canny', 'model_path', 'tiler_config', 'RGB', 'activation_layer', 'batch_size', 'ilastik_project_path'],
+        "segmentation": ['rerun_segmentation', 'segmentation_column', 'segmentation_method', 'segmentation_channels', 'augment_contrast', 'pixelsize', 'sigma_canny', 'model_path', 'tiler_config', 'RGB', 'activation_layer', 'batch_size', 'ilastik_project_path', 'ilastik_result_channel'],
         "straightening": ['rerun_straightening', 'straightening_source', 'straightening_masks'],
         "volume_computation": ['rerun_volume_computation', 'volume_computation_masks', 'pixelsize'],
         "classification": ['rerun_classification', 'classification_source', 'classifier', 'pixelsize'],
