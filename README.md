@@ -102,7 +102,7 @@ Follow the directions given, so basically, push enter a bunch of times and type 
 3. run the following command
 
 ```bash
-cd ~/towintools_pipeline
+cd ~/towbintools_pipeline
 ```
 
 ```bash
@@ -124,7 +124,7 @@ git fetch origin
 Then, run :
 
 ```bash
-git reset --hard origin/master
+git reset --hard origin/main
 ```
 
 ### If you want to save some changes you made
