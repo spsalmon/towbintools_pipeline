@@ -33,8 +33,7 @@ def run_segmentation(experiment_filemap, config, block_config):
     return segmentation_subdir
 
 
-def run_straightening(experiment_filemap, config, block_config):
-        
+def run_straightening(experiment_filemap, config, block_config):    
     straightening_subdir = get_output_name(config['experiment_dir'], block_config['straightening_source'][0], 'str', channels = block_config['straightening_source'][1], return_subdir=True, add_raw = True)
 
     columns = [block_config['straightening_source'][0], block_config['straightening_masks']]
@@ -138,9 +137,13 @@ def run_fluorescence_quantification(experiment_filemap, config, block_config):
 
     fluorescence_quantification_source = block_config['fluorescence_quantification_source'][0]
     fluorescence_quantification_channel = block_config['fluorescence_quantification_source'][1]
+
+    fluorescence_quantification_masks_name = block_config['fluorescence_quantification_masks'].split('/')[-1]
     normalization = block_config['fluorescence_quantification_normalization']
 
-    output_file = get_output_name(config['experiment_dir'], fluorescence_quantification_source,'fluo', channels=fluorescence_quantification_channel,return_subdir=False, add_raw = False, suffix = normalization)
+    output_name_suffix = f'{normalization}_on_{fluorescence_quantification_masks_name}'
+
+    output_file = get_output_name(config['experiment_dir'], fluorescence_quantification_source,'fluo', channels=fluorescence_quantification_channel,return_subdir=False, add_raw = False, suffix = output_name_suffix)
 
     columns = [fluorescence_quantification_source, block_config['fluorescence_quantification_masks']]
 

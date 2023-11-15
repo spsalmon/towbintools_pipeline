@@ -1,7 +1,7 @@
 experiment_dir: "/mnt/external.data/TowbinLab/spsalmon/pipeline_test_folder/"
 
 building_blocks: ["segmentation", "segmentation", "straightening", "straightening", "straightening", 
-                    "volume_computation", "volume_computation"]
+                    "volume_computation", "volume_computation", "fluorescence_quantification"]
 # building_blocks: ["segmentation", "segmentation"]
 
 rerun_segmentation: [True]
@@ -58,6 +58,6 @@ custom_script_parameters : [null]
 
 # sbatch parameters
 sbatch_memory: 128G
-sbatch_time: 0-48:00:00
+sbatch_time: 0-02:00:00
 sbatch_cpus: 32
 sbatch_gpus: 0
