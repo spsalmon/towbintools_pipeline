@@ -50,7 +50,7 @@ def main(input_pickle, output_file, config, n_jobs):
 
     # rename columns to match the rest of the pipeline
     output_file_basename = os.path.basename(output_file).split('_volume.csv')[0]
-    volume_dataframe.rename(columns={'Volume': f'{output_file_basename}_volume', 'Length': f'{output_file_basename}_length'}, 'Area': f'{output_file_basename}_area'}, inplace=True)
+    volume_dataframe.rename(columns={'Volume': f'{output_file_basename}_volume', 'Length': f'{output_file_basename}_length', 'Area': f'{output_file_basename}_area'}, inplace=True)
     volume_dataframe.to_csv(output_file, index=False)
 
 if __name__ == '__main__':
