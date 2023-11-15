@@ -1,6 +1,6 @@
 experiment_dir: "/mnt/external.data/TowbinLab/spsalmon/pipeline_test_folder/"
 
-building_blocks: ["segmentation", "segmentation", "straightening", "straightening", "straightening", 
+building_blocks: ["segmentation", "segmentation", "straightening", "straightening", 
                     "volume_computation", "volume_computation", "fluorescence_quantification"]
 # building_blocks: ["segmentation", "segmentation"]
 
@@ -33,8 +33,8 @@ ilastik_project_path: ["/mnt/external.data/TowbinLab/kstojanovski/classifier_tra
 ilastik_result_channel: [0]
 
 # straightening parameters
-straightening_source: [['raw', [0,1]], ['analysis/ch1_seg', null], ['analysis/ch2_seg', null]]
-straightening_masks: ['analysis/ch2_seg', 'analysis/ch1_seg', 'analysis/ch2_seg']
+straightening_source: [['analysis/ch1_seg', null], ['analysis/ch2_seg', null]]
+straightening_masks: ['analysis/ch1_seg', 'analysis/ch2_seg']
 
 # volume computation parameters
 volume_computation_masks: ['analysis/ch1_seg_str', 'analysis/ch2_seg_str']
