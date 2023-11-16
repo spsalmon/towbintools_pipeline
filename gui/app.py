@@ -10,11 +10,15 @@ import plotly.express as px
 import plotly.graph_objs as go
 import numpy as np
 import atexit
+import os
 
 from time import perf_counter
 
-filemap_path = '/mnt/external.data/TowbinLab/igheor/20231027_Ti2_10x_rpl22_AID_356_369_20231027_182159_936//analysis/report/analysis_filemap.csv'
+filemap_path = '/mnt/external.data/TowbinLab/spsalmon/pipeline_test_folder/analysis/report/analysis_filemap.csv'
 filemap = pd.read_csv(filemap_path)
+
+filemap_name = filemap_path.split('.')[0]
+filemap_save_path = f'{filemap_name}_annotated.csv'
 
 times = filemap['Time'].unique().tolist()
 points = filemap['Point'].unique().tolist()
@@ -32,7 +36,7 @@ worm_type_column = [column for column in filemap.columns.tolist() if 'worm_type'
 
 def save_filemap():
     print('Saving filemap ...')
-    filemap.to_csv(filemap_path, index=False)
+    filemap.to_csv(filemap_save_path, index=False)
     print('Filemap saved !')
 
 molt_annotator = ui.column(7,
