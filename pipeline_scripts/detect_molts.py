@@ -24,8 +24,9 @@ def run_detect_molts(analysis_filemap, volume_column, worm_type_column, point, m
         ecdysis = {'hatch_time': np.nan, 'M1': np.nan, 'M2': np.nan, 'M3': np.nan, 'M4': np.nan}
         volume_at_ecdysis = {'volume_at_hatch': np.nan, 'volume_at_M1': np.nan, 'volume_at_M2': np.nan, 'volume_at_M3': np.nan, 'volume_at_M4': np.nan}
 
-    return {'Point': point, 'HatchTime': ecdysis['hatch_time'], 'VolumeAtHatch': volume_at_ecdysis['volume_at_hatch'], 'M1': ecdysis['M1'], "VolumeAtM1": volume_at_ecdysis['volume_at_M1'], 'M2': ecdysis['M2'], "VolumeAtM2": volume_at_ecdysis['volume_at_M2'],
-            'M3': ecdysis['M3'], "VolumeAtM3": volume_at_ecdysis['volume_at_M3'], 'M4': ecdysis['M4'], "VolumeAtM4": volume_at_ecdysis['volume_at_M4']}
+    volume_names = [f'{volume_column}_at_{molt}' for molt in ['HatchTime', 'M1', 'M2', 'M3', 'M4']]
+    return {'Point': point, 'HatchTime': ecdysis['hatch_time'], volume_names[0]: volume_at_ecdysis['volume_at_hatch'], 'M1': ecdysis['M1'], volume_names[1]: volume_at_ecdysis['volume_at_M1'], 'M2': ecdysis['M2'], volume_names[2]: volume_at_ecdysis['volume_at_M2'],
+            'M3': ecdysis['M3'], volume_names[3]: volume_at_ecdysis['volume_at_M3'], 'M4': ecdysis['M4'], volume_names[4]: volume_at_ecdysis['volume_at_M4']}
 
 def compute_other_features_at_molt(analysis_filemap, molt_dataframe, volume_column, worm_type_column, point):
     data_of_point = analysis_filemap[analysis_filemap['Point'] == point]
@@ -47,9 +48,9 @@ def compute_other_features_at_molt(analysis_filemap, molt_dataframe, volume_colu
     for column in columns_to_compute:
         column_data = data_of_point[column].values
         for molt in ['HatchTime', 'M1', 'M2', 'M3', 'M4']:
-            molt_time = molt_data_of_point[molt].values[0]
+            molt_time = float(molt_data_of_point[molt].values[0])
             if not np.isnan(molt_time):
-                features_at_molt[f'{column}_at_{molt}'] = detect_molts.compute_volume_at_time(column_data, volumes, worm_types, molt_time)
+                features_at_molt[f'{column}_at_{molt}'] = detect_molts.compute_volume_at_time(column_data, worm_types, molt_time)
 
     return features_at_molt
 
@@ -74,6 +75,8 @@ def main(input_dataframe_path, output_file, config, n_jobs):
     
     other_features_at_molt_dataframe = pd.DataFrame(other_features_at_molt)
     molts_dataframe = molts_dataframe.merge(other_features_at_molt_dataframe, on='Point')
+
+
     molts_dataframe.to_csv(output_file, index=False)
 
 

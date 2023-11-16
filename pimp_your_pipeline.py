@@ -249,6 +249,10 @@ def rename_merge_and_save_csv(experiment_filemap, report_subdir, csv_file, colum
 
 def merge_and_save_csv(experiment_filemap, report_subdir, csv_file, merge_cols=['Time', 'Point']):
     dataframe = pd.read_csv(csv_file)
+    new_columns = [column for column in dataframe.columns if (column != 'Time' and column != 'Point')]
+    for column in new_columns:
+        if column in experiment_filemap.columns:
+            experiment_filemap.drop(columns=[column], inplace=True)
     experiment_filemap = experiment_filemap.merge(dataframe, on=merge_cols, how='left')
     experiment_filemap.to_csv(os.path.join(report_subdir, 'analysis_filemap.csv'), index=False)
     return experiment_filemap
@@ -287,7 +291,7 @@ for i, building_block in enumerate(building_blocks):
         elif func_data.get("process_molt"):
             ecdysis_csv = pd.read_csv(os.path.join(report_subdir, 'ecdysis.csv'))
             if 'M1' not in experiment_filemap.columns:
-                experiment_filemap = experiment_filemap.merge(ecdysis_csv, on=['Time', 'Point'], how='left')
+                experiment_filemap = experiment_filemap.merge(ecdysis_csv, on=['Point'], how='left')
                 experiment_filemap.to_csv(os.path.join(report_subdir, 'analysis_filemap.csv'), index=False)
         
     else:

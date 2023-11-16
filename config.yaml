@@ -1,12 +1,12 @@
 experiment_dir: "/mnt/external.data/TowbinLab/spsalmon/pipeline_test_folder/"
 
 building_blocks: ["segmentation", "segmentation", "straightening", "straightening", 
-                    "volume_computation", "volume_computation", "fluorescence_quantification"]
+                    "volume_computation", "volume_computation", "classification", "molt_detection", "fluorescence_quantification"]
 # building_blocks: ["segmentation", "segmentation"]
 
-rerun_segmentation: [True]
-rerun_straightening: [True]
-rerun_volume_computation: [True]
+rerun_segmentation: [False]
+rerun_straightening: [False]
+rerun_volume_computation: [False]
 rerun_classification: [False]
 rerun_molt_detection: [False]
 rerun_fluorescence_quantification: [False]
