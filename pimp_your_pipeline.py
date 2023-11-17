@@ -182,7 +182,7 @@ if not os.path.exists(os.path.join(report_subdir, 'analysis_filemap.csv')):
     experiment_filemap.to_csv(os.path.join(report_subdir, 'analysis_filemap.csv'), index=False)
 else:
     experiment_filemap = pd.read_csv(os.path.join(report_subdir, 'analysis_filemap.csv'))
-    experiment_filemap.fillna('', inplace=True)
+    experiment_filemap = experiment_filemap.replace(np.nan, '', regex=True)
 
 print(experiment_filemap.head())
 

@@ -30,7 +30,7 @@ usual_columns = ['Time', 'Point', 'raw', 'HatchTime', 'VolumeAtHatch', 'M1', 'Vo
 usual_columns.extend([column for column in filemap.columns.tolist() if 'worm_type' in column])
 usual_columns.extend([column for column in filemap.columns.tolist() if 'seg' in column])
 usual_columns.extend([column for column in filemap.columns.tolist() if 'str' in column])
-usual_columns.extend([column for column in filemap.columns.tolist() if 'Length' in column])
+usual_columns.extend([column for column in filemap.columns.tolist() if 'length' in column])
 list_custom_columns = [column for column in filemap.columns.tolist() if column not in usual_columns]
 worm_type_column = [column for column in filemap.columns.tolist() if 'worm_type' in column][0]
 

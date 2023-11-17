@@ -1,8 +1,6 @@
-experiment_dir: "/mnt/external.data/TowbinLab/spsalmon/pipeline_test_folder/"
+experiment_dir: "/mnt/towbin.data/shared/spsalmon/20231110_115705_772_yap1GFP_wts1RNAi/pad2/"
 
-building_blocks: ["segmentation", "segmentation", "straightening", "straightening", 
-                    "volume_computation", "volume_computation", "classification", "molt_detection", "fluorescence_quantification"]
-# building_blocks: ["segmentation", "segmentation"]
+building_blocks: ["segmentation", "straightening"]
 
 rerun_segmentation: [False]
 rerun_straightening: [False]
@@ -13,8 +11,8 @@ rerun_fluorescence_quantification: [False]
 
 # segmentation parameters
 segmentation_column: ['raw']
-segmentation_method: ["edge_based", "ilastik"]
-segmentation_channels: [[1], [0]]
+segmentation_method: ["deep_learning"]
+segmentation_channels: [[2]]
 augment_contrast: [False]
 
 # edge-based segmentation parameters
@@ -33,8 +31,8 @@ ilastik_project_path: ["/mnt/external.data/TowbinLab/kstojanovski/classifier_tra
 ilastik_result_channel: [0]
 
 # straightening parameters
-straightening_source: [['analysis/ch1_seg', null], ['analysis/ch2_seg', null]]
-straightening_masks: ['analysis/ch1_seg', 'analysis/ch2_seg']
+straightening_source: [['raw', [0,1]]]
+straightening_masks: ['analysis/ch3_seg']
 
 # volume computation parameters
 volume_computation_masks: ['analysis/ch1_seg_str', 'analysis/ch2_seg_str']
@@ -58,6 +56,6 @@ custom_script_parameters : [null]
 
 # sbatch parameters
 sbatch_memory: 128G
-sbatch_time: 0-02:00:00
+sbatch_time: 0-18:00:00
 sbatch_cpus: 32
-sbatch_gpus: 0
+sbatch_gpus: 2
