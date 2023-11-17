@@ -3,6 +3,7 @@ import argparse
 from towbintools.foundation import file_handling as file_handling
 import os
 import subprocess
+import numpy as np
 
 # ----BOILERPLATE CODE FOR FILE HANDLING----
 
@@ -81,6 +82,7 @@ def add_dir_to_experiment_filemap(experiment_filemap, dir_path, subdir_name):
         experiment_filemap.drop(columns=[subdir_name], inplace=True)
     experiment_filemap = experiment_filemap.merge(
         subdir_filemap, on=['Time', 'Point'], how='left')
+    experiment_filemap = experiment_filemap.replace(np.nan, '', regex=True)
     return experiment_filemap
 
 # ----BOILERPLATE CODE FOR PICKLING----

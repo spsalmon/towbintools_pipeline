@@ -20,6 +20,10 @@
 
 python -m pip install -r ~/towbintools_pipeline/requirements.txt
 
+# Install all the cuda stuff
+
+pip3 install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu118
+
 # Add the environment to the jupyter notebook kernel
 
 python -m ipykernel install --user --name=towbintools
