@@ -9,7 +9,6 @@ from joblib import Parallel, delayed
 import plotly.express as px
 import plotly.graph_objs as go
 import numpy as np
-import atexit
 import os
 
 from time import perf_counter
@@ -17,8 +16,12 @@ from time import perf_counter
 filemap_path = '/mnt/external.data/TowbinLab/spsalmon/pipeline_test_folder/analysis/report/analysis_filemap.csv'
 filemap = pd.read_csv(filemap_path)
 
-filemap_name = filemap_path.split('.')[0]
+filemap_folder = os.path.dirname(filemap_path)
+filemap_name = os.path.basename(filemap_path)
+filemap_name = filemap_name.split('.')[0]
+
 filemap_save_path = f'{filemap_name}_annotated.csv'
+filemap_save_path = os.path.join(filemap_folder, filemap_save_path)
 
 times = filemap['Time'].unique().tolist()
 points = filemap['Point'].unique().tolist()
@@ -33,9 +36,10 @@ usual_columns.extend([column for column in filemap.columns.tolist() if 'str' in 
 usual_columns.extend([column for column in filemap.columns.tolist() if 'length' in column])
 list_custom_columns = [column for column in filemap.columns.tolist() if column not in usual_columns]
 worm_type_column = [column for column in filemap.columns.tolist() if 'worm_type' in column][0]
+base_volume_column = [column for column in filemap.columns.tolist() if 'volume' in column][0]
 
 def save_filemap():
-    print('Saving filemap ...')
+    print(f'Saving filemap ...')
     filemap.to_csv(filemap_save_path, index=False)
     print('Filemap saved !')
 
@@ -86,7 +90,7 @@ timepoint_selector = ui.column(5,
                           "next_point", "next point")),
                   ),
                   ui.row(ui.input_selectize("channel", 'Select channel', choices=list_channels)),
-                  ui.row(ui.input_selectize("column_to_plot", 'Select column to plot', selected='Volume', choices=filemap.columns.tolist())))
+                  ui.row(ui.input_selectize("column_to_plot", 'Select column to plot', selected=base_volume_column, choices=filemap.columns.tolist())))
 
 app_ui = ui.page_fluid(
     ui.row(
@@ -184,28 +188,28 @@ def server(input, output, session):
     @ reactive.event(input.previous_time)
     def previous_time():
         print("previous_time")
-        new_time = max(int(input.time()) - 1, 0)
+        new_time = max(int(input.time()) - 1, np.min(times))
         ui.update_selectize('time', selected=str(int(new_time)))
 
     @ reactive.Effect
     @ reactive.event(input.next_time)
     def next_time():
         print("next_time")
-        new_time = min(int(input.time()) + 1, np.max(times) - 1)
+        new_time = min(int(input.time()) + 1, np.max(times))
         ui.update_selectize('time', selected=str(int(new_time)))
 
     @ reactive.Effect
     @ reactive.event(input.previous_point)
     def previous_point():
         print("previous_point")
-        new_point = max(int(input.point()) - 1, 0)
+        new_point = max(int(input.point()), np.min(points))
         ui.update_selectize('point', selected=str(int(new_point)))
 
     @ reactive.Effect
     @ reactive.event(input.next_point)
     def next_point():
         print("next_point")
-        new_point = min(int(input.point()) + 1, np.max(points) - 1)
+        new_point = min(int(input.point()) + 1, np.max(points))
         ui.update_selectize('point', selected=str(int(new_point)))
 
     @ output
@@ -273,7 +277,7 @@ def server(input, output, session):
         filemap.loc[filemap['Point'] == int(input.point()), ['HatchTime']] = new_hatch
         volume_at_hatch = compute_volume_at_time(volume, worm_types, new_hatch)
         filemap.loc[filemap['Point'] == int(input.point()), ['VolumeAtHatch']] = volume_at_hatch
-        # filemap.to_csv(filemap_path, index=False)
+
         hatch.set(new_hatch)
 
     @ reactive.Effect
@@ -288,7 +292,7 @@ def server(input, output, session):
         filemap.loc[filemap['Point'] == int(input.point()), ['M1']] = new_m1
         volume_at_new_m1 = compute_volume_at_time(volume, worm_types, new_m1)
         filemap.loc[filemap['Point'] == int(input.point()), ['VolumeAtM1']] = volume_at_new_m1
-        # filemap.to_csv(filemap_path, index=False)
+
         m1.set(new_m1)
 
     @ reactive.Effect
@@ -303,7 +307,7 @@ def server(input, output, session):
         filemap.loc[filemap['Point'] == int(input.point()), ['M2']] = new_m2
         volume_at_new_m2 = compute_volume_at_time(volume, worm_types, new_m2)
         filemap.loc[filemap['Point'] == int(input.point()), ['VolumeAtM2']] = volume_at_new_m2
-        # filemap.to_csv(filemap_path, index=False)
+
         m2.set(new_m2)
 
     @ reactive.Effect
@@ -318,7 +322,7 @@ def server(input, output, session):
         filemap.loc[filemap['Point'] == int(input.point()), ['M3']] = new_m3
         volume_at_new_m3 = compute_volume_at_time(volume, worm_types, new_m3)
         filemap.loc[filemap['Point'] == int(input.point()), ['VolumeAtM3']] = volume_at_new_m3
-        # filemap.to_csv(filemap_path, index=False)
+
         m3.set(new_m3)
 
     @ reactive.Effect
@@ -333,7 +337,7 @@ def server(input, output, session):
         filemap.loc[filemap['Point'] == int(input.point()), ['M4']] = new_m4
         volume_at_new_m4 = compute_volume_at_time(volume, worm_types, new_m4)
         filemap.loc[filemap['Point'] == int(input.point()), ['VolumeAtM4']] = volume_at_new_m4
-        # filemap.to_csv(filemap_path, index=False)
+
         m4.set(new_m4)
 
 
@@ -343,7 +347,7 @@ def server(input, output, session):
         print("reset_hatch")
         filemap.loc[filemap['Point'] == int(input.point()), ['HatchTime']] = np.nan
         filemap.loc[filemap['Point'] == int(input.point()), ['VolumeAtHatch']] = np.nan
-        # filemap.to_csv(filemap_path, index=False)
+
         hatch.set(np.nan)
 
     
@@ -353,7 +357,7 @@ def server(input, output, session):
         print("reset_m1")
         filemap.loc[filemap['Point'] == int(input.point()), ['M1']] = np.nan
         filemap.loc[filemap['Point'] == int(input.point()), ['VolumeAtM1']] = np.nan
-        # filemap.to_csv(filemap_path, index=False)
+
         m1.set(np.nan)
 
     @ reactive.Effect
@@ -362,7 +366,7 @@ def server(input, output, session):
         print("reset_m2")
         filemap.loc[filemap['Point'] == int(input.point()), ['M2']] = np.nan
         filemap.loc[filemap['Point'] == int(input.point()), ['VolumeAtM2']] = np.nan
-        # filemap.to_csv(filemap_path, index=False)
+
         m2.set(np.nan)
 
     @ reactive.Effect
@@ -371,7 +375,7 @@ def server(input, output, session):
         print("reset_m3")
         filemap.loc[filemap['Point'] == int(input.point()), ['M3']] = np.nan
         filemap.loc[filemap['Point'] == int(input.point()), ['VolumeAtM3']] = np.nan
-        # filemap.to_csv(filemap_path, index=False)
+
         m3.set(np.nan)
 
     @ reactive.Effect
@@ -380,7 +384,7 @@ def server(input, output, session):
         print("reset_m4")
         filemap.loc[filemap['Point'] == int(input.point()), ['M4']] = np.nan
         filemap.loc[filemap['Point'] == int(input.point()), ['VolumeAtM4']] = np.nan
-        # filemap.to_csv(filemap_path, index=False)
+
         m4.set(np.nan)
 
     @ reactive.Effect
@@ -396,15 +400,12 @@ def server(input, output, session):
             ui.update_text('new_custom_column', value="")
             filemap[new_column_name] = np.nan
             filemap.loc[((filemap['Point'] == int(input.point())) & (filemap['Time'] == int(input.time()))), new_column_name] = float(input.time())
-            # filemap.to_csv(filemap_path, index=False)
 
             print(filemap.loc[((filemap['Point'] == int(input.point())) & (filemap['Time'] == int(input.time())))])
 
         if new_column_name == "" and custom_column != "":
             print("add custom annotation")
             filemap.loc[((filemap['Point'] == int(input.point())) & (filemap['Time'] == int(input.time()))), custom_column] = float(input.time())
-            # filemap.to_csv(filemap_path, index=False)
-
             print(filemap.loc[((filemap['Point'] == int(input.point())) & (filemap['Time'] == int(input.time())))])
             
     @ reactive.Effect
@@ -414,8 +415,6 @@ def server(input, output, session):
         if custom_column != "":
             print("reset custom annotation")
             filemap.loc[((filemap['Point'] == int(input.point())) & (filemap['Time'] == int(input.time()))), custom_column] = np.nan
-            # filemap.to_csv(filemap_path, index=False)
-
             print(filemap.loc[((filemap['Point'] == int(input.point())) & (filemap['Time'] == int(input.time())))])
 
     
@@ -435,13 +434,12 @@ def server(input, output, session):
         fig, ax = plt.subplots()
         im = ax.imshow(img[channel].squeeze(), cmap='gray')
         return fig
-    
-    # this closes the session when the user exits out on their browser
+
+    session.on_ended(save_filemap)
+
     @reactive.Effect
     @reactive.event(input.close)
     async def _():
-        save_filemap()
         await session.close()
 
 app = App(app_ui, server)
-atexit.register(save_filemap)
