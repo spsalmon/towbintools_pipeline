@@ -1,6 +1,6 @@
 experiment_dir: "/mnt/towbin.data/shared/spsalmon/20231110_115705_772_yap1GFP_wts1RNAi/pad2/"
 
-building_blocks: ["segmentation", "straightening"]
+building_blocks: ["straightening"]
 
 rerun_segmentation: [False]
 rerun_straightening: [False]
@@ -56,6 +56,6 @@ custom_script_parameters : [null]
 
 # sbatch parameters
 sbatch_memory: 128G
-sbatch_time: 0-18:00:00
+sbatch_time: 0-48:00:00
 sbatch_cpus: 32
 sbatch_gpus: 2
