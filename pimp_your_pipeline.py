@@ -6,6 +6,7 @@ from towbintools.foundation import file_handling as file_handling
 import pandas as pd
 from pipeline_scripts.utils import pickle_objects, create_sbatch_file, get_and_create_folders, get_input_and_output_files, add_dir_to_experiment_filemap, create_temp_folders, get_output_name, run_command, cleanup_files
 import numpy as np
+import shutil
 
 def run_segmentation(experiment_filemap, config, block_config):
 
@@ -175,6 +176,14 @@ create_temp_folders()
 
 experiment_dir, raw_subdir, analysis_subdir, report_subdir = get_and_create_folders(
     config)
+
+# copy the config file to the report folder
+# if it already exists, change the name of the new one by adding a number
+if os.path.exists(os.path.join(report_subdir, 'config.yaml')):
+    i = 1
+    while os.path.exists(os.path.join(report_subdir, f'config_{i}.yaml')):
+        i += 1
+    shutil.copyfile(config_file, os.path.join(report_subdir, f'config_{i}.yaml'))
 
 if not os.path.exists(os.path.join(report_subdir, 'analysis_filemap.csv')):
     experiment_filemap = file_handling.get_dir_filemap(raw_subdir)
