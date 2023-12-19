@@ -13,7 +13,7 @@ import os
 
 from time import perf_counter
 
-filemap_path = '/mnt/external.data/TowbinLab/spsalmon/pipeline_test_folder/analysis/report/analysis_filemap.csv'
+filemap_path = '/mnt/towbin.data/shared/plenart/20231112_CREST_10X_wBT318_gradual_24-92h_20_degrees/analysis/report/analysis_filemap.csv'
 filemap = pd.read_csv(filemap_path)
 
 filemap_folder = os.path.dirname(filemap_path)
@@ -37,6 +37,24 @@ usual_columns.extend([column for column in filemap.columns.tolist() if 'length' 
 list_custom_columns = [column for column in filemap.columns.tolist() if column not in usual_columns]
 worm_type_column = [column for column in filemap.columns.tolist() if 'worm_type' in column][0]
 base_volume_column = [column for column in filemap.columns.tolist() if 'volume' in column][0]
+
+# check if hatch columns exist
+if 'HatchTime' not in filemap.columns.tolist():
+    filemap['HatchTime'] = np.nan
+    filemap['VolumeAtHatch'] = np.nan
+# check if molt columns exist
+if 'M1' not in filemap.columns.tolist():
+    filemap['M1'] = np.nan
+    filemap['VolumeAtM1'] = np.nan
+if 'M2' not in filemap.columns.tolist():
+    filemap['M2'] = np.nan
+    filemap['VolumeAtM2'] = np.nan
+if 'M3' not in filemap.columns.tolist():
+    filemap['M3'] = np.nan
+    filemap['VolumeAtM3'] = np.nan
+if 'M4' not in filemap.columns.tolist():
+    filemap['M4'] = np.nan
+    filemap['VolumeAtM4'] = np.nan
 
 def save_filemap():
     print(f'Saving filemap ...')
@@ -202,7 +220,7 @@ def server(input, output, session):
     @ reactive.event(input.previous_point)
     def previous_point():
         print("previous_point")
-        new_point = max(int(input.point()), np.min(points))
+        new_point = max(int(input.point()) - 1, np.min(points))
         ui.update_selectize('point', selected=str(int(new_point)))
 
     @ reactive.Effect
