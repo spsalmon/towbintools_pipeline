@@ -13,7 +13,7 @@ import os
 
 from time import perf_counter
 
-filemap_path = '/mnt/towbin.data/shared/plenart/20231112_CREST_10X_wBT318_gradual_24-92h_20_degrees/analysis/report/analysis_filemap.csv'
+filemap_path = '/mnt/towbin.data/shared/plenart/20231112_CREST_10X_wBT318_gradual_24-92h_20_degrees/analysis/report/analysis_filemap_annotated.csv'
 filemap = pd.read_csv(filemap_path)
 
 filemap_folder = os.path.dirname(filemap_path)
@@ -35,6 +35,10 @@ usual_columns.extend([column for column in filemap.columns.tolist() if 'seg' in 
 usual_columns.extend([column for column in filemap.columns.tolist() if 'str' in column])
 usual_columns.extend([column for column in filemap.columns.tolist() if 'length' in column])
 list_custom_columns = [column for column in filemap.columns.tolist() if column not in usual_columns]
+
+print(f'usual columns : {usual_columns}')
+print(f'custom columns : {list_custom_columns}')
+print(f'all columns : {filemap.columns.tolist()}')
 worm_type_column = [column for column in filemap.columns.tolist() if 'worm_type' in column][0]
 base_volume_column = [column for column in filemap.columns.tolist() if 'volume' in column][0]
 
@@ -56,7 +60,7 @@ if 'M4' not in filemap.columns.tolist():
     filemap['M4'] = np.nan
     filemap['VolumeAtM4'] = np.nan
 
-def save_filemap():
+def save_filemap(filemap=filemap):
     print(f'Saving filemap ...')
     filemap.to_csv(filemap_save_path, index=False)
     print('Filemap saved !')
@@ -108,7 +112,8 @@ timepoint_selector = ui.column(5,
                           "next_point", "next point")),
                   ),
                   ui.row(ui.input_selectize("channel", 'Select channel', choices=list_channels)),
-                  ui.row(ui.input_selectize("column_to_plot", 'Select column to plot', selected=base_volume_column, choices=filemap.columns.tolist())))
+                  ui.row(ui.input_selectize("column_to_plot", 'Select column to plot', selected=base_volume_column, choices=filemap.columns.tolist())),
+                  ui.row(ui.input_action_button("save", "Save")))
 
 app_ui = ui.page_fluid(
     ui.row(
@@ -191,6 +196,11 @@ def server(input, output, session):
             return []
         custom_annotations = filemap[filemap['Point'] == int(input.point())][input.custom_column()].values.tolist()
         return custom_annotations
+    
+    @ reactive.Effect
+    @ reactive.event(input.save)
+    def save():
+        save_filemap(filemap)
     
     @ reactive.Effect
     def get_hatch_and_molts():
