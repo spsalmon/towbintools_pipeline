@@ -1,6 +1,6 @@
-experiment_dir: "/mnt/towbin.data/shared/spsalmon/20231110_115705_772_yap1GFP_wts1RNAi/pad2/"
+experiment_dir: "/mnt/external.data/TowbinLab/spsalmon/pipeline_test_folder/"
 
-building_blocks: ["straightening"]
+building_blocks: ["segmentation"]
 
 rerun_segmentation: [False]
 rerun_straightening: [False]
@@ -11,8 +11,8 @@ rerun_fluorescence_quantification: [False]
 
 # segmentation parameters
 segmentation_column: ['raw']
-segmentation_method: ["deep_learning"]
-segmentation_channels: [[2]]
+segmentation_method: ["edge_based"]
+segmentation_channels: [[1]]
 augment_contrast: [False]
 
 # edge-based segmentation parameters
