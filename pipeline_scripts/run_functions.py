@@ -1,12 +1,6 @@
-import yaml
 import os
-import subprocess
-import pickle
 from towbintools.foundation import file_handling as file_handling
-import pandas as pd
-from pipeline_scripts.utils import pickle_objects, create_sbatch_file, get_and_create_folders, get_input_and_output_files_parallel, add_dir_to_experiment_filemap, create_temp_folders, get_output_name, run_command, cleanup_files
-import numpy as np
-import shutil
+from pipeline_scripts.utils import pickle_objects, get_input_and_output_files_parallel, add_dir_to_experiment_filemap, get_output_name, run_command, cleanup_files
 
 def run_segmentation(experiment_filemap, config, block_config):
 
@@ -69,6 +63,8 @@ def run_straightening(experiment_filemap, config, block_config):
 
 
 def run_compute_volume(experiment_filemap, config, block_config):
+    analysis_subdir = os.path.join(config['experiment_dir'], "analysis")
+
     volume_computation_masks = [block_config['volume_computation_masks']]
     output_file = get_output_name(config['experiment_dir'], volume_computation_masks[0], 'volume', return_subdir=False, add_raw = False)
 
@@ -92,6 +88,8 @@ def run_compute_volume(experiment_filemap, config, block_config):
     return output_file
 
 def run_classification(experiment_filemap, config, block_config):
+    analysis_subdir = os.path.join(config['experiment_dir'], "analysis")
+
     model_name = os.path.basename(os.path.normpath(block_config['classifier']))
     model_name = model_name.split('_classifier')[0]
     classification_source = [block_config['classification_source']]
@@ -135,6 +133,7 @@ def run_detect_molts(experiment_filemap, config, block_config):
     return output_file
 
 def run_fluorescence_quantification(experiment_filemap, config, block_config):
+    analysis_subdir = os.path.join(config['experiment_dir'], "analysis")
 
     fluorescence_quantification_source = block_config['fluorescence_quantification_source'][0]
     fluorescence_quantification_channel = block_config['fluorescence_quantification_source'][1]
