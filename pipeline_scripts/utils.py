@@ -59,7 +59,7 @@ def process_row_input_output_files(row, columns, output_dir, rerun):
     else:
         return None, None
 
-def get_input_and_output_files_parallel(experiment_filemap: pd.DataFrame, columns: list, output_dir: str, rerun=True, n_jobs=-1):
+def get_input_and_output_files_parallel(experiment_filemap, columns: list, output_dir: str, rerun=True, n_jobs=-1):
     results = Parallel(n_jobs=n_jobs)(delayed(process_row_input_output_files)(row, columns, output_dir, rerun) for _, row in experiment_filemap.iterrows())
 
     # Filter out None results
