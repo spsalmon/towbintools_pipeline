@@ -119,7 +119,7 @@ If you don't specify anything, the config file used will be "./config.yaml" but 
 bash run_pipeline.sh -c path_to_config_file
 ```
 
-or 
+or
 
 ```bash
 bash run_pipeline.sh --config path_to_config_file
