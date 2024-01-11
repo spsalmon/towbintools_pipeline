@@ -4,6 +4,7 @@ from towbintools.foundation import file_handling as file_handling
 import os
 import subprocess
 import numpy as np
+from joblib import Parallel, delayed
 
 # ----BOILERPLATE CODE FOR FILE HANDLING----
 
@@ -49,23 +50,31 @@ def create_temp_folders():
     os.makedirs(os.path.join(temp_dir, "batch"), exist_ok=True)
     os.makedirs(os.path.join(temp_dir, "sbatch_output"), exist_ok=True)
 
+def process_row_input_output_files(row, columns, output_dir, rerun):
+    input_file = [row[column] for column in columns]
+    output_file = os.path.join(output_dir, os.path.basename(row[columns[0]]))
+
+    if (rerun or not os.path.exists(output_file)) and all([(inp is not None) and (inp != '') for inp in input_file]):
+        return input_file, output_file
+    else:
+        return None, None
+
+def get_input_and_output_files_parallel(experiment_filemap: pd.DataFrame, columns: list, output_dir: str, rerun=True, n_jobs=-1):
+    results = Parallel(n_jobs=n_jobs)(delayed(process_row_input_output_files)(row, columns, output_dir, rerun) for _, row in experiment_filemap.iterrows())
+
+    # Filter out None results
+    results = [result for result in results if result[0] is not None]
+
+    # Separate input and output files
+    input_files, output_files = zip(*results) if results else ([], [])
+
+    return input_files, output_files
 
 def get_input_and_output_files(experiment_filemap, columns, output_dir, rerun=True):
     input_files = []
     output_files = []
 
     for _, row in experiment_filemap.iterrows():
-
-        # input_file = []
-        # for column in columns:
-        #     try:
-        #         input_file.append(row[column])
-        #     except KeyError:
-        #         experiment_dir = experiment_filemap['raw'][0].split('raw')[0]
-        #         analysis_dir = os.path.join(experiment_dir, column)
-        #         experiment_filemap = add_dir_to_experiment_filemap(experiment_filemap, analysis_dir, column)
-                
-        #         input_file.append(row[column])
         input_file = [row[column] for column in columns]
         output_file = os.path.join(
             output_dir, os.path.basename(row[columns[0]]))

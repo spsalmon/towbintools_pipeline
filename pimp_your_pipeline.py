@@ -4,7 +4,7 @@ import subprocess
 import pickle
 from towbintools.foundation import file_handling as file_handling
 import pandas as pd
-from pipeline_scripts.utils import pickle_objects, create_sbatch_file, get_and_create_folders, get_input_and_output_files, add_dir_to_experiment_filemap, create_temp_folders, get_output_name, run_command, cleanup_files
+from pipeline_scripts.utils import pickle_objects, create_sbatch_file, get_and_create_folders, get_input_and_output_files_parallel, add_dir_to_experiment_filemap, create_temp_folders, get_output_name, run_command, cleanup_files
 import numpy as np
 import shutil
 
@@ -15,7 +15,7 @@ def run_segmentation(experiment_filemap, config, block_config):
 
     segmentation_subdir = get_output_name(experiment_dir, block_config['segmentation_column'], 'seg', block_config['segmentation_channels'], return_subdir=True, add_raw = False)
 
-    images_to_segment, segmentation_output_files = get_input_and_output_files(
+    images_to_segment, segmentation_output_files = get_input_and_output_files_parallel(
         experiment_filemap, [block_config['segmentation_column']], segmentation_subdir, rerun=block_config['rerun_segmentation'])
     
     
@@ -52,7 +52,7 @@ def run_straightening(experiment_filemap, config, block_config):
                 print(f'Could not find {column} in the experiment_filemap and could not infer the files that it would contain.')
                 return straightening_subdir
 
-    input_files, straightening_output_files = get_input_and_output_files(
+    input_files, straightening_output_files = get_input_and_output_files_parallel(
         experiment_filemap, columns, straightening_subdir, rerun=block_config['rerun_straightening'])
 
     if len(input_files) != 0:
@@ -74,7 +74,7 @@ def run_compute_volume(experiment_filemap, config, block_config):
 
     rerun = ((block_config['rerun_volume_computation']) or (os.path.exists(output_file) == False))
 
-    input_files, _ = get_input_and_output_files(
+    input_files, _ = get_input_and_output_files_parallel(
         experiment_filemap, volume_computation_masks, analysis_subdir, rerun=True)
 
     input_files = [input_file[0] for input_file in input_files]
@@ -100,7 +100,7 @@ def run_classification(experiment_filemap, config, block_config):
 
     rerun = ((block_config['rerun_classification']) or (os.path.exists(output_file) == False))
 
-    input_files, _ = get_input_and_output_files(
+    input_files, _ = get_input_and_output_files_parallel(
         experiment_filemap, classification_source, analysis_subdir, rerun=True)
 
     input_files = [input_file[0] for input_file in input_files]
@@ -148,7 +148,7 @@ def run_fluorescence_quantification(experiment_filemap, config, block_config):
 
     columns = [fluorescence_quantification_source, block_config['fluorescence_quantification_masks']]
 
-    input_files, _ = get_input_and_output_files(experiment_filemap, columns, analysis_subdir, rerun=True)
+    input_files, _ = get_input_and_output_files_parallel(experiment_filemap, columns, analysis_subdir, rerun=True)
 
     rerun = ((block_config['rerun_fluorescence_quantification']) or (os.path.exists(output_file) == False))
 
