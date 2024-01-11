@@ -108,7 +108,21 @@ cd ~/towbintools_pipeline
 ```
 
 ```bash
-sbatch run_pipeline.sh
+bash run_pipeline.sh
+```
+
+### Using a custom config file
+
+If you don't specify anything, the config file used will be "./config.yaml" but you can specify one using
+
+```bash
+bash run_pipeline.sh -c path_to_config_file
+```
+
+or 
+
+```bash
+bash run_pipeline.sh --config path_to_config_file
 ```
 
 ## Updating the pipeline

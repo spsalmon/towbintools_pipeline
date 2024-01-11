@@ -6,8 +6,15 @@ from pipeline_scripts.utils import get_and_create_folders, add_dir_to_experiment
 import numpy as np
 import shutil
 from pipeline_scripts.run_functions import run_segmentation, run_straightening, run_compute_volume, run_classification, run_detect_molts, run_fluorescence_quantification, run_custom
+import argparse
 
-config_file = "./config.yaml"
+def get_args():
+    parser = argparse.ArgumentParser()
+    parser.add_argument('-c', '--config', help='Path to the config file', required=True)
+    args = parser.parse_args()
+    return args
+
+config_file = get_args().config
 with open(config_file) as f:
     config = yaml.load(f, Loader=yaml.FullLoader)
 
