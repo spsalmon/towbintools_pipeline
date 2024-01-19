@@ -23,7 +23,12 @@ import argparse
 
 def get_args():
     parser = argparse.ArgumentParser()
-    parser.add_argument("-c", "--config", help="Path to the config file", required=True)
+    parser.add_argument(
+        "-c",
+        "--config",
+        help="Path to the config file",
+        required=True
+    )
     args = parser.parse_args()
     return args
 
@@ -34,8 +39,8 @@ with open(config_file) as f:
 
 create_temp_folders()
 
-experiment_dir, raw_subdir, analysis_subdir, report_subdir = get_and_create_folders(
-    config
+experiment_dir, raw_subdir, analysis_subdir, report_subdir = (
+    get_and_create_folders(config)
 )
 
 # copy the config file to the report folder
