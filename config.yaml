@@ -1,11 +1,11 @@
-experiment_dir: "/mnt/external.data/TowbinLab/spsalmon/pipeline_test_folder/"
+experiment_dir: "/mnt/external.data/TowbinLab/plenart/20221020_Ti2_10x_green_bacteria_wbt150_small_chambers_good/"
 
-building_blocks: ["segmentation"]
+building_blocks: ["classification"]
 
 rerun_segmentation: [False]
 rerun_straightening: [False]
 rerun_volume_computation: [False]
-rerun_classification: [False]
+rerun_classification: [True]
 rerun_molt_detection: [False]
 rerun_fluorescence_quantification: [False]
 

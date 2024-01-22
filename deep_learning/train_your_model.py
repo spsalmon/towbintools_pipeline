@@ -8,6 +8,7 @@ from towbintools.deep_learning.utils.augmentation import (
 )
 from towbintools.deep_learning.utils.dataset import (
     create_segmentation_training_dataframes_and_dataloaders,
+    create_dataloaders_from_filemap,
 )
 import yaml
 import argparse
@@ -29,6 +30,7 @@ with open(config_file) as f:
 
 image_directories = config["image_directories"]
 mask_directories = config["mask_directories"]
+training_filemap = config.get("training_filemap", None)
 save_dir = config["save_dir"]
 model_name = config["model_name"]
 pretrained = config.get("pretrained", True)
@@ -57,24 +59,37 @@ os.makedirs(model_save_dir, exist_ok=True)
 
 input_channels = len(channels_to_segment)
 
-# create dataframes and dataloaders
-(
-    training_dataframe,
-    validation_dataframe,
-    train_loader,
-    val_loader,
-) = create_segmentation_training_dataframes_and_dataloaders(
-    image_directories,
-    mask_directories,
-    save_dir=model_save_dir,
-    train_test_split_ratio=train_val_split_ratio,
-    batch_size=batch_size,
-    num_workers=num_workers,
-    train_on_tiles=train_on_tiles,
-    tiler_params=tiler_params,
-    training_transform=get_training_augmentation(**normalization_parameters),
-    validation_transform=get_prediction_augmentation(**normalization_parameters),
-)
+if training_filemap is not None:
+    train_loader, val_loader = create_dataloaders_from_filemap(
+        training_filemap,
+        batch_size=batch_size,
+        num_workers=num_workers,
+        channels=channels_to_segment,
+        tiler_params=tiler_params,
+        training_transform=get_training_augmentation(**normalization_parameters),
+        validation_transform=get_prediction_augmentation(**normalization_parameters),
+    )
+
+else :
+    # create dataframes and dataloaders
+    (
+        training_dataframe,
+        validation_dataframe,
+        train_loader,
+        val_loader,
+    ) = create_segmentation_training_dataframes_and_dataloaders(
+        image_directories,
+        mask_directories,
+        save_dir=model_save_dir,
+        train_test_split_ratio=train_val_split_ratio,
+        batch_size=batch_size,
+        num_workers=num_workers,
+        train_on_tiles=train_on_tiles,
+        channels=channels_to_segment,
+        tiler_params=tiler_params,
+        training_transform=get_training_augmentation(**normalization_parameters),
+        validation_transform=get_prediction_augmentation(**normalization_parameters),
+    )
 
 # initialize model
 if pretrained:
