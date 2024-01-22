@@ -92,7 +92,7 @@ if "M4" not in filemap.columns.tolist():
 
 
 def save_filemap(filemap=filemap):
-    print(f"Saving filemap ...")
+    print("Saving filemap ...")
     filemap.to_csv(filemap_save_path, index=False)
     print("Filemap saved !")
 
@@ -178,7 +178,7 @@ timepoint_selector = ui.column(
         ui.column(4, ui.input_action_button("next_point", "next point")),
     ),
     ui.row(ui.input_selectize("channel", "Select channel", choices=list_channels),
-           ui.input_selectize("segmentation_overlay", "Overlay segmentation", choices=segmentation_columns, selected="")),
+           ui.input_selectize("segmentation_overlay", "Overlay segmentation", choices=[""].extend(segmentation_columns), selected="")),
     ui.row(
         ui.input_selectize(
             "column_to_plot",
@@ -640,7 +640,7 @@ def server(input, output, session):
             segmentation = image_handling.read_tiff_file(segmentation)
             fig, ax = plt.subplots()
             ax.imshow(img_to_plot, cmap="gray")
-            ax.imshow(segmentation.squeeze(), cmap = "viridis", alpha=0.5)
+            ax.imshow(segmentation.squeeze(), cmap = "viridis", alpha=0.3)
             return fig
         else:
             fig, ax = plt.subplots()
