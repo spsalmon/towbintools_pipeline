@@ -44,6 +44,7 @@ usual_columns = [
     "M4",
     "VolumeAtM4",
 ]
+
 usual_columns.extend(
     [column for column in filemap.columns.tolist() if "worm_type" in column]
 )
@@ -65,6 +66,11 @@ worm_type_column = [
 base_volume_column = [
     column for column in filemap.columns.tolist() if "volume" in column
 ][0]
+
+
+segmentation_columns = [column for column in filemap.columns.tolist() if "seg" in column 
+                        and "str" not in column and "worm_type" not in column and "volume" 
+                        not in column and "area" not in column and "length" not in column]
 
 # check if hatch columns exist
 if "HatchTime" not in filemap.columns.tolist():
@@ -171,7 +177,8 @@ timepoint_selector = ui.column(
         ui.column(4, ui.input_selectize("point", "Select point", choices=points)),
         ui.column(4, ui.input_action_button("next_point", "next point")),
     ),
-    ui.row(ui.input_selectize("channel", "Select channel", choices=list_channels)),
+    ui.row(ui.input_selectize("channel", "Select channel", choices=list_channels),
+           ui.input_selectize("segmentation_overlay", "Overlay segmentation", choices=segmentation_columns, selected="")),
     ui.row(
         ui.input_selectize(
             "column_to_plot",
@@ -252,9 +259,22 @@ def server(input, output, session):
         images_of_point_paths = filemap[filemap["Point"] == int(input.point())][
             "raw"
         ].values.tolist()
+
         images_of_point = images_of_point_paths
         # images_of_point = Parallel(n_jobs=-1)(delayed(image_handling.read_tiff_file)(path) for path in images_of_point_paths['raw'].values.tolist())
         return images_of_point
+    
+    @reactive.Calc
+    def get_segmentation_of_point():
+        if input.segmentation_overlay() == "":
+            return []
+        
+        segmentation_of_point_paths = filemap[filemap["Point"] == int(input.point())][
+            input.segmentation_overlay()
+        ].values.tolist()
+
+        segmentation_of_point = segmentation_of_point_paths
+        return segmentation_of_point
 
     def get_custom_annotations():
         if input.custom_column() == "":
@@ -608,13 +628,24 @@ def server(input, output, session):
         channel = int(channel) - 1
 
         images_of_point = get_images_of_point()
+        segmentation_of_point = get_segmentation_of_point()
+
         img = images_of_point[int(input.time())]
         img = image_handling.read_tiff_file(img)
-        print(img.shape)
 
-        fig, ax = plt.subplots()
-        im = ax.imshow(img[channel].squeeze(), cmap="gray")
-        return fig
+        img_to_plot = img[channel].squeeze()
+
+        if len(segmentation_of_point) > 0:
+            segmentation = segmentation_of_point[int(input.time())]
+            segmentation = image_handling.read_tiff_file(segmentation)
+            fig, ax = plt.subplots()
+            ax.imshow(img_to_plot, cmap="gray")
+            ax.imshow(segmentation.squeeze(), cmap = "viridis", alpha=0.5)
+            return fig
+        else:
+            fig, ax = plt.subplots()
+            ax.imshow(img_to_plot, cmap="gray")
+            return fig
 
     session.on_ended(save_filemap)
 

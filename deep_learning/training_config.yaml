@@ -1,6 +1,8 @@
 image_directories: ['/home/alex/Downloads/2019-10-01_2019-10-31/']
 mask_directories: ['/home/alex/Downloads/2019-10-01_2019-10-31/']
 
+training_filemap: '/home/alex/Downloads/2019-10-01_2019-10-31/filemap.csv'
+
 model_save_dir: '/home/alex/Downloads/2019-10-01_2019-10-31/'
 model_name: 'basic_unet'
 
