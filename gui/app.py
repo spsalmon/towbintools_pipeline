@@ -71,6 +71,7 @@ base_volume_column = [
 segmentation_columns = [column for column in filemap.columns.tolist() if "seg" in column 
                         and "str" not in column and "worm_type" not in column and "volume" 
                         not in column and "area" not in column and "length" not in column]
+overlay_segmentation_choices = [""] + segmentation_columns
 
 # check if hatch columns exist
 if "HatchTime" not in filemap.columns.tolist():
@@ -178,7 +179,7 @@ timepoint_selector = ui.column(
         ui.column(4, ui.input_action_button("next_point", "next point")),
     ),
     ui.row(ui.input_selectize("channel", "Select channel", choices=list_channels),
-           ui.input_selectize("segmentation_overlay", "Overlay segmentation", choices=[""].extend(segmentation_columns), selected="")),
+           ui.input_selectize("segmentation_overlay", "Overlay segmentation", choices=overlay_segmentation_choices, selected="")),
     ui.row(
         ui.input_selectize(
             "column_to_plot",

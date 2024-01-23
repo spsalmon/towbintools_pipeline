@@ -5,12 +5,23 @@
 ~/.local/bin/micromamba self-update
 
 # Create environment
-
-~/.local/bin/micromamba create -n towbintools --override-channels -c pytorch -c ilastik-forge -c conda-forge ilastik
+~/.local/bin/micromamba create -n towbintools python=3.9
 
 # Activate environment
 
 ~/.local/bin/micromamba activate towbintools
+
+# Install all the cuda stuff
+
+micromamba install pytorch torchvision torchaudio pytorch-cuda=11.8 -c pytorch -c nvidia
+
+# Install imagecodecs
+
+~/.local/bin/micromamba install -c conda-forge imagecodecs=2024.1.1
+
+# Install ilastik
+
+~/.local/bin/micromamba install -c ilastik-forge ilastik-core
 
 # Install pip in the environment
 
@@ -19,10 +30,6 @@
 # Install the required packages 
 
 python -m pip install -r ~/towbintools_pipeline/requirements.txt
-
-# Install all the cuda stuff
-
-pip3 install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu118
 
 # Add the environment to the jupyter notebook kernel
 
