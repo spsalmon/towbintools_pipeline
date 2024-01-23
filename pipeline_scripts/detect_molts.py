@@ -1,12 +1,8 @@
-from towbintools.foundation import image_handling, detect_molts
-import argparse
+from towbintools.foundation import detect_molts
 import numpy as np
-from tifffile import imwrite
 import os
 from joblib import Parallel, delayed
-import re
 import pandas as pd
-import yaml
 import utils
 
 
