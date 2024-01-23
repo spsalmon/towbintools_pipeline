@@ -161,6 +161,7 @@ cython_debug/
 
 temp_files/*
 sbatch_output/*
+lightning_logs/*
 
 *.pkl
 *.csv
