@@ -1,8 +1,0 @@
-architecture: UnetPlusPlus
-encoder: efficientnet-b4
-learning_rate: 0.0001
-n_classes: 1
-normalization:
-  hi: 99
-  lo: 1
-pretrained_weights: image-micronet
