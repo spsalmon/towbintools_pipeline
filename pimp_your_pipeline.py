@@ -251,6 +251,9 @@ for i, building_block in enumerate(building_blocks):
         func_data = building_block_functions[building_block]
         result = func_data["func"](experiment_filemap, config, block_config)
 
+        # reload the experiment filemap in case it was modified during the function call
+        experiment_filemap = pd.read_csv(os.path.join(report_subdir, "analysis_filemap.csv"))
+
         if func_data.get("return_subdir"):
             experiment_filemap = add_dir_to_experiment_filemap(
                 experiment_filemap, result, f'analysis/{result.split("analysis/")[-1]}'
