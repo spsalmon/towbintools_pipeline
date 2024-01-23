@@ -1,17 +1,17 @@
 image_directories: ['/home/alex/Downloads/2019-10-01_2019-10-31/']
 mask_directories: ['/home/alex/Downloads/2019-10-01_2019-10-31/']
 
-training_filemap: '/home/alex/Downloads/2019-10-01_2019-10-31/filemap.csv'
+training_filemap: '/mnt/external.data/TowbinLab/plenart/20221020_Ti2_10x_green_bacteria_wbt150_small_chambers_good/analysis/report/training_filemap.csv'
 
-model_save_dir: '/home/alex/Downloads/2019-10-01_2019-10-31/'
-model_name: 'basic_unet'
+save_dir: '/home/spsalmon/segmentation_models/'
+model_name: 'brightfield_only_unetplusplus_efficientnetb4'
 
 pretrained: True
 
-continue_training_from_checkpoint: ['/home/alex/Downloads/2019-10-01_2019-10-31/basic_unet/epoch=0.ckpt']
+continue_training_from_checkpoint: null
 
 n_classes: 1
-channels_to_segment: [0]
+channels_to_segment: [2]
 
 architecture: 'UnetPlusPlus'
 pretrained_encoder: 'efficientnet-b4'
@@ -19,16 +19,16 @@ pretrained_weights: 'image-micronet'
 
 deep_supervision: False
 
-learning_rate: 1e-4
+learning_rate: 1.0e-4
 normalization_parameters: {'type': 'percentile', 'lo': 1, 'hi': 99}
 
 train_on_tiles: True
-tiler_config: [[[512, 512], [256, 256]]]
+tiler_config: {'tile_size':[512, 512], 'tile_step':[256, 256]}
 
 max_epochs: 100
 batch_size: 5
 accumulate_grad_batches: 8
-num_workers: 8
+num_workers: 32
 
 save_best_k_models: 2
 train_val_split_ratio: 0.25

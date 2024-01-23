@@ -41,11 +41,19 @@ pretrained_encoder = config.get("pretrained_encoder", "efficientnet-b4")
 pretrained_weights = config.get("pretrained_weights", "image-micronet")
 deep_supervision = config.get("deep_supervision", False)
 learning_rate = config.get("learning_rate", 1e-4)
+
 normalization_parameters = config.get(
     "normalization_parameters", {"type": "percentile", "lo": 1, "hi": 99}
 )
+
+normalization_type = normalization_parameters["type"]
+# remove type from normalization_parameters
+del normalization_parameters["type"]
+
 train_on_tiles = config.get("train_on_tiles", True)
-tiler_params = config.get("tiler_params", [[[512, 512], [256, 256]]])
+tiler_params = config.get(
+    "tiler_params", {"tile_size": [512, 512], "tile_step": [256, 256]}
+)
 max_epochs = config.get("max_epochs", 100)
 batch_size = config.get("batch_size", 5)
 accumulate_grad_batches = config.get("accumulate_grad_batches", 8)
@@ -60,17 +68,18 @@ os.makedirs(model_save_dir, exist_ok=True)
 input_channels = len(channels_to_segment)
 
 if training_filemap is not None:
-    train_loader, val_loader = create_dataloaders_from_filemap(
+    _, _, train_loader, val_loader = create_dataloaders_from_filemap(
         training_filemap,
+        save_dir=model_save_dir,
         batch_size=batch_size,
         num_workers=num_workers,
         channels=channels_to_segment,
         tiler_params=tiler_params,
-        training_transform=get_training_augmentation(**normalization_parameters),
-        validation_transform=get_prediction_augmentation(**normalization_parameters),
+        training_transform=get_training_augmentation(normalization_type, **normalization_parameters),
+        validation_transform=get_prediction_augmentation(normalization_type, **normalization_parameters),
     )
 
-else :
+else:
     # create dataframes and dataloaders
     (
         training_dataframe,
@@ -87,8 +96,8 @@ else :
         train_on_tiles=train_on_tiles,
         channels=channels_to_segment,
         tiler_params=tiler_params,
-        training_transform=get_training_augmentation(**normalization_parameters),
-        validation_transform=get_prediction_augmentation(**normalization_parameters),
+        training_transform=get_training_augmentation(normalization_type,**normalization_parameters),
+        validation_transform=get_prediction_augmentation(normalization_type, **normalization_parameters),
     )
 
 # initialize model
@@ -126,7 +135,7 @@ trainer = pl.Trainer(
     callbacks=[checkpoint_callback, swa_callback],
     accumulate_grad_batches=accumulate_grad_batches,
     gradient_clip_val=0.5,
-    detect_anomaly=True,
+    detect_anomaly=False,
 )
 trainer.fit(model=model, train_dataloaders=train_loader, val_dataloaders=val_loader)
 print(checkpoint_callback.best_model_path)
