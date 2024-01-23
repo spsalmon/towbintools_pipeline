@@ -1,27 +1,17 @@
 from towbintools.foundation import image_handling
 from towbintools.segmentation import segmentation_tools
-from towbintools.foundation import binary_image
-import argparse
-import yaml
 import numpy as np
 from tifffile import imwrite
 import os
 from joblib import Parallel, delayed
-from joblib import wrap_non_picklable_objects
 import utils
 import torch
-from towbintools.deep_learning.architectures import models
+from towbintools.deep_learning.deep_learning_tools import load_segmentation_model_from_checkpoint
 from towbintools.deep_learning.utils.augmentation import get_prediction_augmentation
 from pytorch_toolbelt.inference.tiles import ImageSlicer
-from tifffile import tiffcomment
-import ome_types
-from time import perf_counter
-
 from ilastik.experimental.api import PixelClassificationPipeline
 from xarray import DataArray
-
 import logging
-import multiprocessing
 
 logging.basicConfig(level=logging.INFO)
 
@@ -162,9 +152,7 @@ def main(input_pickle, output_pickle, config, n_jobs):
 
         if len(devices) == 1:
             device = devices[0]
-            model = models.LightningPretrained.load_from_checkpoint(
-                config["model_path"], map_location=device
-            )
+            model = load_segmentation_model_from_checkpoint(config["model_path"]).to(device)
             model.eval()
             model.freeze()
             # except KeyError:
@@ -212,9 +200,7 @@ def main(input_pickle, output_pickle, config, n_jobs):
 
         else:
             modelz = [
-                models.LightningPretrained.load_from_checkpoint(
-                    config["model_path"], map_location=device
-                )
+                load_segmentation_model_from_checkpoint(config["model_path"]).to(device)
                 for device in devices
             ]
             normalization_type = modelz[0].normalization["type"]

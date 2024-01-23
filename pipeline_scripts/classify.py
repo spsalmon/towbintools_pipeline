@@ -1,15 +1,11 @@
-from towbintools.foundation import image_handling, worm_features
+from towbintools.foundation import image_handling
 from towbintools.classification import classification_tools
-import argparse
-import numpy as np
-from tifffile import imwrite
 import os
 from joblib import Parallel, delayed
 import re
 import pandas as pd
 import utils
 import xgboost as xgb
-import yaml
 
 
 def classify_worm_type_from_file_path(

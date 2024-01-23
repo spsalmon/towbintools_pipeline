@@ -1,16 +1,10 @@
-from towbintools.foundation import image_handling, worm_features
+from towbintools.foundation import image_handling
 from towbintools.quantification import fluorescence_in_mask
-import argparse
-import numpy as np
-from tifffile import imwrite
 import os
 from joblib import Parallel, delayed
 import re
 import pandas as pd
 import utils
-import yaml
-
-import logging
 
 
 def quantify_fluorescence_from_file_path(

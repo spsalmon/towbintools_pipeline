@@ -6,8 +6,6 @@ from tifffile import imwrite
 import os
 from joblib import Parallel, delayed
 from scipy.ndimage import binary_fill_holes
-import argparse
-import yaml
 import utils
 import cv2
 
