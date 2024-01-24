@@ -42,13 +42,13 @@ pretrained_weights = config.get("pretrained_weights", "image-micronet")
 deep_supervision = config.get("deep_supervision", False)
 learning_rate = config.get("learning_rate", 1e-4)
 
-normalization_parameters = config.get(
+full_normalization_parameters = config.get(
     "normalization_parameters", {"type": "percentile", "lo": 1, "hi": 99}
 )
 
-normalization_type = normalization_parameters["type"]
+normalization_type = full_normalization_parameters["type"]
 # remove type from normalization_parameters
-del normalization_parameters["type"]
+normalization_parameters = {k: v for k, v in full_normalization_parameters.items() if k != "type"}
 
 train_on_tiles = config.get("train_on_tiles", True)
 tiler_params = config.get(
@@ -107,7 +107,7 @@ if pretrained:
         architecture=architecture,
         encoder=pretrained_encoder,
         pretrained_weights=pretrained_weights,
-        normalization=normalization_parameters,
+        normalization=full_normalization_parameters,
         learning_rate=learning_rate,
         checkpoint_path=checkpoint_path,
     )
@@ -116,7 +116,7 @@ else:
         n_classes=n_classes,
         input_channels=input_channels,
         architecture=architecture,
-        normalization=normalization_parameters,
+        normalization=full_normalization_parameters,
         learning_rate=learning_rate,
         checkpoint_path=checkpoint_path,
         deep_supervision=deep_supervision,
