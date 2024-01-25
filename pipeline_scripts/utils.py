@@ -28,6 +28,7 @@ def get_output_name(
     return_subdir=True,
     add_raw=False,
     suffix=None,
+    custom_suffix=None,
 ):
     analysis_subdir = os.path.join(experiment_dir, "analysis")
     report_subdir = os.path.join(analysis_subdir, "report")
@@ -44,6 +45,8 @@ def get_output_name(
     output_name += task_name
     if suffix is not None:
         output_name += f"_{suffix}"
+    if custom_suffix is not None:
+        output_name += f"_{custom_suffix}"
 
     if return_subdir:
         output_name = os.path.join(analysis_subdir, output_name)

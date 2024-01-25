@@ -21,6 +21,7 @@ def run_segmentation(experiment_filemap, config, block_config):
         block_config["segmentation_channels"],
         return_subdir=True,
         add_raw=False,
+        custom_suffix=block_config["segmentation_name_suffix"],
     )
 
     images_to_segment, segmentation_output_files = get_input_and_output_files_parallel(
