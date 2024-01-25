@@ -99,6 +99,7 @@ def build_config_of_building_blocks(building_blocks, config):
         "segmentation": [
             "rerun_segmentation",
             "segmentation_column",
+            "segmentation_name_suffix",
             "segmentation_method",
             "segmentation_channels",
             "augment_contrast",

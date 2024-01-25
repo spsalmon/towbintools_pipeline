@@ -12,6 +12,7 @@ rerun_fluorescence_quantification: [False]
 
 # segmentation parameters
 segmentation_column: ['raw']
+segmentation_name_suffix: [null]
 segmentation_method: ["edge_based", "ilastik"]
 segmentation_channels: [[1], [0]]
 augment_contrast: [False]
