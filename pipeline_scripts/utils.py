@@ -66,7 +66,12 @@ def create_temp_folders():
 
 def process_row_input_output_files(row, columns, output_dir, rerun):
     input_file = [row[column] for column in columns]
-    output_file = os.path.join(output_dir, os.path.basename(row[columns[0]]))
+
+    try:
+        output_file = os.path.join(output_dir, os.path.basename(row[columns[0]]))
+    except Exception as e:
+        print(f'Raised exception {e} for row {row}')
+        return None, None
 
     if (rerun or not os.path.exists(output_file)) and all(
         [(inp is not None) and (inp != "") for inp in input_file]
