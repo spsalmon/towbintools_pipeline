@@ -43,7 +43,10 @@ def run_segmentation(experiment_filemap, config, block_config):
 
         command = f"~/.local/bin/micromamba run -n towbintools python3 ./pipeline_scripts/segment.py -i {input_pickle_path} -o {output_pickle_path} -c {pickled_block_config} -j {config['sbatch_cpus']}"
 
-        run_command(command, "seg", config)
+        if config['segmentation_method'] == "deep_learning":
+            run_command(command, "seg", config, requires_gpu=True)
+        else:
+            run_command(command, "seg", config)
 
         cleanup_files(input_pickle_path, output_pickle_path, pickled_block_config)
 
