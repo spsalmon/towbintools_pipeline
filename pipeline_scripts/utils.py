@@ -158,7 +158,7 @@ def cleanup_files(*filepaths):
 # ----BOILERPLATE CODE FOR SLURM----
 
 
-def run_command(command, script_name, config):
+def run_command(command, script_name, config, requires_gpu=False):
     if config["sbatch_gpus"] == 0 or config["sbatch_gpus"] is None:
         create_sbatch_file(
             script_name,
@@ -167,7 +167,7 @@ def run_command(command, script_name, config):
             config["sbatch_memory"],
             command,
         )
-    else:
+    elif requires_gpu:
         create_sbatch_file(
             script_name,
             config["sbatch_cpus"],
@@ -175,6 +175,14 @@ def run_command(command, script_name, config):
             config["sbatch_memory"],
             command,
             gpus=config["sbatch_gpus"],
+        )
+    else:
+        create_sbatch_file(
+            script_name,
+            config["sbatch_cpus"],
+            config["sbatch_time"],
+            config["sbatch_memory"],
+            command,
         )
     subprocess.run(["sbatch", f"./temp_files/batch/{script_name}.sh"])
 
