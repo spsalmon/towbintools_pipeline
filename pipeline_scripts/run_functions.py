@@ -9,7 +9,6 @@ from pipeline_scripts.utils import (
     cleanup_files,
 )
 
-
 def run_segmentation(experiment_filemap, config, block_config):
     # create segmentation subdir
     experiment_dir = config["experiment_dir"]
@@ -43,7 +42,7 @@ def run_segmentation(experiment_filemap, config, block_config):
 
         command = f"~/.local/bin/micromamba run -n towbintools python3 ./pipeline_scripts/segment.py -i {input_pickle_path} -o {output_pickle_path} -c {pickled_block_config} -j {config['sbatch_cpus']}"
 
-        if config['segmentation_method'] == "deep_learning":
+        if block_config["segmentation_method"] == "deep_learning":
             run_command(command, "seg", config, requires_gpu=True)
         else:
             run_command(command, "seg", config)

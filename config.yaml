@@ -1,8 +1,8 @@
 experiment_dir: "/mnt/external.data/TowbinLab/spsalmon/pipeline_test_folder/"
 
-building_blocks: ["segmentation", "straightening"]
+building_blocks: ["segmentation", "segmentation"]
 
-rerun_segmentation: [False]
+rerun_segmentation: [True]
 rerun_straightening: [True]
 rerun_volume_computation: [True]
 rerun_classification: [False]
@@ -12,7 +12,7 @@ rerun_fluorescence_quantification: [False]
 # segmentation parameters
 segmentation_column: ['raw']
 segmentation_name_suffix: [null]
-segmentation_method: ["edge_based"]
+segmentation_method: ["deep_learning"]
 segmentation_channels: [[1]]
 augment_contrast: [False]
 
