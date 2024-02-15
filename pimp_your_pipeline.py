@@ -6,9 +6,9 @@ from pipeline_scripts.utils import (
     get_and_create_folders,
     add_dir_to_experiment_filemap,
     create_temp_folders,
+    backup_file,
 )
 import numpy as np
-import shutil
 from pipeline_scripts.run_functions import (
     run_segmentation,
     run_straightening,
@@ -47,24 +47,8 @@ experiment_dir, raw_subdir, analysis_subdir, report_subdir = (
 # if it already exists, change the name of the new one by adding a number
 config_dir = os.path.join(report_subdir, "config")
 os.makedirs(config_dir, exist_ok=True)
-if os.path.exists(os.path.join(config_dir, os.path.basename(config_file))):
-    i = 1
-    while os.path.exists(
-        os.path.join(
-            config_dir, f"{os.path.splitext(os.path.basename(config_file))[0]}_{i}.yaml"
-        )
-    ):
-        i += 1
-    shutil.copyfile(
-        config_file,
-        os.path.join(
-            config_dir, f"{os.path.splitext(os.path.basename(config_file))[0]}_{i}.yaml"
-        ),
-    )
-else:
-    shutil.copyfile(
-        config_file, os.path.join(config_dir, os.path.basename(config_file))
-    )
+
+backup_file(config_file, config_dir)
 
 if not os.path.exists(os.path.join(report_subdir, "analysis_filemap.csv")):
     experiment_filemap = file_handling.get_dir_filemap(raw_subdir)

@@ -5,9 +5,45 @@ import os
 import subprocess
 import numpy as np
 from joblib import Parallel, delayed
+import shutil
 
 # ----BOILERPLATE CODE FOR FILE HANDLING----
 
+def backup_file(file_path, destination_dir):
+    # Ensure the source file exists
+    if not os.path.exists(file_path):
+        print(f"Source file does not exist: {file_path}")
+        return False
+
+    # Ensure the destination directory exists
+    if not os.path.exists(destination_dir):
+        print(f"Destination directory does not exist, attempting to create: {destination_dir}")
+        try:
+            os.makedirs(destination_dir)
+        except OSError as e:
+            print(f"Failed to create destination directory: {e}")
+            return False
+
+    base_name = os.path.splitext(os.path.basename(file_path))[0]
+    file_extension = os.path.splitext(file_path)[1]
+    destination_file_path = os.path.join(destination_dir, f"{base_name}{file_extension}")
+
+    # If a file with the same name exists, append an incrementing number
+    i = 1
+    while os.path.exists(destination_file_path):
+        destination_file_path = os.path.join(
+            destination_dir, f"{base_name}_{i}{file_extension}"
+        )
+        i += 1
+
+    # Attempt to copy the file
+    try:
+        shutil.copyfile(file_path, destination_file_path)
+        print(f"File backed up as: {destination_file_path}")
+        return True
+    except IOError as e:
+        print(f"Failed to backup file: {e}")
+        return False
 
 def get_and_create_folders(config):
     experiment_dir = config["experiment_dir"]
@@ -160,7 +196,7 @@ def cleanup_files(*filepaths):
 
 def run_command(command, script_name, config, requires_gpu=False):
     if config["sbatch_gpus"] == 0 or config["sbatch_gpus"] is None:
-        create_sbatch_file(
+        sbatch_output_file, sbatch_error_file = create_sbatch_file(
             script_name,
             config["sbatch_cpus"],
             config["sbatch_time"],
@@ -168,7 +204,7 @@ def run_command(command, script_name, config, requires_gpu=False):
             command,
         )
     elif requires_gpu:
-        create_sbatch_file(
+         sbatch_output_file,  sbatch_error_file = create_sbatch_file(
             script_name,
             config["sbatch_cpus"],
             config["sbatch_time"],
@@ -177,7 +213,7 @@ def run_command(command, script_name, config, requires_gpu=False):
             gpus=config["sbatch_gpus"],
         )
     else:
-        create_sbatch_file(
+         sbatch_output_file,  sbatch_error_file = create_sbatch_file(
             script_name,
             config["sbatch_cpus"],
             config["sbatch_time"],
@@ -185,6 +221,7 @@ def run_command(command, script_name, config, requires_gpu=False):
             command,
         )
     subprocess.run(["sbatch", f"./temp_files/batch/{script_name}.sh"])
+    return  sbatch_output_file,  sbatch_error_file
 
 
 def create_sbatch_file(job_name, cores, time_limit, memory, command, gpus=0):
@@ -203,6 +240,10 @@ def create_sbatch_file(job_name, cores, time_limit, memory, command, gpus=0):
 
     with open(f"./temp_files/batch/{job_name}.sh", "w") as file:
         file.write(content)
+    
+    sbatch_output_file = f"./temp_files/sbatch_output/{job_name}.out"
+    sbatch_error_file = f"./temp_files/sbatch_output/{job_name}.err"
+    return sbatch_output_file, sbatch_error_file
 
 
 # ----BOILERPLATE CODE FOR COMMAND LINE INTERFACE----

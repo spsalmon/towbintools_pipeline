@@ -28,6 +28,7 @@ points = filemap["Point"].unique().tolist()
 
 channels = image_handling.read_tiff_file(filemap["raw"].iloc[0]).shape[0]
 list_channels = [f"Channel {i+1}" for i in range(channels)]
+list_channels = ["None"] + list_channels
 
 usual_columns = [
     "Time",
@@ -178,7 +179,8 @@ timepoint_selector = ui.column(
         ui.column(4, ui.input_selectize("point", "Select point", choices=points)),
         ui.column(4, ui.input_action_button("next_point", "next point")),
     ),
-    ui.row(ui.input_selectize("channel", "Select channel", choices=list_channels),
+    ui.row(ui.input_selectize("channel", "Select channel", choices=list_channels, selected=list_channels[1]),
+           ui.input_selectize("channel_overlay", "Overlay channel", choices=list_channels, selected="None"),
            ui.input_selectize("segmentation_overlay", "Overlay segmentation", choices=overlay_segmentation_choices, selected="None")),
     ui.row(
         ui.input_selectize(
@@ -633,19 +635,36 @@ def server(input, output, session):
 
         img = images_of_point[int(input.time())]
         img = image_handling.read_tiff_file(img)
+        img_to_plot = img[channel]
 
-        img_to_plot = img[channel].squeeze()
+        plot_overlay = False
+        if input.channel_overlay() != "None":
+            channel_overlay = input.channel_overlay()
+            channel_overlay = channel_overlay.split(" ")[-1]
+            channel_overlay = int(channel_overlay) - 1
+
+            overlay = img[channel_overlay]
+            overlay = image_handling.normalize_image(overlay, dest_dtype=np.float64)
+            plot_overlay = True
+        else:
+            overlay = np.zeros_like(img[channel])
+        
+        img_to_plot = image_handling.normalize_image(img_to_plot, dest_dtype=np.float64)
 
         if len(segmentation_of_point) > 0:
             segmentation = segmentation_of_point[int(input.time())]
             segmentation = image_handling.read_tiff_file(segmentation)
             fig, ax = plt.subplots()
-            ax.imshow(img_to_plot, cmap="gray")
-            ax.imshow(segmentation.squeeze(), cmap = "viridis", alpha=0.3)
+            ax.imshow(img_to_plot, cmap="viridis")
+            if plot_overlay:
+                ax.imshow(overlay, cmap = "magma", alpha=0.7)
+            ax.imshow(segmentation.squeeze(), cmap = "gray", alpha=0.3)
             return fig
         else:
             fig, ax = plt.subplots()
-            ax.imshow(img_to_plot, cmap="gray")
+            ax.imshow(img_to_plot, cmap="viridis")
+            if plot_overlay:
+                ax.imshow(overlay, cmap = "magma", alpha=0.7)
             return fig
 
     session.on_ended(save_filemap)
