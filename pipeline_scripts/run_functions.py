@@ -7,11 +7,13 @@ from pipeline_scripts.utils import (
     get_output_name,
     run_command,
     cleanup_files,
+    backup_file,
 )
 
 def run_segmentation(experiment_filemap, config, block_config):
     # create segmentation subdir
     experiment_dir = config["experiment_dir"]
+    sbatch_backup_dir = os.path.join(experiment_dir, "analysis", "report", "sbatch_backup")
 
     segmentation_subdir = get_output_name(
         experiment_dir,
@@ -43,9 +45,13 @@ def run_segmentation(experiment_filemap, config, block_config):
         command = f"~/.local/bin/micromamba run -n towbintools python3 ./pipeline_scripts/segment.py -i {input_pickle_path} -o {output_pickle_path} -c {pickled_block_config} -j {config['sbatch_cpus']}"
 
         if block_config["segmentation_method"] == "deep_learning":
-            run_command(command, "seg", config, requires_gpu=True)
+            sbatch_output_file, sbatch_error_file = run_command(command, "seg", config, requires_gpu=True)
         else:
-            run_command(command, "seg", config)
+            sbatch_output_file, sbatch_error_file = run_command(command, "seg", config)
+
+        # backup output and error files
+        backup_file(sbatch_output_file, sbatch_backup_dir)
+        backup_file(sbatch_error_file, sbatch_backup_dir)
 
         cleanup_files(input_pickle_path, output_pickle_path, pickled_block_config)
 
@@ -53,6 +59,9 @@ def run_segmentation(experiment_filemap, config, block_config):
 
 
 def run_straightening(experiment_filemap, config, block_config):
+    experiment_dir = config["experiment_dir"]
+    sbatch_backup_dir = os.path.join(experiment_dir, "analysis", "report", "sbatch_backup")
+
     straightening_subdir = get_output_name(
         config["experiment_dir"],
         block_config["straightening_source"][0],
@@ -70,7 +79,6 @@ def run_straightening(experiment_filemap, config, block_config):
     for column in columns:
         if column not in experiment_filemap.columns:
             try:
-                experiment_dir = config["experiment_dir"]
                 report_subdir = os.path.join(experiment_dir, "analysis", "report")
                 column_subdir = os.path.join(experiment_dir, column)
                 experiment_filemap = add_dir_to_experiment_filemap(
@@ -108,14 +116,19 @@ def run_straightening(experiment_filemap, config, block_config):
             {"path": "block_config", "obj": block_config}
         )[0]
         command = f"~/.local/bin/micromamba run -n towbintools python3 ./pipeline_scripts/straighten.py -i {input_pickle_path} -o {output_pickle_path} -c {pickled_block_config} -j {config['sbatch_cpus']}"
-        run_command(command, "str", config)
+        sbatch_output_file, sbatch_error_file = run_command(command, "str", config)
+        backup_file(sbatch_output_file, sbatch_backup_dir)
+        backup_file(sbatch_error_file, sbatch_backup_dir)
         cleanup_files(input_pickle_path, output_pickle_path, pickled_block_config)
 
     return straightening_subdir
 
 
 def run_compute_volume(experiment_filemap, config, block_config):
+    experiment_dir = config["experiment_dir"]
+    sbatch_backup_dir = os.path.join(experiment_dir, "analysis", "report", "sbatch_backup")
     analysis_subdir = os.path.join(config["experiment_dir"], "analysis")
+
 
     volume_computation_masks = [block_config["volume_computation_masks"]]
     output_file = get_output_name(
@@ -146,13 +159,18 @@ def run_compute_volume(experiment_filemap, config, block_config):
         )[0]
 
         command = f"~/.local/bin/micromamba run -n towbintools python3 ./pipeline_scripts/compute_volume.py -i {input_files_pickle_path} -o {output_file} -c {pickled_block_config} -j {config['sbatch_cpus']}"
-        run_command(command, "vol", config)
+        sbatch_output_file, sbatch_error_file = run_command(command, "vol", config)
+        backup_file(sbatch_output_file, sbatch_backup_dir)
+        backup_file(sbatch_error_file, sbatch_backup_dir)
         cleanup_files(input_files_pickle_path, pickled_block_config)
 
     return output_file
 
 
 def run_classification(experiment_filemap, config, block_config):
+    experiment_dir = config["experiment_dir"]
+    sbatch_backup_dir = os.path.join(experiment_dir, "analysis", "report", "sbatch_backup")
+
     analysis_subdir = os.path.join(config["experiment_dir"], "analysis")
 
     model_name = os.path.basename(os.path.normpath(block_config["classifier"]))
@@ -187,13 +205,17 @@ def run_classification(experiment_filemap, config, block_config):
         )[0]
 
         command = f"~/.local/bin/micromamba run -n towbintools python3 ./pipeline_scripts/classify.py -i {input_files_pickle_path} -o {output_file} -c {pickled_block_config} -j {config['sbatch_cpus']}"
-        run_command(command, "class", config)
+        sbatch_output_file, sbatch_error_file = run_command(command, "class", config)
+        backup_file(sbatch_output_file, sbatch_backup_dir)
+        backup_file(sbatch_error_file, sbatch_backup_dir)
         cleanup_files(input_files_pickle_path, pickled_block_config)
 
     return output_file
 
 
 def run_detect_molts(experiment_filemap, config, block_config):
+    experiment_dir = config["experiment_dir"]
+    sbatch_backup_dir = os.path.join(experiment_dir, "analysis", "report", "sbatch_backup")
     report_subdir = os.path.join(config["experiment_dir"], "analysis", "report")
 
     experiment_filemap_pickle_path = pickle_objects(
@@ -210,13 +232,18 @@ def run_detect_molts(experiment_filemap, config, block_config):
             {"path": "block_config", "obj": block_config}
         )[0]
         command = f"~/.local/bin/micromamba run -n towbintools python3 ./pipeline_scripts/detect_molts.py -i {experiment_filemap_pickle_path} -o {output_file} -c {pickled_block_config} -j {config['sbatch_cpus']}"
-        run_command(command, "molt", config)
+        sbatch_output_file, sbatch_error_file = run_command(command, "molt", config)
+        backup_file(sbatch_output_file, sbatch_backup_dir)
+        backup_file(sbatch_error_file, sbatch_backup_dir)
         cleanup_files(experiment_filemap_pickle_path, pickled_block_config)
 
     return output_file
 
 
 def run_fluorescence_quantification(experiment_filemap, config, block_config):
+    experiment_dir = config["experiment_dir"]
+    sbatch_backup_dir = os.path.join(experiment_dir, "analysis", "report", "sbatch_backup")
+
     analysis_subdir = os.path.join(config["experiment_dir"], "analysis")
 
     fluorescence_quantification_source = block_config[
@@ -270,7 +297,9 @@ def run_fluorescence_quantification(experiment_filemap, config, block_config):
         )[0]
 
         command = f"~/.local/bin/micromamba run -n towbintools python3 ./pipeline_scripts/quantify_fluorescence.py -i {input_pickle_path} -o {output_file} -c {pickled_block_config} -j {config['sbatch_cpus']}"
-        run_command(command, "fluo", config)
+        sbatch_output_file, sbatch_error_file = run_command(command, "fluo", config)
+        backup_file(sbatch_output_file, sbatch_backup_dir)
+        backup_file(sbatch_error_file, sbatch_backup_dir)
         cleanup_files(input_pickle_path, pickled_block_config)
 
     return output_file
