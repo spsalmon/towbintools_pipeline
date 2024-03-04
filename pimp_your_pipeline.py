@@ -7,6 +7,7 @@ from pipeline_scripts.utils import (
     add_dir_to_experiment_filemap,
     create_temp_folders,
     backup_file,
+    get_experiment_time_from_filemap,
 )
 import numpy as np
 from pipeline_scripts.run_functions import (
@@ -62,6 +63,10 @@ else:
     )
     experiment_filemap = experiment_filemap.replace(np.nan, "", regex=True)
 
+# if the ExperimentTime column is not present, create it
+if "ExperimentTime" not in experiment_filemap.columns:
+    experiment_filemap["ExperimentTime"] = get_experiment_time_from_filemap(experiment_filemap)
+    
 print(experiment_filemap.head())
 
 building_blocks = config["building_blocks"]
