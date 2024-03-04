@@ -6,6 +6,7 @@ import subprocess
 import numpy as np
 from joblib import Parallel, delayed
 import shutil
+from towbintools.foundation.image_handling import get_acquisition_date
 
 # ----BOILERPLATE CODE FOR FILE HANDLING----
 
@@ -161,6 +162,24 @@ def add_dir_to_experiment_filemap(experiment_filemap, dir_path, subdir_name):
     experiment_filemap = experiment_filemap.replace(np.nan, "", regex=True)
     return experiment_filemap
 
+def get_experiment_time_from_filemap(experiment_filemap):
+    experiment_filemap['date'] = experiment_filemap['raw'].apply(get_acquisition_date)
+    # grouped by Point value, calculate the time difference between the first time and all other times
+    grouped = experiment_filemap.groupby('Point')
+    # get the date of the raw where Time is 0
+    first_time = grouped.apply(lambda x: x[x['Time'] == 0].iloc[0]['date'])
+
+    # iterate over each point and calculate the time difference
+    for point in experiment_filemap['Point'].unique():
+        # Use .loc to ensure you're modifying the original DataFrame
+        point_indices = experiment_filemap['Point'] == point
+        point_data = experiment_filemap.loc[point_indices]
+        experiment_filemap.loc[point_indices, 'ExperimentTime'] = (point_data['date'] - first_time[point]).dt.total_seconds()
+    
+    # remove the date column
+    experiment_filemap.drop(columns=['date'], inplace=True)
+
+    return experiment_filemap
 
 # ----BOILERPLATE CODE FOR PICKLING----
 
