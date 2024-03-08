@@ -176,10 +176,8 @@ def get_experiment_time_from_filemap(experiment_filemap):
         point_data = experiment_filemap.loc[point_indices]
         experiment_filemap.loc[point_indices, 'ExperimentTime'] = (point_data['date'] - first_time[point]).dt.total_seconds()
     
-    # remove the date column
-    experiment_filemap.drop(columns=['date'], inplace=True)
-
-    return experiment_filemap
+    # keep only the ExperimentTime column
+    return experiment_filemap['ExperimentTime']
 
 # ----BOILERPLATE CODE FOR PICKLING----
 

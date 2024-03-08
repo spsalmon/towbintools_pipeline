@@ -66,6 +66,9 @@ else:
 # if the ExperimentTime column is not present, create it
 if "ExperimentTime" not in experiment_filemap.columns:
     experiment_filemap["ExperimentTime"] = get_experiment_time_from_filemap(experiment_filemap)
+    experiment_filemap.to_csv(
+        os.path.join(report_subdir, "analysis_filemap.csv"), index=False
+    )
     
 print(experiment_filemap.head())
 

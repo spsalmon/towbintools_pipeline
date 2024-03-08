@@ -10,6 +10,7 @@ import plotly.express as px
 import plotly.graph_objs as go
 import numpy as np
 import os
+import aicsimageio
 
 from time import perf_counter
 
@@ -26,7 +27,8 @@ filemap_save_path = os.path.join(filemap_folder, filemap_save_path)
 times = filemap["Time"].unique().tolist()
 points = filemap["Point"].unique().tolist()
 
-channels = image_handling.read_tiff_file(filemap["raw"].iloc[0]).shape[0]
+# channels = image_handling.read_tiff_file(filemap["raw"].iloc[0]).shape[0]
+channels = int(aicsimageio.AICSImage(filemap["raw"].iloc[0]).dims["C"][0])
 list_channels = [f"Channel {i+1}" for i in range(channels)]
 list_channels = ["None"] + list_channels
 
