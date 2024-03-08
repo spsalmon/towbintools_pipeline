@@ -6,7 +6,11 @@ import subprocess
 import numpy as np
 from joblib import Parallel, delayed
 import shutil
+import pandas as pd
 from towbintools.foundation.image_handling import get_acquisition_date
+import dask.dataframe as dd
+from dask.diagnostics import ProgressBar
+
 
 # ----BOILERPLATE CODE FOR FILE HANDLING----
 
@@ -163,6 +167,7 @@ def add_dir_to_experiment_filemap(experiment_filemap, dir_path, subdir_name):
     return experiment_filemap
 
 def get_experiment_time_from_filemap(experiment_filemap):
+    print('### Calculating ExperimentTime ###')
     experiment_filemap['date'] = experiment_filemap['raw'].apply(get_acquisition_date)
     # grouped by Point value, calculate the time difference between the first time and all other times
     grouped = experiment_filemap.groupby('Point')
@@ -181,7 +186,12 @@ def get_experiment_time_from_filemap(experiment_filemap):
     return experiment_filemap['ExperimentTime']
 
 def get_experiment_time_from_filemap_parallel(experiment_filemap):
-    experiment_filemap['date'] = experiment_filemap['raw'].apply(get_acquisition_date)
+    experiment_filemap_dask = dd.from_pandas(experiment_filemap, npartitions=100)
+    print('### Calculating ExperimentTime ###')
+    with ProgressBar():
+        result = experiment_filemap_dask['raw'].map_partitions(lambda df: df.apply(get_acquisition_date), meta=('str', 'object')).compute()
+
+    experiment_filemap['date'] = result
     # grouped by Point value, calculate the time difference between the first time and all other times
     grouped = experiment_filemap.groupby('Point')
     # get the date of the raw where Time is 0
@@ -192,6 +202,8 @@ def get_experiment_time_from_filemap_parallel(experiment_filemap):
         delayed(calculate_experiment_time)(point, experiment_filemap, first_time)
         for point in experiment_filemap['Point'].unique()
     )
+
+    experiment_time = pd.concat(experiment_time)
     experiment_filemap['ExperimentTime'] = experiment_time
     # keep only the ExperimentTime column
     return experiment_filemap['ExperimentTime']
