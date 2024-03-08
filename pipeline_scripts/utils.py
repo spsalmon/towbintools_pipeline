@@ -171,6 +171,7 @@ def get_experiment_time_from_filemap(experiment_filemap):
 
     # iterate over each point and calculate the time difference
     for point in experiment_filemap['Point'].unique():
+        print(f'### Processing point {point} ###')
         # Use .loc to ensure you're modifying the original DataFrame
         point_indices = experiment_filemap['Point'] == point
         point_data = experiment_filemap.loc[point_indices]
@@ -178,6 +179,28 @@ def get_experiment_time_from_filemap(experiment_filemap):
     
     # keep only the ExperimentTime column
     return experiment_filemap['ExperimentTime']
+
+def get_experiment_time_from_filemap_parallel(experiment_filemap):
+    experiment_filemap['date'] = experiment_filemap['raw'].apply(get_acquisition_date)
+    # grouped by Point value, calculate the time difference between the first time and all other times
+    grouped = experiment_filemap.groupby('Point')
+    # get the date of the raw where Time is 0
+    first_time = grouped.apply(lambda x: x[x['Time'] == 0].iloc[0]['date'])
+
+    # iterate over each point and calculate the time difference
+    experiment_time = Parallel(n_jobs=-1)(
+        delayed(calculate_experiment_time)(point, experiment_filemap, first_time)
+        for point in experiment_filemap['Point'].unique()
+    )
+    experiment_filemap['ExperimentTime'] = experiment_time
+    # keep only the ExperimentTime column
+    return experiment_filemap['ExperimentTime']
+
+def calculate_experiment_time(point, experiment_filemap, first_time):
+    print(f'### Processing point {point} ###')
+    point_indices = experiment_filemap['Point'] == point
+    point_data = experiment_filemap.loc[point_indices]
+    return (point_data['date'] - first_time[point]).dt.total_seconds()
 
 # ----BOILERPLATE CODE FOR PICKLING----
 
