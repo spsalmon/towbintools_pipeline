@@ -46,6 +46,8 @@ usual_columns = [
     "VolumeAtM3",
     "M4",
     "VolumeAtM4",
+    "date",
+    "ExperimentTime"
 ]
 
 usual_columns.extend(
@@ -59,6 +61,8 @@ usual_columns.extend(
 list_custom_columns = [
     column for column in filemap.columns.tolist() if column not in usual_columns
 ]
+# add None to the list of custom columns
+list_custom_columns = ["None"] + list_custom_columns
 
 print(f"usual columns : {usual_columns}")
 print(f"custom columns : {list_custom_columns}")
@@ -282,7 +286,7 @@ def server(input, output, session):
         return segmentation_of_point
 
     def get_custom_annotations():
-        if input.custom_column() == "":
+        if input.custom_column() == "" or input.custom_column() == "None":
             return []
         custom_annotations = filemap[filemap["Point"] == int(input.point())][
             input.custom_column()
