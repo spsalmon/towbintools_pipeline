@@ -186,17 +186,15 @@ def get_experiment_time_from_filemap(experiment_filemap):
     return experiment_filemap['ExperimentTime']
 
 def get_experiment_time_from_filemap_parallel(experiment_filemap):
-    experiment_filemap_dask = dd.from_pandas(experiment_filemap, npartitions=100)
     print('### Calculating ExperimentTime ###')
-    with ProgressBar():
-        result = experiment_filemap_dask['raw'].map_partitions(lambda df: df.apply(get_acquisition_date), meta=('str', 'object')).compute()
-
-    experiment_filemap['date'] = result
+    # copy the filemap to avoid modifying the original
+    experiment_filemap = experiment_filemap.copy()
+    date_result = Parallel(n_jobs=-1)(delayed(get_acquisition_date)(raw) for raw in experiment_filemap['raw'])
+    experiment_filemap['date'] = date_result
     # grouped by Point value, calculate the time difference between the first time and all other times
     grouped = experiment_filemap.groupby('Point')
     # get the date of the raw where Time is 0
-    first_time = grouped.apply(lambda x: x[x['Time'] == 0].iloc[0]['date'])
-
+    first_time = grouped.apply(lambda x: x[x['Time'] == 0].iloc[0]['date'], include_groups=False)
     # iterate over each point and calculate the time difference
     experiment_time = Parallel(n_jobs=-1)(
         delayed(calculate_experiment_time)(point, experiment_filemap, first_time)
@@ -209,7 +207,6 @@ def get_experiment_time_from_filemap_parallel(experiment_filemap):
     return experiment_filemap['ExperimentTime']
 
 def calculate_experiment_time(point, experiment_filemap, first_time):
-    print(f'### Processing point {point} ###')
     point_indices = experiment_filemap['Point'] == point
     point_data = experiment_filemap.loc[point_indices]
     return (point_data['date'] - first_time[point]).dt.total_seconds()
