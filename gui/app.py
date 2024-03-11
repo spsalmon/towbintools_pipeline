@@ -637,7 +637,11 @@ def server(input, output, session):
 
         img = images_of_point[int(input.time())]
         img = image_handling.read_tiff_file(img)
-        img_to_plot = img[channel]
+
+        if img.ndim > 2:
+            img_to_plot = img[channel]
+        else:
+            img_to_plot = img
 
         plot_overlay = False
         if input.channel_overlay() != "None":
