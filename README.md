@@ -129,7 +129,15 @@ bash run_pipeline.sh --config path_to_config_file
 
 I will update the pipeline frequently, so please try to keep up to date by running the following commands on a regular basis.
 
-### If you want to reset the folder completely
+### Update script
+
+Running the following script will update both the pipeline and the underlying towbintools python package
+
+```bash
+bash update_pipeline.sh
+```
+
+### If you want to reset the folder completely (manually)
 
 First, fetch the repository
 
