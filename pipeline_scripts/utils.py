@@ -237,8 +237,14 @@ def pickle_objects(*objects):
 
 def cleanup_files(*filepaths):
     for filepath in filepaths:
-        os.remove(filepath)
-
+        try:
+            os.remove(filepath)
+        except FileNotFoundError:
+            print(f"File not found: {filepath}")
+        except PermissionError:
+            print(f"Permission denied: {filepath}")
+        except Exception as e:
+            print(f"Error deleting file {filepath}: {e}")
 
 # ----BOILERPLATE CODE FOR SLURM----
 
