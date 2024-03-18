@@ -247,7 +247,7 @@ def main(input_pickle, output_pickle, config, n_jobs):
                     is_zstack=is_zstack,
                 )
 
-            Parallel(n_jobs=device_count)(
+            Parallel(n_jobs=device_count, backend="threading")(
                 delayed(process_on_gpu)(input_file, output_path, i % device_count)
                 for i, (input_file, output_path) in enumerate(
                     zip(input_files, output_files)
