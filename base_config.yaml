@@ -1,4 +1,5 @@
 experiment_dir: "/mnt/external.data/TowbinLab/igheor/20231027_Ti2_10x_rpl22_AID_356_369_20231027_182159_936/"
+analysis_dir_name: "analysis"
 
 building_blocks: ["segmentation", "segmentation", "straightening", "straightening", "straightening", 
                     "volume_computation", "volume_computation", "classification", "molt_detection"]

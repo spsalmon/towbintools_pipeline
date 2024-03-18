@@ -49,13 +49,20 @@ def backup_file(file_path, destination_dir):
 
 def get_and_create_folders(config):
     experiment_dir = config["experiment_dir"]
+    try:
+        analysis_dir_name = config["analysis_dir_name"]
+    except KeyError:
+        analysis_dir_name = "analysis"
+
     raw_subdir = os.path.join(experiment_dir, "raw")
-    analysis_subdir = os.path.join(experiment_dir, "analysis")
+    analysis_subdir = os.path.join(experiment_dir, analysis_dir_name)
     os.makedirs(analysis_subdir, exist_ok=True)
     report_subdir = os.path.join(analysis_subdir, "report")
     os.makedirs(report_subdir, exist_ok=True)
+    sbatch_backup_dir = os.path.join(report_subdir, "sbatch_backup")
+    os.makedirs(sbatch_backup_dir, exist_ok=True)
 
-    return experiment_dir, raw_subdir, analysis_subdir, report_subdir
+    return experiment_dir, raw_subdir, analysis_subdir, report_subdir, sbatch_backup_dir
 
 
 def get_output_name(

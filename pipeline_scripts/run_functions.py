@@ -13,8 +13,7 @@ from pipeline_scripts.utils import (
 def run_segmentation(experiment_filemap, config, block_config):
     # create segmentation subdir
     experiment_dir = config["experiment_dir"]
-    sbatch_backup_dir = os.path.join(experiment_dir, "analysis", "report", "sbatch_backup")
-
+    sbatch_backup_dir = config["sbatch_backup_dir"]
     segmentation_subdir = get_output_name(
         experiment_dir,
         block_config["segmentation_column"],
@@ -60,7 +59,7 @@ def run_segmentation(experiment_filemap, config, block_config):
 
 def run_straightening(experiment_filemap, config, block_config):
     experiment_dir = config["experiment_dir"]
-    sbatch_backup_dir = os.path.join(experiment_dir, "analysis", "report", "sbatch_backup")
+    sbatch_backup_dir = config["sbatch_backup_dir"]
 
     straightening_subdir = get_output_name(
         config["experiment_dir"],
@@ -125,8 +124,8 @@ def run_straightening(experiment_filemap, config, block_config):
 
 
 def run_compute_volume(experiment_filemap, config, block_config):
-    experiment_dir = config["experiment_dir"]
-    sbatch_backup_dir = os.path.join(experiment_dir, "analysis", "report", "sbatch_backup")
+    sbatch_backup_dir = config["sbatch_backup_dir"]
+
     analysis_subdir = os.path.join(config["experiment_dir"], "analysis")
 
 
@@ -168,10 +167,8 @@ def run_compute_volume(experiment_filemap, config, block_config):
 
 
 def run_classification(experiment_filemap, config, block_config):
-    experiment_dir = config["experiment_dir"]
-    sbatch_backup_dir = os.path.join(experiment_dir, "analysis", "report", "sbatch_backup")
-
-    analysis_subdir = os.path.join(config["experiment_dir"], "analysis")
+    sbatch_backup_dir = config["sbatch_backup_dir"]
+    analysis_subdir = config["analysis_subdir"]
 
     model_name = os.path.basename(os.path.normpath(block_config["classifier"]))
     model_name = model_name.split("_classifier")[0]
@@ -214,9 +211,8 @@ def run_classification(experiment_filemap, config, block_config):
 
 
 def run_detect_molts(experiment_filemap, config, block_config):
-    experiment_dir = config["experiment_dir"]
-    sbatch_backup_dir = os.path.join(experiment_dir, "analysis", "report", "sbatch_backup")
-    report_subdir = os.path.join(config["experiment_dir"], "analysis", "report")
+    sbatch_backup_dir = config["sbatch_backup_dir"]
+    report_subdir = config["report_subdir"]
 
     experiment_filemap_pickle_path = pickle_objects(
         {"path": "experiment_filemap", "obj": experiment_filemap}
@@ -241,10 +237,9 @@ def run_detect_molts(experiment_filemap, config, block_config):
 
 
 def run_fluorescence_quantification(experiment_filemap, config, block_config):
-    experiment_dir = config["experiment_dir"]
-    sbatch_backup_dir = os.path.join(experiment_dir, "analysis", "report", "sbatch_backup")
 
-    analysis_subdir = os.path.join(config["experiment_dir"], "analysis")
+    sbatch_backup_dir = config["sbatch_backup_dir"]
+    analysis_subdir = config["analysis_subdir"]
 
     fluorescence_quantification_source = block_config[
         "fluorescence_quantification_source"

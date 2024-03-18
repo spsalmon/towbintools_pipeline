@@ -43,13 +43,20 @@ with open(config_file) as f:
 
 create_temp_folders()
 
-experiment_dir, raw_subdir, analysis_subdir, report_subdir = (
+experiment_dir, raw_subdir, analysis_subdir, report_subdir, sbatch_backup_dir = (
     get_and_create_folders(config)
 )
+
+# add the directories to the config dictionary for easy access
+config["raw_subdir"] = raw_subdir
+config["analysis_subdir"] = analysis_subdir
+config["report_subdir"] = report_subdir
+config["sbatch_backup_dir"] = sbatch_backup_dir
 
 # copy the config file to the report folder
 # if it already exists, change the name of the new one by adding a number
 config_dir = os.path.join(report_subdir, "config")
+
 os.makedirs(config_dir, exist_ok=True)
 
 backup_file(config_file, config_dir)
