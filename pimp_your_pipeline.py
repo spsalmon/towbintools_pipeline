@@ -121,7 +121,7 @@ for i, building_block in enumerate(building_blocks):
 
         if func_data.get("return_subdir"):
             experiment_filemap = add_dir_to_experiment_filemap(
-                experiment_filemap, result, f'analysis/{result.split("analysis/")[-1]}'
+                experiment_filemap, result, f'{config["analysis_dir_name"]}_{os.path.basename(os.path.normpath(result))}'
             )
             experiment_filemap.to_csv(
                 os.path.join(report_subdir, "analysis_filemap.csv"), index=False
