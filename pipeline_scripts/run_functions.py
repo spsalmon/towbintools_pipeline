@@ -12,10 +12,9 @@ from pipeline_scripts.utils import (
 
 def run_segmentation(experiment_filemap, config, block_config):
     # create segmentation subdir
-    experiment_dir = config["experiment_dir"]
     sbatch_backup_dir = config["sbatch_backup_dir"]
     segmentation_subdir = get_output_name(
-        experiment_dir,
+        config,
         block_config["segmentation_column"],
         "seg",
         block_config["segmentation_channels"],
@@ -62,7 +61,7 @@ def run_straightening(experiment_filemap, config, block_config):
     sbatch_backup_dir = config["sbatch_backup_dir"]
 
     straightening_subdir = get_output_name(
-        config["experiment_dir"],
+        config,
         block_config["straightening_source"][0],
         "str",
         channels=block_config["straightening_source"][1],
@@ -131,7 +130,7 @@ def run_compute_volume(experiment_filemap, config, block_config):
 
     volume_computation_masks = [block_config["volume_computation_masks"]]
     output_file = get_output_name(
-        config["experiment_dir"],
+        config,
         volume_computation_masks[0],
         "volume",
         return_subdir=False,
@@ -175,7 +174,7 @@ def run_classification(experiment_filemap, config, block_config):
     classification_source = [block_config["classification_source"]]
 
     output_file = get_output_name(
-        config["experiment_dir"],
+        config,
         classification_source[0],
         model_name,
         return_subdir=False,
@@ -256,7 +255,7 @@ def run_fluorescence_quantification(experiment_filemap, config, block_config):
     output_name_suffix = f"{normalization}_on_{fluorescence_quantification_masks_name}"
 
     output_file = get_output_name(
-        config["experiment_dir"],
+        config,
         fluorescence_quantification_source,
         "fluo",
         channels=fluorescence_quantification_channel,
