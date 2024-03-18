@@ -1,4 +1,5 @@
 experiment_dir: "/mnt/external.data/TowbinLab/spsalmon/pipeline_test_folder/"
+analysis_dir_name: "analysis_test_uwu"
 
 building_blocks: ["segmentation", "straightening", "volume_computation", "classification", "molt_detection"]
 
@@ -56,7 +57,7 @@ custom_script_path : [null]
 custom_script_parameters : [null]
 
 # sbatch parameters
-sbatch_memory: 128G
+sbatch_memory: 32G
 sbatch_time: 0-48:00:00
-sbatch_cpus: 32
+sbatch_cpus: 8
 sbatch_gpus: 0

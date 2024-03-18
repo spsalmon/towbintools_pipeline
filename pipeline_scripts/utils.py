@@ -66,7 +66,7 @@ def get_and_create_folders(config):
 
 
 def get_output_name(
-    experiment_dir,
+    config,
     input_name,
     task_name,
     channels=None,
@@ -75,8 +75,8 @@ def get_output_name(
     suffix=None,
     custom_suffix=None,
 ):
-    analysis_subdir = os.path.join(experiment_dir, "analysis")
-    report_subdir = os.path.join(analysis_subdir, "report")
+    analysis_subdir = config["analysis_subdir"]
+    report_subdir = config["report_subdir"]
 
     output_name = ""
     if channels is not None:
