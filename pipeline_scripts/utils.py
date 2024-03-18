@@ -332,3 +332,42 @@ def basic_get_args() -> argparse.Namespace:
     )
 
     return parser.parse_args()
+
+# ----BOILERPLATE CODE FOR SAVING ----
+
+def rename_merge_and_save_csv(
+    experiment_filemap,
+    report_subdir,
+    csv_file,
+    column_name_old,
+    column_name_new,
+    merge_cols=["Time", "Point"],
+):
+    dataframe = pd.read_csv(csv_file)
+    dataframe.rename(columns={column_name_old: column_name_new}, inplace=True)
+    if column_name_new in experiment_filemap.columns:
+        experiment_filemap.drop(columns=[column_name_new], inplace=True)
+    experiment_filemap = experiment_filemap.merge(dataframe, on=merge_cols, how="left")
+    experiment_filemap.to_csv(
+        os.path.join(report_subdir, "analysis_filemap.csv"), index=False
+    )
+    return experiment_filemap
+
+
+def merge_and_save_csv(
+    experiment_filemap, report_subdir, csv_file, merge_cols=["Time", "Point"]
+):
+    dataframe = pd.read_csv(csv_file)
+    new_columns = [
+        column
+        for column in dataframe.columns
+        if (column != "Time" and column != "Point")
+    ]
+    for column in new_columns:
+        if column in experiment_filemap.columns:
+            experiment_filemap.drop(columns=[column], inplace=True)
+    experiment_filemap = experiment_filemap.merge(dataframe, on=merge_cols, how="left")
+    experiment_filemap.to_csv(
+        os.path.join(report_subdir, "analysis_filemap.csv"), index=False
+    )
+    return experiment_filemap
