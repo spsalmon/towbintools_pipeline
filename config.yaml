@@ -1,5 +1,5 @@
 experiment_dir: "/mnt/external.data/TowbinLab/spsalmon/pipeline_test_folder/"
-analysis_dir_name: "analysis_test_uwu"
+analysis_dir_name: "analysis"
 
 building_blocks: ["segmentation", "straightening", "volume_computation", "classification", "molt_detection"]
 
