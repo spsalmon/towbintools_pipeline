@@ -126,6 +126,18 @@ def main(input_pickle, output_pickle, config, n_jobs):
             for input_file, output_path in zip(input_files, output_files)
         )
 
+    elif config["segmentation_method"] == "double_threshold":
+        Parallel(n_jobs=n_jobs)(
+            delayed(segment_and_save)(
+                input_file,
+                output_path,
+                method=config["segmentation_method"],
+                channels=config["segmentation_channels"],
+                is_zstack=is_zstack,
+            )
+            for input_file, output_path in zip(input_files, output_files)
+        )
+
     elif config["segmentation_method"] == "deep_learning":
         device_count = 1
         if torch.cuda.is_available():
