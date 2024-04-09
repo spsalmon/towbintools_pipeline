@@ -22,7 +22,7 @@ def segment_and_save(
     method,
     augment_contrast=False,
     clip_limit=5,
-    channels=[],
+    channels=None,
     pixelsize=None,
     sigma_canny=1,
     preprocessing_fn=None,
@@ -72,7 +72,7 @@ def segment_and_save_ilastik(
     ilastik_project_path,
     augment_contrast=False,
     clip_limit=5,
-    channels=[],
+    channels=None,
     is_zstack=False,
     result_channel=0,
 ):

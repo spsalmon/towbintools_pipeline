@@ -14,7 +14,7 @@ import aicsimageio
 
 from time import perf_counter
 
-filemap_path = "/mnt/towbin.data/shared/plenart/20231112_CREST_10X_wBT318_gradual_24-92h_20_degrees/analysis/report/analysis_filemap_annotated.csv"
+filemap_path = "/mnt/towbin.data/shared/spsalmon/20240405_151229_703_LIPSI_60x_397_405_microchambers/analysis/report/pad1/analysis_filemap_pad1_annotated.csv"
 filemap = pd.read_csv(filemap_path)
 
 filemap_folder = os.path.dirname(filemap_path)
