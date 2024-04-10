@@ -1,17 +1,20 @@
+import logging
+import os
+
+import numpy as np
+import torch
+import utils
+from ilastik.experimental.api import PixelClassificationPipeline
+from joblib import Parallel, delayed
+from pytorch_toolbelt.inference.tiles import ImageSlicer
+from tifffile import imwrite
+from towbintools.deep_learning.deep_learning_tools import (
+    load_segmentation_model_from_checkpoint,
+)
+from towbintools.deep_learning.utils.augmentation import get_prediction_augmentation
 from towbintools.foundation import image_handling
 from towbintools.segmentation import segmentation_tools
-import numpy as np
-from tifffile import imwrite
-import os
-from joblib import Parallel, delayed
-import utils
-import torch
-from towbintools.deep_learning.deep_learning_tools import load_segmentation_model_from_checkpoint
-from towbintools.deep_learning.utils.augmentation import get_prediction_augmentation
-from pytorch_toolbelt.inference.tiles import ImageSlicer
-from ilastik.experimental.api import PixelClassificationPipeline
 from xarray import DataArray
-import logging
 
 logging.basicConfig(level=logging.INFO)
 
@@ -123,6 +126,18 @@ def main(input_pickle, output_pickle, config, n_jobs):
             for input_file, output_path in zip(input_files, output_files)
         )
 
+    elif config["segmentation_method"] == "double_threshold":
+        Parallel(n_jobs=n_jobs)(
+            delayed(segment_and_save)(
+                input_file,
+                output_path,
+                method=config["segmentation_method"],
+                channels=config["segmentation_channels"],
+                is_zstack=is_zstack,
+            )
+            for input_file, output_path in zip(input_files, output_files)
+        )
+
     elif config["segmentation_method"] == "deep_learning":
         device_count = 1
         if torch.cuda.is_available():
@@ -152,7 +167,9 @@ def main(input_pickle, output_pickle, config, n_jobs):
 
         if len(devices) == 1:
             device = devices[0]
-            model = load_segmentation_model_from_checkpoint(config["model_path"]).to(device)
+            model = load_segmentation_model_from_checkpoint(config["model_path"]).to(
+                device
+            )
             model.eval()
             model.freeze()
             # except KeyError:
