@@ -1,5 +1,6 @@
 import numpy as np
 
+
 def count_building_blocks_types(building_blocks):
     building_block_counts = {}
     for i, building_block in enumerate(building_blocks):
