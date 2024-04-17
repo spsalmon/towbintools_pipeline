@@ -1,14 +1,17 @@
 import os
+
 from towbintools.foundation import file_handling as file_handling
+
 from pipeline_scripts.utils import (
-    pickle_objects,
-    get_input_and_output_files_parallel,
     add_dir_to_experiment_filemap,
-    get_output_name,
-    run_command,
-    cleanup_files,
     backup_file,
+    cleanup_files,
+    get_input_and_output_files_parallel,
+    get_output_name,
+    pickle_objects,
+    run_command,
 )
+
 
 def run_segmentation(experiment_filemap, config, block_config):
     # create segmentation subdir
@@ -43,7 +46,9 @@ def run_segmentation(experiment_filemap, config, block_config):
         command = f"~/.local/bin/micromamba run -n towbintools python3 ./pipeline_scripts/segment.py -i {input_pickle_path} -o {output_pickle_path} -c {pickled_block_config} -j {config['sbatch_cpus']}"
 
         if block_config["segmentation_method"] == "deep_learning":
-            sbatch_output_file, sbatch_error_file = run_command(command, "seg", config, requires_gpu=True)
+            sbatch_output_file, sbatch_error_file = run_command(
+                command, "seg", config, requires_gpu=True
+            )
         else:
             sbatch_output_file, sbatch_error_file = run_command(command, "seg", config)
 
@@ -126,7 +131,6 @@ def run_compute_volume(experiment_filemap, config, block_config):
     sbatch_backup_dir = config["sbatch_backup_dir"]
 
     analysis_subdir = os.path.join(config["experiment_dir"], "analysis")
-
 
     volume_computation_masks = [block_config["volume_computation_masks"]]
     output_file = get_output_name(
@@ -236,7 +240,6 @@ def run_detect_molts(experiment_filemap, config, block_config):
 
 
 def run_fluorescence_quantification(experiment_filemap, config, block_config):
-
     sbatch_backup_dir = config["sbatch_backup_dir"]
     analysis_subdir = config["analysis_subdir"]
 
