@@ -173,6 +173,10 @@ def add_dir_to_experiment_filemap(experiment_filemap, dir_path, subdir_name):
 def get_experiment_time_from_filemap(experiment_filemap):
     print('### Calculating ExperimentTime ###')
     experiment_filemap['date'] = experiment_filemap['raw'].apply(get_acquisition_date)
+
+    # in case all acquisition dates are None, return a nan filled ExperimentTime column
+    if experiment_filemap['date'].isnull().all():
+        return pd.Series([np.nan] * len(experiment_filemap))
     # grouped by Point value, calculate the time difference between the first time and all other times
     grouped = experiment_filemap.groupby('Point')
     # get the date of the raw where Time is 0
@@ -199,6 +203,10 @@ def get_experiment_time_from_filemap_parallel(experiment_filemap):
     experiment_filemap = experiment_filemap.copy()
     date_result = Parallel(n_jobs=-1)(delayed(get_acquisition_date)(raw) for raw in experiment_filemap['raw'])
     experiment_filemap['date'] = date_result
+
+    # in case all acquisition dates are None, return a None filled ExperimentTime column
+    if experiment_filemap['date'].isnull().all():
+        return pd.Series([np.nan] * len(experiment_filemap))
     # grouped by Point value, calculate the time difference between the first time and all other times
     grouped = experiment_filemap.groupby('Point')
     # get the date of the raw where Time is 0
@@ -221,7 +229,12 @@ def get_experiment_time_from_filemap_parallel(experiment_filemap):
 def calculate_experiment_time(point, experiment_filemap, first_time):
     point_indices = experiment_filemap['Point'] == point
     point_data = experiment_filemap.loc[point_indices]
-    return (point_data['date'] - first_time[point]).dt.total_seconds()
+    try:
+        return (point_data['date'] - first_time[point]).dt.total_seconds()
+    except KeyError:
+        print(f'### Error calculating experiment time for point {point} ###')
+        return pd.Series([np.nan] * len(point_data))
+
 
 # ----BOILERPLATE CODE FOR PICKLING----
 
