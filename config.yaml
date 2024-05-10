@@ -53,8 +53,11 @@ fluorescence_quantification_masks: ['analysis/ch1_seg']
 fluorescence_quantification_normalization: ['area']
 
 # custom parameters
-custom_script_path : [null]
-custom_script_parameters : [null]
+custom_script_path: [null]
+custom_script_name: [null]
+custom_script_return_type: [null]
+custom_script_parameters: [null]
+
 
 # sbatch parameters
 sbatch_memory: 32G

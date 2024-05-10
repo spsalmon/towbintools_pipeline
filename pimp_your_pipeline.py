@@ -107,7 +107,7 @@ building_block_functions = {
         "column_name_old": "Fluo",
         "column_name_new_key": True,
     },
-    "custom": {"func": run_custom, "return_subdir": False},
+    "custom": {"func": run_custom},
 }
 
 for i, building_block in enumerate(building_blocks):
@@ -119,7 +119,19 @@ for i, building_block in enumerate(building_blocks):
         # reload the experiment filemap in case it was modified during the function call
         experiment_filemap = pd.read_csv(os.path.join(report_subdir, "analysis_filemap.csv"))
 
-        if func_data.get("return_subdir"):
+        if building_block == "custom":
+            # check if result is a file or a directory
+            if os.path.isdir(result):
+                experiment_filemap = add_dir_to_experiment_filemap(
+                    experiment_filemap, result, f'{config["analysis_dir_name"]}/{os.path.basename(os.path.normpath(result))}'
+                )
+                experiment_filemap.to_csv(
+                    os.path.join(report_subdir, "analysis_filemap.csv"), index=False
+                )
+            elif os.path.isfile(result) and result.endswith(".csv"):
+                experiment_filemap = merge_and_save_csv(experiment_filemap, report_subdir, result)
+
+        elif func_data.get("return_subdir"):
             experiment_filemap = add_dir_to_experiment_filemap(
                 experiment_filemap, result, f'{config["analysis_dir_name"]}/{os.path.basename(os.path.normpath(result))}'
             )
