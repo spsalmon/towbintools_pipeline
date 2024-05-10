@@ -85,7 +85,7 @@ def segment_and_save_ilastik(
         image_path, channels_to_keep=channels
     ).squeeze()
 
-    if (image.ndim > 2) and (is_zstack == False):
+    if (image.ndim > 2) and (is_zstack is False):
         raise ValueError(
             "The image is not a z-stack, but has more than 2 dimensions. Ilastik only works on 2D single channel images."
         )

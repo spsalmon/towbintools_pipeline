@@ -303,4 +303,30 @@ def run_fluorescence_quantification(experiment_filemap, config, block_config):
 
 
 def run_custom(experiment_filemap, config, block_config):
-    pass
+    sbatch_backup_dir = config["sbatch_backup_dir"]
+    analysis_subdir = config["analysis_subdir"]
+    report_subdir = config["report_subdir"]
+
+    custom_script_path = block_config["custom_script_path"]
+    custom_script_name = block_config["custom_script_name"]
+    custom_script_return_type = block_config["custom_script_return_type"]
+    custom_script_parameters = block_config["custom_script_parameters"]
+
+    if custom_script_return_type == "subdir":
+        output = os.path.join(analysis_subdir, custom_script_name)
+        os.makedirs(output, exist_ok=True)
+
+        rerun = block_config["rerun_custom_script"]
+    else:
+        output = os.path.join(report_subdir, custom_script_name)
+        rerun = (block_config["rerun_custom_script"]) or (
+            os.path.exists(output) is False
+        )
+
+    if rerun:
+        command = f"bash {custom_script_path} {custom_script_parameters}"
+        sbatch_output_file, sbatch_error_file = run_command(command, "custom", config)
+        backup_file(sbatch_output_file, sbatch_backup_dir)
+        backup_file(sbatch_error_file, sbatch_backup_dir)
+
+    return output
