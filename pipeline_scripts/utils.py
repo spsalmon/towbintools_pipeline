@@ -157,7 +157,6 @@ def get_input_and_output_files(experiment_filemap, columns, output_dir, rerun=Tr
             output_files.append(output_file)
     return input_files, output_files
 
-
 def add_dir_to_experiment_filemap(experiment_filemap, dir_path, subdir_name):
     subdir_filemap = file_handling.get_dir_filemap(dir_path)
     subdir_filemap.rename(columns={"ImagePath": subdir_name}, inplace=True)

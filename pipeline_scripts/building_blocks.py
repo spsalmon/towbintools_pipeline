@@ -59,7 +59,13 @@ def build_config_of_building_blocks(building_blocks, config):
             "fluorescence_quantification_normalization",
             "pixelsize",
         ],
-        "custom": ["custom_script_path", "custom_script_parameters"],
+        "custom": [
+            "rerun_custom_script",
+            "custom_script_path",
+            "custom_script_name",
+            "custom_script_return_type",
+            "custom_script_parameters",
+        ],
     }
 
     blocks_config = {}
