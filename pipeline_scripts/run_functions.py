@@ -322,7 +322,7 @@ def run_custom(experiment_filemap, config, block_config):
         output = os.path.join(analysis_subdir, custom_script_name)
         os.makedirs(output, exist_ok=True)
 
-        rerun = block_config["rerun_custom_script"]
+        rerun = (block_config["rerun_custom_script"] or (os.path.exists(output) is False))
     elif custom_script_return_type == "csv":
         output = os.path.join(report_subdir, f'{custom_script_name}.csv')
         rerun = (block_config["rerun_custom_script"]) or (

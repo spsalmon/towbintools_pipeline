@@ -6,14 +6,14 @@ The documentation for the package used as a backbone for the pipeline can be fou
 
 ## RTFM
 
-There is a small wiki available here : [https://github.com/spsalmon/towbintools_pipeline/wiki/Building-Block] that should cover the basis of how to write your first configuration file. 
+There is a small wiki available here : <https://github.com/spsalmon/towbintools_pipeline/wiki/Building-Block> that should cover the basis of how to write your first configuration file. 
 If you don't understand something, feel free to ask, and I'll update the wiki to make it clearer !
 
 ## How to install ?
 
 ### How to set up Visual Studio Code ?
 
-1. Download VS Code : [https://code.visualstudio.com/download]
+1. Download VS Code : <https://code.visualstudio.com/download>
 2. Install it like you would install any software.
 3. Inside of VS Code, open a terminal and run :
 
