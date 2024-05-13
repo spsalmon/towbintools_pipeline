@@ -312,23 +312,30 @@ def run_custom(experiment_filemap, config, block_config):
     custom_script_return_type = block_config["custom_script_return_type"]
     custom_script_parameters = block_config["custom_script_parameters"]
 
+    filemap_path = os.path.join(report_subdir, "analysis_filemap.csv")
+
+
+    # concatenate the elements of the custom_script_parameters list
+    custom_script_parameters = " ".join(custom_script_parameters)
     
     if custom_script_return_type == "subdir":
         output = os.path.join(analysis_subdir, custom_script_name)
         os.makedirs(output, exist_ok=True)
 
         rerun = block_config["rerun_custom_script"]
-    else:
-        output = os.path.join(report_subdir, custom_script_name)
+    elif custom_script_return_type == "csv":
+        output = os.path.join(report_subdir, f'{custom_script_name}.csv')
         rerun = (block_config["rerun_custom_script"]) or (
             os.path.exists(output) is False
         )
+    else:
+        return None
 
     if rerun:
         if custom_script_path.endswith('.sh'):
-            command = f"bash {custom_script_path} {custom_script_parameters}"
+            command = f"bash {custom_script_path} -f {experiment_filemap} -o {output} {custom_script_parameters}"
         elif custom_script_path.endswith('.py'):
-            command = f"~/.local/bin/micromamba run -n towbintools python3 {custom_script_path} {custom_script_parameters}"
+            command = f"~/.local/bin/micromamba run -n towbintools python3 {custom_script_path} -f {filemap_path} -o {output} {custom_script_parameters}"
         else:
             print(f'Script type of {custom_script_path} is not supported. The pipeline only supports bash or python scripts.')
         sbatch_output_file, sbatch_error_file = run_command(command, "custom", config)
