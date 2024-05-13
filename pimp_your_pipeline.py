@@ -121,7 +121,9 @@ for i, building_block in enumerate(building_blocks):
 
         if building_block == "custom":
             # check if result is a file or a directory
-            if os.path.isdir(result):
+            if result is None:
+                continue
+            elif os.path.isdir(result):
                 experiment_filemap = add_dir_to_experiment_filemap(
                     experiment_filemap, result, f'{config["analysis_dir_name"]}/{os.path.basename(os.path.normpath(result))}'
                 )

@@ -4,6 +4,11 @@ This is still in early development, hopefully in the future it will replace all 
 
 The documentation for the package used as a backbone for the pipeline can be found here : <https://towbintools.readthedocs.io/en/latest/towbintools.html>
 
+## RTFM
+
+There is a small wiki available here : [https://github.com/spsalmon/towbintools_pipeline/wiki/Building-Block] that should cover the basis of how to write your first configuration file. 
+If you don't understand something, feel free to ask, and I'll update the wiki to make it clearer !
+
 ## How to install ?
 
 ### How to set up Visual Studio Code ?
@@ -94,6 +99,8 @@ chmod +x ~/towbintools_pipeline/pipeline_instalation_script.sh
 ```bash
 ~/towbintools_pipeline/pipeline_instalation_script.sh
 ```
+
+For some reason, the script doesn't really work for some people. In case it doesn't work for you, just run every line of the installation script manually.
 
 Follow the directions given, so basically, push enter a bunch of times and type yes (you want to answer yes everytime) when asked to.
 

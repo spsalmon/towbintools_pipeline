@@ -1,14 +1,15 @@
 experiment_dir: "/mnt/external.data/TowbinLab/spsalmon/pipeline_test_folder/"
 analysis_dir_name: "analysis"
 
-building_blocks: ["segmentation", "straightening", "volume_computation", "classification", "molt_detection"]
+building_blocks: ["segmentation", "straightening", "volume_computation", "classification", "molt_detection", "custom"]
 
 rerun_segmentation: [False]
-rerun_straightening: [True]
-rerun_volume_computation: [True]
+rerun_straightening: [False]
+rerun_volume_computation: [False]
 rerun_classification: [False]
 rerun_molt_detection: [False]
 rerun_fluorescence_quantification: [False]
+rerun_custom_script: [True]
 
 # segmentation parameters
 segmentation_column: ['raw']
@@ -53,10 +54,10 @@ fluorescence_quantification_masks: ['analysis/ch1_seg']
 fluorescence_quantification_normalization: ['area']
 
 # custom parameters
-custom_script_path: [null]
-custom_script_name: [null]
-custom_script_return_type: [null]
-custom_script_parameters: [null]
+custom_script_path: ["/home/spsalmon/test_custom_script.py"]
+custom_script_name: ["test_custom_script"]
+custom_script_return_type: ["subdir"]
+custom_script_parameters: [["-i testinput"]]
 
 
 # sbatch parameters
