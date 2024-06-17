@@ -56,7 +56,7 @@ def build_config_of_building_blocks(building_blocks, config):
             "rerun_fluorescence_quantification",
             "fluorescence_quantification_source",
             "fluorescence_quantification_masks",
-            "fluorescence_quantification_normalization",
+            "fluorescence_quantification_aggregation",
             "pixelsize",
         ],
         "custom": [

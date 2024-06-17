@@ -253,9 +253,9 @@ def run_fluorescence_quantification(experiment_filemap, config, block_config):
     fluorescence_quantification_masks_name = block_config[
         "fluorescence_quantification_masks"
     ].split("/")[-1]
-    normalization = block_config["fluorescence_quantification_normalization"]
+    aggregation = block_config["fluorescence_quantification_aggregation"]
 
-    output_name_suffix = f"{normalization}_on_{fluorescence_quantification_masks_name}"
+    output_name_suffix = f"{aggregation}_on_{fluorescence_quantification_masks_name}"
 
     output_file = get_output_name(
         config,

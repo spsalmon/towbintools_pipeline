@@ -102,11 +102,7 @@ building_block_functions = {
         "process_molt": True,
     },
     "fluorescence_quantification": {
-        "func": run_fluorescence_quantification,
-        "return_subdir": False,
-        "column_name_old": "Fluo",
-        "column_name_new_key": True,
-    },
+        "func": run_fluorescence_quantification, "return_subdir": False},
     "custom": {"func": run_custom},
 }
 

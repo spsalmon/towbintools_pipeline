@@ -1,5 +1,5 @@
 from towbintools.foundation import image_handling
-from towbintools.quantification import fluorescence_in_mask
+from towbintools.quantification import compute_fluorescence_in_mask, compute_background_fluorescence
 import os
 from joblib import Parallel, delayed
 import re
@@ -8,7 +8,7 @@ import utils
 
 
 def quantify_fluorescence_from_file_path(
-    source_image_path, source_image_channel, mask_path, pixelsize, normalization="mean"
+    source_image_path, source_image_channel, mask_path, aggregation="sum", background_aggregation="median"
 ):
     """Quantify the fluorescence of an image inside a mask."""
     source_image = image_handling.read_tiff_file(
@@ -16,15 +16,21 @@ def quantify_fluorescence_from_file_path(
     )
     mask = image_handling.read_tiff_file(mask_path)
 
-    fluo = fluorescence_in_mask(
-        source_image, mask, pixelsize, normalization=normalization
+    fluo = compute_fluorescence_in_mask(
+        source_image, mask, aggregation=aggregation
+    )
+    fluo_std = compute_background_fluorescence(
+        source_image, mask, aggregation="std"
+    )
+    background_fluo = compute_background_fluorescence(
+        source_image, mask, aggregation=background_aggregation
     )
     pattern = re.compile(r"Time(\d+)_Point(\d+)")
     match = pattern.search(mask_path)
     if match:
         time = int(match.group(1))
         point = int(match.group(2))
-        return {"Time": time, "Point": point, "Fluo": fluo}
+        return {"Time": time, "Point": point, "FluoAggregation": fluo, "FluoStd": fluo_std, "BackgroundFluo": background_fluo}
     else:
         raise ValueError("Could not extract time and point from file name.")
 
@@ -44,12 +50,29 @@ def main(input_pickle, output_file, config, n_jobs):
             config["fluorescence_quantification_source"][1],
             mask_file,
             config["pixelsize"],
-            normalization=config["fluorescence_quantification_normalization"],
+            aggregation=config["fluorescence_quantification_aggregation"],
         )
         for source_file, mask_file in zip(source_files, mask_files)
     )
     fluo_dataframe = pd.DataFrame(fluo)
+
+    # rename columns to match the rest of the pipeline
+    output_file_basename = os.path.basename(output_file).split(".csv")[0]
+    fluo_source = output_file_basename.split("_")[0]
+    mask_column = output_file_basename.split("_on_")[-1]
+    aggregation = config["fluorescence_quantification_aggregation"]
+    fluo_dataframe.rename(
+        columns={
+            "FluoAggregation": f"{fluo_source}_fluo_{aggregation}_on_{mask_column}",
+            "FluoStd": f"{fluo_source}_fluo_std_on_{mask_column}",
+            "BackgroundFluo": f"{fluo_source}_fluo_background_on_{mask_column}",
+        },
+        inplace=True,
+    )
+
     fluo_dataframe.to_csv(output_file, index=False)
+
+
 
 
 if __name__ == "__main__":
