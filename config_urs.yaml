@@ -1,7 +1,7 @@
-experiment_dir: "//mnt/towbin.data/shared/unoesberger/Experiments/rpl_25_1EGFP_rpl_29GFP_chamberswithfood/20240501"
+experiment_dir: "//mnt/towbin.data/shared/unoesberger/Experiments/wBT427_wBT148_N2_starvation_chambers/20240610/Growth_experiment"
 analysis_dir_name: "analysis"
 
-building_blocks: ["segmentation", "straightening", "volume_computation", "classification", "molt_detection", "fluo_quantification"]
+building_blocks: ["segmentation", "straightening", "volume_computation", "classification", "fluorescence_quantification"]
 
 rerun_segmentation: [False]
 rerun_straightening: [False]
@@ -9,6 +9,7 @@ rerun_volume_computation: [False]
 rerun_classification: [False]
 rerun_molt_detection: [False]
 rerun_fluorescence_quantification: [False]
+rerun_custom_script: [False]
 
 # segmentation parameters
 segmentation_column: ["raw"]
@@ -17,7 +18,7 @@ segmentation_method: ["edge_based"]
 segmentation_channels: [[0]]
 augment_contrast: [False]
 
-# edge-based segmentation parameters
+# edge-based segmentation parameters: pixel size hould be 0.65 for 10x, 0.325 for 20x
 pixelsize: [0.65]
 sigma_canny: [1]
 
@@ -53,11 +54,15 @@ fluorescence_quantification_masks: ['analysis/ch1_seg']
 fluorescence_quantification_aggregation: ['sum']
 
 # custom parameters
-custom_script_path : [null]
-custom_script_parameters : [null]
+custom_script_path : ["//mnt/towbin.data/shared/unoesberger/Experiments/wBT413_wBT148_wBT123_N2_starvation/20240517/analysis_scripts/extract_best_plane.sh"]
+custom_script_name : ["extract_best_plane"]
+custom_script_return_type : ["null"]
+custom_script_parameters : [""]
+
+
 
 # sbatch parameters
-sbatch_memory: 64G
+sbatch_memory: 128G
 sbatch_time: 0-48:00:00
 sbatch_cpus: 32
 sbatch_gpus: 0
