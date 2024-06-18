@@ -75,14 +75,14 @@ else:
 
 # if the ExperimentTime column is not present, create it
 if "ExperimentTime" not in experiment_filemap.columns:
-    print(f'Computing experiment time ...')
+    print('Computing experiment time ...')
     experiment_filemap["ExperimentTime"] = get_experiment_time_from_filemap_parallel(experiment_filemap)
     experiment_filemap.to_csv(
         os.path.join(report_subdir, "analysis_filemap.csv"), index=False
     )
     
 
-print(f'Building the config of the building blocks ...')
+print('Building the config of the building blocks ...')
 
 building_blocks = config["building_blocks"]
 

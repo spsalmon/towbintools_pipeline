@@ -42,6 +42,7 @@ def main(input_pickle, output_file, config, n_jobs):
     input_files = utils.load_pickles(input_pickle)[0]
     source_files = [f["source_image_path"] for f in input_files]
     mask_files = [f["mask_path"] for f in input_files]
+    aggregation = config["fluorescence_quantification_aggregation"]
 
     os.makedirs(os.path.dirname(output_file), exist_ok=True)
     fluo = Parallel(n_jobs=n_jobs)(
@@ -49,8 +50,7 @@ def main(input_pickle, output_file, config, n_jobs):
             source_file,
             config["fluorescence_quantification_source"][1],
             mask_file,
-            config["pixelsize"],
-            aggregation=config["fluorescence_quantification_aggregation"],
+            aggregation=aggregation,
         )
         for source_file, mask_file in zip(source_files, mask_files)
     )
@@ -60,7 +60,6 @@ def main(input_pickle, output_file, config, n_jobs):
     output_file_basename = os.path.basename(output_file).split(".csv")[0]
     fluo_source = output_file_basename.split("_")[0]
     mask_column = output_file_basename.split("_on_")[-1]
-    aggregation = config["fluorescence_quantification_aggregation"]
     fluo_dataframe.rename(
         columns={
             "FluoAggregation": f"{fluo_source}_fluo_{aggregation}_on_{mask_column}",
