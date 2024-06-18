@@ -19,7 +19,7 @@ def quantify_fluorescence_from_file_path(
     fluo = compute_fluorescence_in_mask(
         source_image, mask, aggregation=aggregation
     )
-    fluo_std = compute_background_fluorescence(
+    fluo_std = compute_fluorescence_in_mask(
         source_image, mask, aggregation="std"
     )
     background_fluo = compute_background_fluorescence(
@@ -43,6 +43,7 @@ def main(input_pickle, output_file, config, n_jobs):
     source_files = [f["source_image_path"] for f in input_files]
     mask_files = [f["mask_path"] for f in input_files]
     aggregation = config["fluorescence_quantification_aggregation"]
+    background_aggregation = config["fluorescence_background_aggregation"]
 
     os.makedirs(os.path.dirname(output_file), exist_ok=True)
     fluo = Parallel(n_jobs=n_jobs)(
@@ -51,6 +52,7 @@ def main(input_pickle, output_file, config, n_jobs):
             config["fluorescence_quantification_source"][1],
             mask_file,
             aggregation=aggregation,
+            background_aggregation=background_aggregation,
         )
         for source_file, mask_file in zip(source_files, mask_files)
     )
@@ -64,7 +66,7 @@ def main(input_pickle, output_file, config, n_jobs):
         columns={
             "FluoAggregation": f"{fluo_source}_fluo_{aggregation}_on_{mask_column}",
             "FluoStd": f"{fluo_source}_fluo_std_on_{mask_column}",
-            "BackgroundFluo": f"{fluo_source}_fluo_background_on_{mask_column}",
+            "BackgroundFluo": f"{fluo_source}_fluo_background_{background_aggregation}_on_{mask_column}",
         },
         inplace=True,
     )
