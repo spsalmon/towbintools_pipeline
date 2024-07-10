@@ -47,6 +47,28 @@ def backup_file(file_path, destination_dir):
         print(f"Failed to backup file: {e}")
         return False
 
+def get_experiment_pads(config):
+    experiment_dir = config["experiment_dir"]
+    pads = [f for f in os.listdir(experiment_dir) if os.path.isdir(os.path.join(experiment_dir, f)) and "pad" in f]
+    return pads
+
+def get_and_create_folders_pad(config, pad):
+    experiment_dir = config["experiment_dir"]
+    try:
+        analysis_dir_name = config["analysis_dir_name"]
+    except KeyError:
+        analysis_dir_name = "analysis"
+
+    raw_subdir = os.path.join(experiment_dir, "raw", pad)
+    analysis_subdir = os.path.join(experiment_dir, analysis_dir_name)
+    os.makedirs(analysis_subdir, exist_ok=True)
+    report_subdir = os.path.join(analysis_subdir, "report", pad)
+    os.makedirs(report_subdir, exist_ok=True)
+    sbatch_backup_dir = os.path.join(report_subdir, "sbatch_backup")
+    os.makedirs(sbatch_backup_dir, exist_ok=True)
+
+    return experiment_dir, raw_subdir, analysis_subdir, report_subdir, sbatch_backup_dir    
+
 def get_and_create_folders(config):
     experiment_dir = config["experiment_dir"]
     try:
@@ -69,6 +91,7 @@ def get_output_name(
     config,
     input_name,
     task_name,
+    pad=None,
     channels=None,
     return_subdir=True,
     add_raw=False,
@@ -95,6 +118,8 @@ def get_output_name(
 
     if return_subdir:
         output_name = os.path.join(analysis_subdir, output_name)
+        if pad is not None:
+            output_name = os.path.join(output_name, pad)
         os.makedirs(output_name, exist_ok=True)
     else:
         output_name = os.path.join(report_subdir, f"{output_name}.csv")

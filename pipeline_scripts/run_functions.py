@@ -13,7 +13,7 @@ from pipeline_scripts.utils import (
 )
 
 
-def run_segmentation(experiment_filemap, config, block_config):
+def run_segmentation(experiment_filemap, config, block_config, pad=None):
     # create segmentation subdir
     sbatch_backup_dir = config["sbatch_backup_dir"]
     segmentation_subdir = get_output_name(
@@ -21,6 +21,7 @@ def run_segmentation(experiment_filemap, config, block_config):
         block_config["segmentation_column"],
         "seg",
         block_config["segmentation_channels"],
+        pad=pad,
         return_subdir=True,
         add_raw=False,
         custom_suffix=block_config["segmentation_name_suffix"],
@@ -61,7 +62,7 @@ def run_segmentation(experiment_filemap, config, block_config):
     return segmentation_subdir
 
 
-def run_straightening(experiment_filemap, config, block_config):
+def run_straightening(experiment_filemap, config, block_config, pad=None):
     experiment_dir = config["experiment_dir"]
     sbatch_backup_dir = config["sbatch_backup_dir"]
 
@@ -69,6 +70,7 @@ def run_straightening(experiment_filemap, config, block_config):
         config,
         block_config["straightening_source"][0],
         "str",
+        pad=pad,
         channels=block_config["straightening_source"][1],
         return_subdir=True,
         add_raw=True,
@@ -127,7 +129,7 @@ def run_straightening(experiment_filemap, config, block_config):
     return straightening_subdir
 
 
-def run_compute_volume(experiment_filemap, config, block_config):
+def run_compute_volume(experiment_filemap, config, block_config, pad=None):
     sbatch_backup_dir = config["sbatch_backup_dir"]
 
     analysis_subdir = os.path.join(config["experiment_dir"], "analysis")
@@ -169,7 +171,7 @@ def run_compute_volume(experiment_filemap, config, block_config):
     return output_file
 
 
-def run_classification(experiment_filemap, config, block_config):
+def run_classification(experiment_filemap, config, block_config, pad=None):
     sbatch_backup_dir = config["sbatch_backup_dir"]
     analysis_subdir = config["analysis_subdir"]
 
@@ -213,7 +215,7 @@ def run_classification(experiment_filemap, config, block_config):
     return output_file
 
 
-def run_detect_molts(experiment_filemap, config, block_config):
+def run_detect_molts(experiment_filemap, config, block_config, pad=None):
     sbatch_backup_dir = config["sbatch_backup_dir"]
     report_subdir = config["report_subdir"]
 
@@ -239,7 +241,7 @@ def run_detect_molts(experiment_filemap, config, block_config):
     return output_file
 
 
-def run_fluorescence_quantification(experiment_filemap, config, block_config):
+def run_fluorescence_quantification(experiment_filemap, config, block_config, pad=None):
     sbatch_backup_dir = config["sbatch_backup_dir"]
     analysis_subdir = config["analysis_subdir"]
 
@@ -302,7 +304,7 @@ def run_fluorescence_quantification(experiment_filemap, config, block_config):
     return output_file
 
 
-def run_custom(experiment_filemap, config, block_config):
+def run_custom(experiment_filemap, config, block_config, pad=None):
     sbatch_backup_dir = config["sbatch_backup_dir"]
     analysis_subdir = config["analysis_subdir"]
     report_subdir = config["report_subdir"]
@@ -320,6 +322,8 @@ def run_custom(experiment_filemap, config, block_config):
     
     if custom_script_return_type == "subdir":
         output = os.path.join(analysis_subdir, custom_script_name)
+        if pad is not None:
+            output = os.path.join(output, pad)
         os.makedirs(output, exist_ok=True)
 
         rerun = (block_config["rerun_custom_script"] or (os.path.exists(output) is False))
