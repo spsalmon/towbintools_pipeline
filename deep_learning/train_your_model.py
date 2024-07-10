@@ -8,7 +8,7 @@ from towbintools.deep_learning.utils.augmentation import (
 )
 from towbintools.deep_learning.utils.dataset import (
     create_segmentation_training_dataframes_and_dataloaders,
-    create_dataloaders_from_filemap,
+    create_segmentation_dataloaders_from_filemap,
 )
 import yaml
 import argparse
@@ -68,7 +68,7 @@ os.makedirs(model_save_dir, exist_ok=True)
 input_channels = len(channels_to_segment)
 
 if training_filemap is not None:
-    _, _, train_loader, val_loader = create_dataloaders_from_filemap(
+    _, _, train_loader, val_loader = create_segmentation_dataloaders_from_filemap(
         training_filemap,
         save_dir=model_save_dir,
         batch_size=batch_size,

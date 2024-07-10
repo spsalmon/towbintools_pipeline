@@ -14,7 +14,8 @@ import aicsimageio
 
 from time import perf_counter
 
-filemap_path = "/mnt/towbin.data/shared/spsalmon/20240524_161257_273_LIPSI_40x_397_405_no_crash/analysis/report/pad2/pad2_fake_filemap_annotated.csv"
+filemap_path = "/mnt/towbin.data/shared/spsalmon/20240628_153634_380_LIPSI_40x_397_405_new_round_chambers/analysis/report/pad2/pad2_filemap.csv"
+# filemap_path = "/mnt/towbin.data/shared/spsalmon/20240524_161257_273_LIPSI_40x_397_405_no_crash/analysis/report/pad1/pad1_fake_filemap_annotated.csv"
 filemap = pd.read_csv(filemap_path)
 
 filemap_folder = os.path.dirname(filemap_path)
@@ -28,7 +29,7 @@ times = filemap["Time"].unique().tolist()
 points = filemap["Point"].unique().tolist()
 
 # channels = image_handling.read_tiff_file(filemap["raw"].iloc[0]).shape[0]
-channels = int(aicsimageio.AICSImage(filemap["raw"].iloc[0]).dims["C"][0])
+channels = int(aicsimageio.AICSImage(filemap["raw"].iloc[1]).dims["C"][0])
 list_channels = [f"Channel {i+1}" for i in range(channels)]
 list_channels = ["None"] + list_channels
 
@@ -80,6 +81,7 @@ segmentation_columns = [column for column in filemap.columns.tolist() if "seg" i
                         not in column and "area" not in column and "length" not in column]
 overlay_segmentation_choices = ["None"] + segmentation_columns
 
+print("Adding molts column to filemap if they do not exist...")
 # check if hatch columns exist
 if "HatchTime" not in filemap.columns.tolist():
     filemap["HatchTime"] = np.nan
@@ -104,7 +106,7 @@ def save_filemap(filemap=filemap):
     filemap.to_csv(filemap_save_path, index=False)
     print("Filemap saved !")
 
-
+print("Initializing the UI ...")
 molt_annotator = ui.column(
     7,
     ui.row(output_widget("volume_plot")),
@@ -257,6 +259,7 @@ def set_marker_shape(
 
 
 def server(input, output, session):
+    print("Initializing the server ...")
     hatch = reactive.Value("")
     m1 = reactive.Value("")
     m2 = reactive.Value("")
@@ -642,9 +645,11 @@ def server(input, output, session):
         img = images_of_point[int(input.time())]
         img = image_handling.read_tiff_file(img)
 
-        if img.ndim > 2:
+        if img.ndim == 3:
             img_to_plot = img[channel]
-        else:
+        elif img.ndim == 4:
+            img_to_plot = img[img.shape[0] // 2, channel, ...]
+        elif img.ndim == 2:
             img_to_plot = img
 
         plot_overlay = False
@@ -684,5 +689,5 @@ def server(input, output, session):
     async def _():
         await session.close()
 
-
+print("Creating the app ...")
 app = App(app_ui, server)
