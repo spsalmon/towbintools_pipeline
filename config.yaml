@@ -1,6 +1,10 @@
 experiment_dir: "/mnt/external.data/TowbinLab/spsalmon/pipeline_test_folder/"
 analysis_dir_name: "analysis"
 
+#########################################################################################################
+################################# IMAGE ANALYSIS PIPELINE CONFIGURATION #################################
+#########################################################################################################
+
 building_blocks: ["segmentation", "straightening", "volume_computation", "classification", "molt_detection", "custom"]
 
 rerun_segmentation: [False]
@@ -66,3 +70,52 @@ sbatch_memory: 32G
 sbatch_time: 0-48:00:00
 sbatch_cpus: 8
 sbatch_gpus: 0
+
+##########################################################################################################
+################################## DATA ANALYSIS PIPELINE CONFIGURATION ##################################
+##########################################################################################################
+
+group_by: "point_range"
+conditions:
+  - auxin_concentration_um: 0
+    strain:
+      - wBT186
+      - wBT437
+      - wBT438
+      - wBT439
+    point_range:
+      - [0, 26]
+      - [27, 54]
+      - [55, 86]
+      - [87, 120]
+  - auxin_concentration_um: 10
+    strain:  
+      - wBT186
+      - wBT437
+      - wBT438
+      - wBT439
+    point_range:
+      - [121, 147]
+      - [148, 176]
+      - [177, 204]
+      - [205, 232]
+  - auxin_concentration_um: 50
+    strain:
+      - wBT186
+      - wBT437
+      - wBT438
+      - wBT439
+    point_range:
+      - [233, 250]
+      - [251, 274]
+      - [275, 298]
+      - [299, 330]
+
+# group_by: "pad"
+# conditions:
+#   - strain: wBT397
+#     auxin_concentration_um: 1000
+#     pad: pad1
+#   - strain: wBT405
+#     auxin_concentration_um: 1000
+#     pad: pad2

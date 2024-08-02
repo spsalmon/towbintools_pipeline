@@ -11,10 +11,10 @@ import plotly.graph_objs as go
 import numpy as np
 import os
 import aicsimageio
-
+import re
 from time import perf_counter
 
-filemap_path = "/mnt/towbin.data/shared/spsalmon/20240628_153634_380_LIPSI_40x_397_405_new_round_chambers/analysis/report/pad2/pad2_filemap.csv"
+filemap_path = "/mnt/external.data/TowbinLab/spsalmon/pipeline_test_folder/analysis/report/analysis_filemap_annotated.csv"
 # filemap_path = "/mnt/towbin.data/shared/spsalmon/20240524_161257_273_LIPSI_40x_397_405_no_crash/analysis/report/pad1/pad1_fake_filemap_annotated.csv"
 filemap = pd.read_csv(filemap_path)
 
@@ -22,8 +22,43 @@ filemap_folder = os.path.dirname(filemap_path)
 filemap_name = os.path.basename(filemap_path)
 filemap_name = filemap_name.split(".")[0]
 
-filemap_save_path = f"{filemap_name}_annotated.csv"
-filemap_save_path = os.path.join(filemap_folder, filemap_save_path)
+def get_backup_path(filemap_folder, filemap_name):
+    # check if the filemap is already annotated
+    match = re.search(r'annotated_v(\d+)', filemap_name)
+    if not match:
+        iteration = 1
+    else:
+        iteration = int(match.group(1))
+
+    filemap_save_path = f"{filemap_name}_v{iteration}.csv"
+    while os.path.exists(os.path.join(filemap_folder, filemap_save_path)):
+        iteration += 1
+        filemap_save_path = f"{filemap_name}_v{iteration}.csv"
+
+    filemap_save_path = os.path.join(filemap_folder, filemap_save_path)
+    return filemap_save_path
+
+if "annotated" not in filemap_name:
+    filemap_save_path = f"{filemap_name}_annotated.csv"
+    filemap_save_path = os.path.join(filemap_folder, filemap_save_path)
+
+    if os.path.exists(filemap_save_path):
+        print(f"Annotated filemap already exists at {filemap_save_path}")
+        print("Opening the existing filemap instead ...")
+        filemap = pd.read_csv(filemap_save_path)
+        filemap_path = filemap_save_path
+        filemap_name = os.path.basename(filemap_path)
+        filemap_name = filemap_name.split(".")[0]
+
+        # backup the filemap
+        backup_path = get_backup_path(filemap_folder, filemap_name)
+        filemap.to_csv(backup_path, index=False)
+
+else:
+    # backup the filemap
+    backup_path = get_backup_path(filemap_folder, filemap_name)
+    filemap.to_csv(backup_path, index=False)
+    filemap_save_path = filemap_path
 
 times = filemap["Time"].unique().tolist()
 points = filemap["Point"].unique().tolist()
