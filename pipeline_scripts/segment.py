@@ -38,28 +38,32 @@ def segment_and_save(
     is_zstack=False,
 ):
     """Segment image and save to output_path."""
-    image = image_handling.read_tiff_file(
-        image_path, channels_to_keep=channels
-    ).squeeze()
-    if augment_contrast:
-        image = image_handling.augment_contrast(image, clip_limit=clip_limit)
+    try:
+        image = image_handling.read_tiff_file(
+            image_path, channels_to_keep=channels
+        ).squeeze()
+        if augment_contrast:
+            image = image_handling.augment_contrast(image, clip_limit=clip_limit)
 
-    mask = segmentation_tools.segment_image(
-        image,
-        method,
-        pixelsize=pixelsize,
-        sigma_canny=sigma_canny,
-        preprocessing_fn=preprocessing_fn,
-        model=model,
-        device=device,
-        tiler=tiler,
-        RGB=RGB,
-        activation=activation,
-        batch_size=batch_size,
-        is_zstack=is_zstack,
-    )
+            mask = segmentation_tools.segment_image(
+                image,
+                method,
+                pixelsize=pixelsize,
+                sigma_canny=sigma_canny,
+                preprocessing_fn=preprocessing_fn,
+                model=model,
+                device=device,
+                tiler=tiler,
+                RGB=RGB,
+                activation=activation,
+                batch_size=batch_size,
+                is_zstack=is_zstack,
+            )
 
-    imwrite(output_path, mask.astype(np.uint8), compression="zlib", ome=True)
+        imwrite(output_path, mask.astype(np.uint8), compression="zlib", ome=True)
+    except Exception as e:
+        logging.error(f"Caught exception while segmenting {image_path}: {e}")
+        return False
 
 
 def segment_image_ilastik(image, pipeline, result_channel=0):
@@ -81,26 +85,30 @@ def segment_and_save_ilastik(
 ):
     """Segment image using ilastik and save to output_path."""
     pipeline = PixelClassificationPipeline.from_ilp_file(ilastik_project_path)
-    image = image_handling.read_tiff_file(
-        image_path, channels_to_keep=channels
-    ).squeeze()
+    try:
+        image = image_handling.read_tiff_file(
+            image_path, channels_to_keep=channels
+        ).squeeze()
 
-    if (image.ndim > 2) and (is_zstack is False):
-        raise ValueError(
-            "The image is not a z-stack, but has more than 2 dimensions. Ilastik only works on 2D single channel images."
-        )
+        if (image.ndim > 2) and (is_zstack is False):
+            raise ValueError(
+                "The image is not a z-stack, but has more than 2 dimensions. Ilastik only works on 2D single channel images."
+            )
 
-    if augment_contrast:
-        image = image_handling.augment_contrast(image, clip_limit=clip_limit)
+        if augment_contrast:
+            image = image_handling.augment_contrast(image, clip_limit=clip_limit)
 
-    if is_zstack:
-        mask = np.zeros(image.shape, dtype=np.uint8)
-        for i, plane in enumerate(image):
-            mask[i] = segment_image_ilastik(plane, pipeline)
-    else:
-        mask = segment_image_ilastik(image, pipeline, result_channel=result_channel)
+        if is_zstack:
+            mask = np.zeros(image.shape, dtype=np.uint8)
+            for i, plane in enumerate(image):
+                mask[i] = segment_image_ilastik(plane, pipeline)
+        else:
+            mask = segment_image_ilastik(image, pipeline, result_channel=result_channel)
 
-    imwrite(output_path, mask.astype(np.uint8), compression="zlib", ome=True)
+        imwrite(output_path, mask.astype(np.uint8), compression="zlib", ome=True)
+    except Exception as e:
+        logging.error(f"Caught exception while segmenting {image_path}: {e}")
+        return False
 
 
 def main(input_pickle, output_pickle, config, n_jobs):
