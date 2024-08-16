@@ -43,7 +43,7 @@ deep_supervision = config.get("deep_supervision", False)
 learning_rate = config.get("learning_rate", 1e-4)
 
 full_normalization_parameters = config.get(
-    "normalization_parameters", {"type": "percentile", "lo": 1, "hi": 99}
+    "normalization_parameters", {"type": "percentile", "lo": 1, "hi": 99, "axis": (-2, -1)}
 )
 
 normalization_type = full_normalization_parameters["type"]
@@ -90,7 +90,6 @@ else:
         image_directories,
         mask_directories,
         save_dir=model_save_dir,
-        train_test_split_ratio=train_val_split_ratio,
         batch_size=batch_size,
         num_workers=num_workers,
         train_on_tiles=train_on_tiles,

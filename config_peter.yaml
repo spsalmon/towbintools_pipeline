@@ -1,0 +1,62 @@
+experiment_dir: "/mnt/towbin.data/shared/plenart/20241707_souvik_w318_ev_mex3_squid"
+analysis_dir_name: "analysis_Peter"
+building_blocks: ["segmentation","straightening","volume_computation"]
+
+rerun_segmentation: [False]
+rerun_straightening: [False]
+rerun_volume_computation: [False]
+rerun_classification: [False]
+rerun_molt_detection: [False]
+rerun_fluorescence_quantification: [False]
+
+# segmentation parameters
+segmentation_column: ['raw']
+segmentation_name_suffix: ["germline"]
+segmentation_method: ["double_threshold"]
+segmentation_channels: [[0]]
+augment_contrast: [False]
+
+# edge-based segmentation parameters
+pixelsize: [0.65]
+sigma_canny: [1]
+
+# deep learning segmentation parameters
+model_path: ["/mnt/towbin.data/shared/bgusev/deep_learning/models/dark_germline_seg/epoch=46-step=2021.ckpt"]
+tiler_config: [[[512, 512], [256, 256]]]
+RGB: [True]
+activation_layer: [null]
+batch_size: [8]
+
+# ilastik segmentation parameters
+ilastik_project_path: ["/mnt/external.data/TowbinLab/plenart/ilastik/germline_segmentation_2.ilp"]
+ilastik_result_channel: [1]
+
+# straightening parameters
+straightening_source: [['analysis_Peter/ch1_seg_germline', null]]
+straightening_masks: ['analysis_Peter/ch2_seg_worm']
+
+# volume computation parameters
+volume_computation_masks: ['analysis_Peter/ch1_seg_germline_str']
+
+# classification parameters
+classification_source: ['analysis_Peter/ch2_seg_worm_str']
+classifier: ["./models/worm_type_classifier.json"]
+
+# molt detection parameters
+molt_detection_volume: ['ch1_seg_worm_str_volume']
+molt_detection_worm_type: ['ch1_seg_worm_str_worm_type']
+
+# fluo quantification parameters
+fluorescence_quantification_source: [['raw', 0]]
+fluorescence_quantification_masks: ['analysis_Peter/ch1_seg']
+fluorescence_quantification_normalization: ['area']
+
+# custom parameters
+custom_script_path : [null]
+custom_script_parameters : [null]
+
+# sbatch parameters
+sbatch_memory: 128G
+sbatch_time: 0-24:00:00
+sbatch_cpus: 32
+sbatch_gpus: 0

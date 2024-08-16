@@ -45,20 +45,20 @@ def segment_and_save(
         if augment_contrast:
             image = image_handling.augment_contrast(image, clip_limit=clip_limit)
 
-            mask = segmentation_tools.segment_image(
-                image,
-                method,
-                pixelsize=pixelsize,
-                sigma_canny=sigma_canny,
-                preprocessing_fn=preprocessing_fn,
-                model=model,
-                device=device,
-                tiler=tiler,
-                RGB=RGB,
-                activation=activation,
-                batch_size=batch_size,
-                is_zstack=is_zstack,
-            )
+        mask = segmentation_tools.segment_image(
+            image,
+            method,
+            pixelsize=pixelsize,
+            sigma_canny=sigma_canny,
+            preprocessing_fn=preprocessing_fn,
+            model=model,
+            device=device,
+            tiler=tiler,
+            RGB=RGB,
+            activation=activation,
+            batch_size=batch_size,
+            is_zstack=is_zstack,
+        )
 
         imwrite(output_path, mask.astype(np.uint8), compression="zlib", ome=True)
     except Exception as e:
