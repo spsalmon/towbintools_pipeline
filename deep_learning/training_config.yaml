@@ -1,9 +1,9 @@
-image_directories: ['/home/alex/Downloads/2019-10-01_2019-10-31/']
-mask_directories: ['/home/alex/Downloads/2019-10-01_2019-10-31/']
+image_directories: ["/mnt/towbin.data/shared/smarin/analysis/2024_02_07_lifespan_wBT318_20C/unet/training_data/check/raw_cropped"]
+mask_directories: ["/mnt/towbin.data/shared/smarin/analysis/2024_02_07_lifespan_wBT318_20C/unet/training_data/check/annotations_cropped"]
 
-training_filemap: '/mnt/external.data/TowbinLab/plenart/20221020_Ti2_10x_green_bacteria_wbt150_small_chambers_good/analysis/report/training_filemap.csv'
+# training_filemap: '/mnt/external.data/TowbinLab/plenart/20221020_Ti2_10x_green_bacteria_wbt150_small_chambers_good/analysis/report/training_filemap.csv'
 
-save_dir: '/home/spsalmon/segmentation_models/'
+save_dir: '/mnt/towbin.data/shared/smarin/analysis/2024_02_07_lifespan_wBT318_20C/unet/training_data/check/models/'
 model_name: 'brightfield_only_unetplusplus_efficientnetb4'
 
 pretrained: True
@@ -20,14 +20,14 @@ pretrained_weights: 'image-micronet'
 deep_supervision: False
 
 learning_rate: 1.0e-4
-normalization_parameters: {'type': 'percentile', 'lo': 1, 'hi': 99}
+normalization_parameters: {'type': 'percentile', 'lo': 1, 'hi': 99, 'axis': [-2, -1]}
 
 train_on_tiles: True
 tiler_config: {'tile_size':[512, 512], 'tile_step':[256, 256]}
 
-max_epochs: 100
+max_epochs: 1000
 batch_size: 5
-accumulate_grad_batches: 8
+accumulate_grad_batches: 1
 num_workers: 32
 
 save_best_k_models: 2
