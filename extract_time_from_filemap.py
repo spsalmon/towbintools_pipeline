@@ -16,4 +16,3 @@ if "ExperimentTime" not in experiment_filemap.columns:
     experiment_filemap.to_csv(
         experiment_filemap_path, index=False
     )
-    
