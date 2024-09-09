@@ -1,4 +1,5 @@
 from towbintools.foundation import detect_molts
+from towbintools.data_analysis import compute_series_at_time_classified
 import numpy as np
 import os
 from joblib import Parallel, delayed
@@ -94,7 +95,7 @@ def compute_other_features_at_molt(
             if not np.isnan(molt_time):
                 features_at_molt[
                     f"{column}_at_{molt}"
-                ] = detect_molts.compute_volume_at_time(
+                ] = compute_series_at_time_classified(
                     column_data, worm_types, molt_time
                 )
 
