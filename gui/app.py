@@ -1,7 +1,7 @@
 from shiny import App, render, ui, reactive
 from shinywidgets import output_widget, render_widget
 from towbintools.foundation import image_handling
-from towbintools.foundation.detect_molts import compute_volume_at_time
+from towbintools.data_analysis import compute_series_at_time_classified
 import matplotlib.pyplot as plt
 import pandas as pd
 from joblib import Parallel, delayed
@@ -468,7 +468,7 @@ def server(input, output, session):
         worm_types = data_of_point[worm_type_column].values
         new_hatch = float(input.time())
         filemap.loc[filemap["Point"] == int(input.point()), ["HatchTime"]] = new_hatch
-        volume_at_hatch = compute_volume_at_time(volume, worm_types, new_hatch)
+        volume_at_hatch = compute_series_at_time_classified(volume, worm_types, new_hatch)
         filemap.loc[
             filemap["Point"] == int(input.point()), ["VolumeAtHatch"]
         ] = volume_at_hatch
@@ -487,7 +487,7 @@ def server(input, output, session):
         worm_types = data_of_point[worm_type_column].values
         new_m1 = float(input.time())
         filemap.loc[filemap["Point"] == int(input.point()), ["M1"]] = new_m1
-        volume_at_new_m1 = compute_volume_at_time(volume, worm_types, new_m1)
+        volume_at_new_m1 = compute_series_at_time_classified(volume, worm_types, new_m1)
         filemap.loc[
             filemap["Point"] == int(input.point()), ["VolumeAtM1"]
         ] = volume_at_new_m1
@@ -506,7 +506,7 @@ def server(input, output, session):
         worm_types = data_of_point[worm_type_column].values
         new_m2 = float(input.time())
         filemap.loc[filemap["Point"] == int(input.point()), ["M2"]] = new_m2
-        volume_at_new_m2 = compute_volume_at_time(volume, worm_types, new_m2)
+        volume_at_new_m2 = compute_series_at_time_classified(volume, worm_types, new_m2)
         filemap.loc[
             filemap["Point"] == int(input.point()), ["VolumeAtM2"]
         ] = volume_at_new_m2
@@ -525,7 +525,7 @@ def server(input, output, session):
         worm_types = data_of_point[worm_type_column].values
         new_m3 = float(input.time())
         filemap.loc[filemap["Point"] == int(input.point()), ["M3"]] = new_m3
-        volume_at_new_m3 = compute_volume_at_time(volume, worm_types, new_m3)
+        volume_at_new_m3 = compute_series_at_time_classified(volume, worm_types, new_m3)
         filemap.loc[
             filemap["Point"] == int(input.point()), ["VolumeAtM3"]
         ] = volume_at_new_m3
@@ -544,7 +544,7 @@ def server(input, output, session):
         worm_types = data_of_point[worm_type_column].values
         new_m4 = float(input.time())
         filemap.loc[filemap["Point"] == int(input.point()), ["M4"]] = new_m4
-        volume_at_new_m4 = compute_volume_at_time(volume, worm_types, new_m4)
+        volume_at_new_m4 = compute_series_at_time_classified(volume, worm_types, new_m4)
         filemap.loc[
             filemap["Point"] == int(input.point()), ["VolumeAtM4"]
         ] = volume_at_new_m4
