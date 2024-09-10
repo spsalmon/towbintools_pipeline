@@ -14,7 +14,7 @@ import aicsimageio
 import re
 from time import perf_counter
 
-filemap_path = "/mnt/external.data/TowbinLab/spsalmon/pipeline_test_folder/analysis/report/analysis_filemap_annotated.csv"
+filemap_path = "/mnt/towbin.data/shared/spsalmon/pipeline_test_folder/analysis/report/analysis_filemap.csv"
 # filemap_path = "/mnt/towbin.data/shared/spsalmon/20240524_161257_273_LIPSI_40x_397_405_no_crash/analysis/report/pad1/pad1_fake_filemap_annotated.csv"
 filemap = pd.read_csv(filemap_path)
 
@@ -301,6 +301,12 @@ def server(input, output, session):
     m3 = reactive.Value("")
     m4 = reactive.Value("")
 
+    value_at_hatch = reactive.Value("")
+    value_at_m1 = reactive.Value("")
+    value_at_m2 = reactive.Value("")
+    value_at_m3 = reactive.Value("")
+    value_at_m4 = reactive.Value("")
+
     @reactive.Calc
     def get_images_of_point():
         images_of_point_paths = filemap[filemap["Point"] == int(input.point())][
@@ -456,144 +462,97 @@ def server(input, output, session):
     def m4_text():
         return f"M4 : {str(m4())}"
 
+    def update_ecdys_columns(ecdys_event, time, point):
+        data_of_point = filemap.loc[
+            filemap["Point"] == point,
+        ]
+        filemap.loc[filemap["Point"] == int(input.point()), [ecdys_event]] = time
+        value_at_ecdys_columns = [column for column in data_of_point.columns.tolist() if f'_at_{ecdys_event}' in column]
+        value_columns = [column.replace(f'_at_{ecdys_event}', '') for column in value_at_ecdys_columns]
+
+        for value_column, value_at_ecdys_column in zip(value_columns, value_at_ecdys_columns):
+            if np.isnan(time):
+                new_column_value = np.nan
+            else:
+                new_column_value = compute_series_at_time_classified(data_of_point[value_column].values, data_of_point[worm_type_column].values, time)
+            
+            print(f'Old value {value_at_ecdys_column}: {filemap.loc[(filemap["Point"] == point), [value_at_ecdys_column]].values[0]}')
+
+            filemap.loc[(filemap["Point"] == point), [value_at_ecdys_column]] = new_column_value
+
+            print(f'Old value {value_at_ecdys_column}: {filemap.loc[(filemap["Point"] == point), [value_at_ecdys_column]].values[0]}')
+
     @reactive.Effect
     @reactive.event(input.set_hatch)
     def set_hatch():
         print("set_hatch")
-        data_of_point = filemap.loc[
-            filemap["Point"] == int(input.point()),
-            [input.column_to_plot(), worm_type_column],
-        ]
-        volume = data_of_point[input.column_to_plot()].values
-        worm_types = data_of_point[worm_type_column].values
         new_hatch = float(input.time())
-        filemap.loc[filemap["Point"] == int(input.point()), ["HatchTime"]] = new_hatch
-        volume_at_hatch = compute_series_at_time_classified(volume, worm_types, new_hatch)
-        filemap.loc[
-            filemap["Point"] == int(input.point()), ["VolumeAtHatch"]
-        ] = volume_at_hatch
-
+        update_ecdys_columns('HatchTime', new_hatch, int(input.point()))
         hatch.set(new_hatch)
 
     @reactive.Effect
     @reactive.event(input.set_m1)
     def set_m1():
         print("set_m1")
-        data_of_point = filemap.loc[
-            filemap["Point"] == int(input.point()),
-            [input.column_to_plot(), worm_type_column],
-        ]
-        volume = data_of_point[input.column_to_plot()].values
-        worm_types = data_of_point[worm_type_column].values
         new_m1 = float(input.time())
-        filemap.loc[filemap["Point"] == int(input.point()), ["M1"]] = new_m1
-        volume_at_new_m1 = compute_series_at_time_classified(volume, worm_types, new_m1)
-        filemap.loc[
-            filemap["Point"] == int(input.point()), ["VolumeAtM1"]
-        ] = volume_at_new_m1
-
+        update_ecdys_columns('M1', new_m1, int(input.point()))
         m1.set(new_m1)
 
     @reactive.Effect
     @reactive.event(input.set_m2)
     def set_m2():
         print("set_m2")
-        data_of_point = filemap.loc[
-            filemap["Point"] == int(input.point()),
-            [input.column_to_plot(), worm_type_column],
-        ]
-        volume = data_of_point[input.column_to_plot()].values
-        worm_types = data_of_point[worm_type_column].values
         new_m2 = float(input.time())
-        filemap.loc[filemap["Point"] == int(input.point()), ["M2"]] = new_m2
-        volume_at_new_m2 = compute_series_at_time_classified(volume, worm_types, new_m2)
-        filemap.loc[
-            filemap["Point"] == int(input.point()), ["VolumeAtM2"]
-        ] = volume_at_new_m2
-
+        update_ecdys_columns('M2', new_m2, int(input.point()))
         m2.set(new_m2)
 
     @reactive.Effect
     @reactive.event(input.set_m3)
     def set_m3():
         print("set_m3")
-        data_of_point = filemap.loc[
-            filemap["Point"] == int(input.point()),
-            [input.column_to_plot(), worm_type_column],
-        ]
-        volume = data_of_point[input.column_to_plot()].values
-        worm_types = data_of_point[worm_type_column].values
         new_m3 = float(input.time())
-        filemap.loc[filemap["Point"] == int(input.point()), ["M3"]] = new_m3
-        volume_at_new_m3 = compute_series_at_time_classified(volume, worm_types, new_m3)
-        filemap.loc[
-            filemap["Point"] == int(input.point()), ["VolumeAtM3"]
-        ] = volume_at_new_m3
-
         m3.set(new_m3)
 
     @reactive.Effect
     @reactive.event(input.set_m4)
     def set_m4():
         print("set_m4")
-        data_of_point = filemap.loc[
-            filemap["Point"] == int(input.point()),
-            [input.column_to_plot(), worm_type_column],
-        ]
-        volume = data_of_point[input.column_to_plot()].values
-        worm_types = data_of_point[worm_type_column].values
         new_m4 = float(input.time())
-        filemap.loc[filemap["Point"] == int(input.point()), ["M4"]] = new_m4
-        volume_at_new_m4 = compute_series_at_time_classified(volume, worm_types, new_m4)
-        filemap.loc[
-            filemap["Point"] == int(input.point()), ["VolumeAtM4"]
-        ] = volume_at_new_m4
-
         m4.set(new_m4)
 
     @reactive.Effect
     @reactive.event(input.reset_hatch)
     def reset_hatch():
         print("reset_hatch")
-        filemap.loc[filemap["Point"] == int(input.point()), ["HatchTime"]] = np.nan
-        filemap.loc[filemap["Point"] == int(input.point()), ["VolumeAtHatch"]] = np.nan
-
+        update_ecdys_columns('HatchTime', np.nan, int(input.point()))
         hatch.set(np.nan)
 
     @reactive.Effect
     @reactive.event(input.reset_m1)
     def reset_m1():
         print("reset_m1")
-        filemap.loc[filemap["Point"] == int(input.point()), ["M1"]] = np.nan
-        filemap.loc[filemap["Point"] == int(input.point()), ["VolumeAtM1"]] = np.nan
-
+        update_ecdys_columns('M1', np.nan, int(input.point()))
         m1.set(np.nan)
 
     @reactive.Effect
     @reactive.event(input.reset_m2)
     def reset_m2():
         print("reset_m2")
-        filemap.loc[filemap["Point"] == int(input.point()), ["M2"]] = np.nan
-        filemap.loc[filemap["Point"] == int(input.point()), ["VolumeAtM2"]] = np.nan
-
+        update_ecdys_columns('M2', np.nan, int(input.point()))
         m2.set(np.nan)
 
     @reactive.Effect
     @reactive.event(input.reset_m3)
     def reset_m3():
         print("reset_m3")
-        filemap.loc[filemap["Point"] == int(input.point()), ["M3"]] = np.nan
-        filemap.loc[filemap["Point"] == int(input.point()), ["VolumeAtM3"]] = np.nan
-
+        update_ecdys_columns('M3', np.nan, int(input.point()))
         m3.set(np.nan)
 
     @reactive.Effect
     @reactive.event(input.reset_m4)
     def reset_m4():
         print("reset_m4")
-        filemap.loc[filemap["Point"] == int(input.point()), ["M4"]] = np.nan
-        filemap.loc[filemap["Point"] == int(input.point()), ["VolumeAtM4"]] = np.nan
-
+        update_ecdys_columns('M4', np.nan, int(input.point()))
         m4.set(np.nan)
 
     @reactive.Effect
