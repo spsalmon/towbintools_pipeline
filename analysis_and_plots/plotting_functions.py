@@ -6,9 +6,34 @@ from itertools import combinations
 from scipy.stats import mannwhitneyu
 import pandas as pd
 import starbars
+from scipy.interpolate import splrep, splev, BSpline
+import matplotlib.patches as mpatches
 
+def build_legend(single_condition_dict, legend):
+    if legend is None:
+        return f'Condition {int(single_condition_dict["condition_id"])}'
+    else:
+        legend_string = ''
+        for i, (key, value) in enumerate(legend.items()):
+            if value:
+                legend_string += f'{single_condition_dict[key]} {value}'
+            else:
+                legend_string += f'{single_condition_dict[key]}'
+            if i < len(legend) - 1:
+                legend_string += ', '
+        return legend_string
 
-def plot_aggregated_series(conditions_struct, series_column, conditions_to_plot, experiment_time = True, aggregation='mean', n_points=100, time_step = 10, log_scale = True, color_palette = "colorblind"):
+def set_scale(ax, log_scale):
+    if isinstance(log_scale, bool):
+        ax.set_yscale('log' if log_scale else 'linear')
+    elif isinstance(log_scale, tuple):
+        ax.set_yscale('log' if log_scale[1] else 'linear')
+        ax.set_xscale('log' if log_scale[0] else 'linear')
+    elif isinstance(log_scale, list):
+        ax.set_yscale('log' if log_scale[1] else 'linear')
+        ax.set_xscale('log' if log_scale[0] else 'linear')
+
+def plot_aggregated_series(conditions_struct, series_column, conditions_to_plot, experiment_time = True, aggregation='mean', n_points=100, time_step = 10, log_scale = True, color_palette = "colorblind", legend = None):
     color_palette = sns.color_palette(color_palette, len(conditions_to_plot))
     
     def plot_single_series(column: str):
@@ -39,7 +64,9 @@ def plot_aggregated_series(conditions_struct, series_column, conditions_to_plot,
             else:
                 rescaled_time = rescaled_time * time_step / 60
 
-            plt.plot(rescaled_time, aggregated_series, color=color_palette[i], label=f'Condition {condition_id}')
+            label = build_legend(condition_dict, legend)
+                
+            plt.plot(rescaled_time, aggregated_series, color=color_palette[i], label=label)
             plt.fill_between(rescaled_time, ci_lower, ci_upper, color=color_palette[i], alpha=0.2)
 
 
@@ -58,7 +85,7 @@ def plot_aggregated_series(conditions_struct, series_column, conditions_to_plot,
     plt.yscale('log' if log_scale else 'linear')
     plt.show()
 
-def plot_correlation(conditions_struct, column_one, column_two, conditions_to_plot,  log_scale = True, color_palette = "colorblind"):
+def plot_correlation(conditions_struct, column_one, column_two, conditions_to_plot,  log_scale = True, color_palette = "colorblind", legend = None):
     color_palette = sns.color_palette(color_palette, len(conditions_to_plot))
     
     for i, condition_id in enumerate(conditions_to_plot):
@@ -80,27 +107,26 @@ def plot_correlation(conditions_struct, column_one, column_two, conditions_to_pl
             condition_dict['larval_stage_durations_time_step'], 
             condition_dict['body_seg_str_worm_type'], 
             aggregation='mean'
-        )
+            )
 
         # sort the values
         order = np.argsort(aggregated_series_one)
         aggregated_series_one = aggregated_series_one[order]
         aggregated_series_two = aggregated_series_two[order]
 
-        plt.plot(aggregated_series_one, aggregated_series_two, color=color_palette[i], label=f'Condition {condition_id}')
+        label = build_legend(condition_dict, legend)
 
-
-
+        plt.plot(aggregated_series_one, aggregated_series_two, color=color_palette[i], label=label)
 
     plt.xlabel(column_one)
     plt.ylabel(column_two)
-    plt.yscale('log' if log_scale else 'linear')
-    plt.xscale('log' if log_scale else 'linear')
+
+    set_scale(plt.gca(), log_scale)
 
     plt.legend()
     plt.show()
 
-def plot_correlation_at_molt(conditions_struct, column_one, column_two, conditions_to_plot, log_scale = True, color_palette = "colorblind"):
+def plot_correlation_at_molt(conditions_struct, column_one, column_two, conditions_to_plot, log_scale = True, color_palette = "colorblind", legend = None):
     color_palette = sns.color_palette(color_palette, len(conditions_to_plot))
     
     for i, condition_id in enumerate(conditions_to_plot):
@@ -114,13 +140,14 @@ def plot_correlation_at_molt(conditions_struct, column_one, column_two, conditio
         y_std = np.nanstd(condition_dict[column_two], axis=0)
         y_ste = y_std / np.sqrt(np.sum(np.isfinite(condition_dict[column_two]), axis=0))
 
-        plt.errorbar(x, y, xerr=x_std, yerr=y_std, fmt='o', color=color_palette[i], label=f'Condition {condition_id}', capsize=3)
+        label = build_legend(condition_dict, legend)
+        plt.errorbar(x, y, xerr=x_std, yerr=y_std, fmt='o', color=color_palette[i], label=label, capsize=3)
         plt.plot(x, y, color=color_palette[i])
         
     plt.xlabel(column_one)
     plt.ylabel(column_two)
-    plt.yscale('log' if log_scale else 'linear')
-    plt.xscale('log' if log_scale else 'linear')
+    
+    set_scale(plt.gca(), log_scale)
 
     plt.legend()
     plt.show()
@@ -133,6 +160,7 @@ def boxplot_at_molt(
     figsize: tuple = None,
     color_palette = "colorblind",
     plot_significance: bool = False,
+    legend = None
 ):
 
     color_palette = sns.color_palette(color_palette, len(conditions_to_plot))
@@ -146,7 +174,7 @@ def boxplot_at_molt(
                 data_list.append({
                     'Condition': condition_id,
                     'Molt': j,
-                    column: np.log(value) if log_scale else value
+                    column: np.log(value) if log_scale else value,
                 })
    
     df = pd.DataFrame(data_list)
@@ -166,8 +194,12 @@ def boxplot_at_molt(
             palette=color_palette,
             showfliers=False,
             ax=ax[i],
-            dodge=False,
+            dodge=False
         )
+
+        handles, labels = ax[i].get_legend_handles_labels()
+        new_label_list = [build_legend(conditions_struct[condition_id], legend) for condition_id in conditions_to_plot]
+        ax[i].legend(handles, new_label_list)
 
         ylims=ax[i].get_ylim()
         sns.stripplot(
@@ -203,7 +235,6 @@ def boxplot_at_molt(
                 bars.append(bar)
 
             starbars.draw_annotation(bars, ax=ax[i])
-
     # Set y label for the first plot
     ax[0].set_ylabel(column)
 
@@ -233,13 +264,51 @@ def plot_growth_curves_individuals(conditions_struct, column, conditions_to_plot
 
             ax[i].plot(time, filtered_data)
 
-        ax[i].set_yscale('log' if log_scale else 'linear')
+        set_scale(ax[i], log_scale)
         
     ax[0].set_ylabel(column)
 
     plt.show()
 
-def get_proportion_model(series_one_at_ecdysis, series_two_at_ecdysis, remove_hatch = True):
+def get_proportion_model(series_one, series_two, worm_type):
+    assert len(series_one) == len(series_two), "The two series must have the same length."
+
+    series_one = np.array(series_one).flatten()
+    series_two = np.array(series_two).flatten()
+    worm_type = np.array(worm_type).flatten()
+
+    series_one = filter_series_with_classification(series_one, worm_type)
+    series_two = filter_series_with_classification(series_two, worm_type)
+
+    # remove elements that are nan in one of the two arrays
+    correct_indices = ~np.isnan(series_one) & ~np.isnan(series_two)
+    series_one = series_one[correct_indices]
+    series_two = series_two[correct_indices]
+
+    # log transform the data
+    series_one = np.log(series_one)
+    series_two = np.log(series_two)
+
+    # for duplicate values, take the mean
+    unique_series_one = np.unique(series_one)
+    unique_series_two = np.array([np.mean(series_two[series_one == value]) for value in unique_series_one])
+
+    series_one = unique_series_one
+    series_two = unique_series_two
+
+    plt.scatter(series_one, series_two)
+    plt.xlabel('column one')
+    plt.ylabel('column two')
+
+    tck = splrep(series_one, series_two, s=2)
+    model = BSpline(*tck, extrapolate=False)
+
+    plt.plot(np.sort(series_one), model(np.sort(series_one)), color='red')
+    plt.show()
+
+    return model
+
+def get_proportion_model_ecdysis(series_one_at_ecdysis, series_two_at_ecdysis, remove_hatch = True):
     assert len(series_one_at_ecdysis) == len(series_two_at_ecdysis), "The two series must have the same length."
 
     if remove_hatch:
@@ -294,24 +363,30 @@ def get_deviation_from_model_at_ecdysis(series_one_at_ecdysis, series_two_at_ecd
 
     return x, y, y_err
 
-def plot_deviation_from_model_at_ecdysis(conditions_struct, column_one, column_two, control_condition_id, conditions_to_plot, remove_hatch = True):
+def plot_deviation_from_model_at_ecdysis(conditions_struct, column_one, column_two, control_condition_id, conditions_to_plot, remove_hatch = True, log_scale = (True, False), legend = None):
     color_palette = sns.color_palette("husl", len(conditions_to_plot))
     control_condition = conditions_struct[control_condition_id]
-    control_model = get_proportion_model(control_condition[column_one], control_condition[column_two], remove_hatch)
+    control_model = get_proportion_model_ecdysis(control_condition[column_one], control_condition[column_two], remove_hatch)
 
     for i, condition_id in enumerate(conditions_to_plot):
         condition = conditions_struct[condition_id]
         body_data, pharynx_data = condition[column_one], condition[column_two]
         x, y, y_err = get_deviation_from_model_at_ecdysis(body_data, pharynx_data, control_model, remove_hatch)
 
-        plt.plot(x, y, label=f'condition {condition_id}', color = color_palette[i], marker='o')
+        label = build_legend(condition, legend)
+        plt.plot(x, y, label=label, color = color_palette[i], marker='o')
         plt.errorbar(x, y, yerr=y_err, color=color_palette[i], fmt='o', capsize=3)
+
+    plt.xlabel(column_one)
+    plt.ylabel(f'deviation from model {column_two}')
+
+    set_scale(plt.gca(), log_scale)
 
     plt.legend()
     plt.show()
 
 
-def plot_normalized_proportions(conditions_struct, column_one, column_two, control_condition_id, conditions_to_plot, aggregation='mean', log_scale = True):
+def plot_normalized_proportions(conditions_struct, column_one, column_two, control_condition_id, conditions_to_plot, aggregation='mean', log_scale = (True, False), legend = None):
     color_palette = sns.color_palette("husl", len(conditions_to_plot))
     control_condition = conditions_struct[control_condition_id]
     control_column_one, control_column_two = control_condition[column_one], control_condition[column_two]
@@ -332,11 +407,15 @@ def plot_normalized_proportions(conditions_struct, column_one, column_two, contr
         y_err = np.nanstd(normalized_proportion, axis=0)/np.sqrt(len(normalized_proportion))
         x = aggregation_function(condition_column_one, axis=0)
 
-        plt.plot(x, y, label=f'condition {condition_id}', color=color_palette[i])
+        label = build_legend(condition, legend)
+
+        plt.plot(x, y, label=label, color=color_palette[i])
         plt.errorbar(x, y, yerr=y_err, fmt='o', capsize=3, color=color_palette[i])
     
-    plt.legend()
     plt.xlabel(column_one)
     plt.ylabel(f'normalized {column_two} to {column_one} ratio')
-    plt.xscale('log' if log_scale else 'linear')
+    
+    set_scale(plt.gca(), log_scale)
+
+    plt.legend()
     plt.show()
