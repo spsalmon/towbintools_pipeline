@@ -64,8 +64,8 @@ times = filemap["Time"].unique().tolist()
 points = filemap["Point"].unique().tolist()
 
 # channels = image_handling.read_tiff_file(filemap["raw"].iloc[0]).shape[0]
-# channels = int(aicsimageio.AICSImage(filemap["raw"].iloc[1]).dims["C"][0])
-channels = 3
+channels = int(aicsimageio.AICSImage(filemap["raw"].iloc[1]).dims["C"][0])
+# channels = 3
 list_channels = [f"Channel {i+1}" for i in range(channels)]
 list_channels = ["None"] + list_channels
 
@@ -479,6 +479,7 @@ def server(input, output, session):
             yaxis_title=input.column_to_plot(),
             margin=dict(l=20, r=20, t=50, b=50),
             height=input.volume_plot_size(),
+            showlegend=False,
         )
 
         def update_selected_time(trace, points, selector):
