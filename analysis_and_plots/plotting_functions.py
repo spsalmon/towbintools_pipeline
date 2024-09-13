@@ -1,13 +1,14 @@
 import matplotlib.pyplot as plt
 import seaborn as sns
 import numpy as np
-from towbintools.data_analysis import rescale_and_aggregate, filter_series_with_classification
+from towbintools.data_analysis import rescale_and_aggregate, filter_series_with_classification, rescale_series, aggregate_interpolated_series
 from itertools import combinations
 from scipy.stats import mannwhitneyu
 import pandas as pd
 import starbars
-from scipy.interpolate import splrep, splev, BSpline
+from scipy.interpolate import make_interp_spline
 import matplotlib.patches as mpatches
+import statsmodels.api as sm
 
 def build_legend(single_condition_dict, legend):
     if legend is None:
@@ -300,13 +301,85 @@ def get_proportion_model(series_one, series_two, worm_type):
     plt.xlabel('column one')
     plt.ylabel('column two')
 
-    tck = splrep(series_one, series_two, s=2)
-    model = BSpline(*tck, extrapolate=False)
+    # lowess will return our "smoothed" data with a y value for at every x-value
+    lowess = sm.nonparametric.lowess(series_two, series_one, frac=1./3)
 
-    plt.plot(np.sort(series_one), model(np.sort(series_one)), color='red')
+    # unpack the lowess smoothed points to their values
+    lowess_x = list(zip(*lowess))[0]
+    lowess_y = list(zip(*lowess))[1]
+
+    # plt.scatter(lowess_x, lowess_y, color='red')
+    # plt.show()
+
+    # interpolate the loess curve
+    model = make_interp_spline(lowess_x, lowess_y, k=3)
+
+    x = np.linspace(min(series_one), max(series_one), 100)
+    y = model(x)
+
+    plt.plot(x, y, color='red')
     plt.show()
 
     return model
+
+def get_deviation_from_model(series_one, series_two, time, ecdysis, model, worm_type, n_points=100):
+
+    _, rescaled_series_one = rescale_series(series_one, time, ecdysis, worm_type, n_points=n_points)
+    _, rescaled_series_two = rescale_series(series_two, time, ecdysis, worm_type, n_points=n_points)
+
+    # log transform the data
+    rescaled_series_one = np.log(rescaled_series_one)
+    rescaled_series_two = np.log(rescaled_series_two)
+
+    expected_series_two = model(rescaled_series_one)
+
+    log_residuals = rescaled_series_two - expected_series_two
+    residuals = np.exp(log_residuals)
+
+    aggregated_series_one = np.full((4, n_points), np.nan)
+    aggregated_residuals = np.full((4, n_points), np.nan)
+    std_residuals = np.full((4, n_points), np.nan)
+    ste_residuals = np.full((4, n_points), np.nan)
+
+    for i in range(4):
+        aggregated_residuals[i, :] = np.nanmean(residuals[:, i, :], axis=0)
+        std_residuals[i, :] = np.nanstd(residuals[:, i, :], axis=0)
+        ste_residuals[i, :] = std_residuals[i, :] / np.sqrt(np.sum(np.isfinite(residuals[:, i, :]), axis=0))
+
+        aggregated_series_one[i, :] = np.nanmean(np.exp(rescaled_series_one[:, i, :]), axis=0)
+
+
+    aggregated_series_one = aggregated_series_one.flatten()
+
+    aggregated_residuals = aggregated_residuals.flatten()
+    std_residuals = std_residuals.flatten()
+    ste_residuals = ste_residuals.flatten()
+    
+    return aggregated_series_one, aggregated_residuals, std_residuals, ste_residuals
+
+def plot_deviation_from_model(conditions_struct, column_one, column_two, control_condition_id, conditions_to_plot, log_scale = (True, False), legend = None):
+    color_palette = sns.color_palette("husl", len(conditions_to_plot))
+    control_condition = conditions_struct[control_condition_id]
+    control_model = get_proportion_model(control_condition[column_one], control_condition[column_two], control_condition['body_seg_str_worm_type'])
+
+    for i, condition_id in enumerate(conditions_to_plot):
+        condition = conditions_struct[condition_id]
+        ecdysis = condition['ecdysis_time_step']
+        time = condition['time']
+        body_data, pharynx_data = condition[column_one], condition[column_two]
+        x, residuals, std_residuals, ste_residuals = get_deviation_from_model(body_data, pharynx_data, time, ecdysis, control_model, condition['body_seg_str_worm_type'])
+
+        label = build_legend(condition, legend)
+        plt.plot(x, residuals, label=label, color = color_palette[i])
+        plt.fill_between(x, residuals - 1.96*std_residuals, residuals + 1.96*std_residuals, color=color_palette[i], alpha=0.2)
+
+    plt.xlabel(column_one)
+    plt.ylabel(f'deviation from model {column_two}')
+
+    set_scale(plt.gca(), log_scale)
+
+    plt.legend()
+    plt.show()
 
 def get_proportion_model_ecdysis(series_one_at_ecdysis, series_two_at_ecdysis, remove_hatch = True):
     assert len(series_one_at_ecdysis) == len(series_two_at_ecdysis), "The two series must have the same length."
