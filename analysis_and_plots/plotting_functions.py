@@ -34,7 +34,7 @@ def set_scale(ax, log_scale):
         ax.set_yscale('log' if log_scale[1] else 'linear')
         ax.set_xscale('log' if log_scale[0] else 'linear')
 
-def plot_aggregated_series(conditions_struct, series_column, conditions_to_plot, experiment_time = True, aggregation='mean', n_points=100, time_step = 10, log_scale = True, color_palette = "colorblind", legend = None):
+def plot_aggregated_series(conditions_struct, series_column, conditions_to_plot, experiment_time = True, aggregation='mean', n_points=100, time_step = 10, log_scale = True, color_palette = "colorblind", legend = None, y_axis_label = None):
     color_palette = sns.color_palette(color_palette, len(conditions_to_plot))
     
     def plot_single_series(column: str):
@@ -84,9 +84,15 @@ def plot_aggregated_series(conditions_struct, series_column, conditions_to_plot,
 
     plt.xlabel('Time (h)')
     plt.yscale('log' if log_scale else 'linear')
+
+    if y_axis_label is not None:
+        plt.ylabel(y_axis_label)
+    else:
+        plt.ylabel(series_column)
+
     plt.show()
 
-def plot_correlation(conditions_struct, column_one, column_two, conditions_to_plot,  log_scale = True, color_palette = "colorblind", legend = None):
+def plot_correlation(conditions_struct, column_one, column_two, conditions_to_plot,  log_scale = True, color_palette = "colorblind", legend = None, x_axis_label = None, y_axis_label = None):
     color_palette = sns.color_palette(color_palette, len(conditions_to_plot))
     
     for i, condition_id in enumerate(conditions_to_plot):
@@ -119,15 +125,22 @@ def plot_correlation(conditions_struct, column_one, column_two, conditions_to_pl
 
         plt.plot(aggregated_series_one, aggregated_series_two, color=color_palette[i], label=label)
 
-    plt.xlabel(column_one)
-    plt.ylabel(column_two)
+    if x_axis_label is not None:
+        plt.xlabel(x_axis_label)
+    else:
+        plt.xlabel(column_one)
+
+    if y_axis_label is not None:
+        plt.ylabel(y_axis_label)
+    else:
+        plt.ylabel(column_two)
 
     set_scale(plt.gca(), log_scale)
 
     plt.legend()
     plt.show()
 
-def plot_correlation_at_molt(conditions_struct, column_one, column_two, conditions_to_plot, log_scale = True, color_palette = "colorblind", legend = None):
+def plot_correlation_at_molt(conditions_struct, column_one, column_two, conditions_to_plot, log_scale = True, color_palette = "colorblind", legend = None, x_axis_label = None, y_axis_label = None):
     color_palette = sns.color_palette(color_palette, len(conditions_to_plot))
     
     for i, condition_id in enumerate(conditions_to_plot):
@@ -145,8 +158,15 @@ def plot_correlation_at_molt(conditions_struct, column_one, column_two, conditio
         plt.errorbar(x, y, xerr=x_std, yerr=y_std, fmt='o', color=color_palette[i], label=label, capsize=3)
         plt.plot(x, y, color=color_palette[i])
         
-    plt.xlabel(column_one)
-    plt.ylabel(column_two)
+    if x_axis_label is not None:
+        plt.xlabel(x_axis_label)
+    else:
+        plt.xlabel(column_one)
+
+    if y_axis_label is not None:
+        plt.ylabel(y_axis_label)
+    else:
+        plt.ylabel(column_two)
     
     set_scale(plt.gca(), log_scale)
 
@@ -161,7 +181,9 @@ def boxplot_at_molt(
     figsize: tuple = None,
     color_palette = "colorblind",
     plot_significance: bool = False,
-    legend = None
+    legend = None,
+    y_axis_label = None,
+    titles = None
 ):
 
     color_palette = sns.color_palette(color_palette, len(conditions_to_plot))
@@ -184,6 +206,10 @@ def boxplot_at_molt(
     if figsize is None:
         figsize = (5 * df['Molt'].nunique(), 6)
    
+    if titles is not None and len(titles) != df['Molt'].nunique():
+        print('Number of titles does not match the number of ecdysis events.')
+        titles = None
+
     # Create plot
     fig, ax = plt.subplots(1, df['Molt'].nunique(), figsize=figsize)
     for i in range(df['Molt'].nunique()):
@@ -216,6 +242,8 @@ def boxplot_at_molt(
 
         ax[i].set_xlabel('')
         ax[i].set_ylabel('')
+        if titles is not None:
+            ax[i].set_title(titles[i])
         # remove ticks
         ax[i].tick_params(axis='x', which='both', bottom=False, top=False, labelbottom=False)
 
@@ -237,7 +265,10 @@ def boxplot_at_molt(
 
             starbars.draw_annotation(bars, ax=ax[i])
     # Set y label for the first plot
-    ax[0].set_ylabel(column)
+    if y_axis_label is not None:
+        ax[0].set_ylabel(y_axis_label)
+    else:
+        ax[0].set_ylabel(column)
 
     # remove x label
    
@@ -245,7 +276,7 @@ def boxplot_at_molt(
     plt.tight_layout()
     plt.show()
 
-def plot_growth_curves_individuals(conditions_struct, column, conditions_to_plot, log_scale = True, color_palette = "colorblind", figsize = None):
+def plot_growth_curves_individuals(conditions_struct, column, conditions_to_plot, log_scale = True, color_palette = "colorblind", figsize = None, legend = None, y_axis_label = None):
     color_palette = sns.color_palette(color_palette, len(conditions_to_plot))
 
     if figsize is None:
@@ -263,15 +294,21 @@ def plot_growth_curves_individuals(conditions_struct, column, conditions_to_plot
             
             filtered_data = filter_series_with_classification(data, worm_type)
 
+            label = build_legend(condition_dict, legend)
+
+            ax[i].title.set_text(label)
             ax[i].plot(time, filtered_data)
 
         set_scale(ax[i], log_scale)
         
-    ax[0].set_ylabel(column)
+    if y_axis_label is not None:
+        ax[0].set_ylabel(y_axis_label)
+    else:
+        ax[0].set_ylabel(column)
 
     plt.show()
 
-def get_proportion_model(series_one, series_two, worm_type):
+def get_proportion_model(series_one, series_two, worm_type, x_axis_label = None, y_axis_label = None):
     assert len(series_one) == len(series_two), "The two series must have the same length."
 
     series_one = np.array(series_one).flatten()
@@ -298,8 +335,16 @@ def get_proportion_model(series_one, series_two, worm_type):
     series_two = unique_series_two
 
     plt.scatter(series_one, series_two)
-    plt.xlabel('column one')
-    plt.ylabel('column two')
+    
+    if x_axis_label is not None:
+        plt.xlabel(x_axis_label)
+    else:
+        plt.xlabel('column one')
+    
+    if y_axis_label is not None:
+        plt.ylabel(y_axis_label)
+    else:
+        plt.ylabel('column two')
 
     # lowess will return our "smoothed" data with a y value for at every x-value
     lowess = sm.nonparametric.lowess(series_two, series_one, frac=1./3)
@@ -357,10 +402,17 @@ def get_deviation_from_model(series_one, series_two, time, ecdysis, model, worm_
     
     return aggregated_series_one, aggregated_residuals, std_residuals, ste_residuals
 
-def plot_deviation_from_model(conditions_struct, column_one, column_two, control_condition_id, conditions_to_plot, log_scale = (True, False), legend = None):
+def plot_deviation_from_model(conditions_struct, column_one, column_two, control_condition_id, conditions_to_plot, log_scale = (True, False), legend = None, x_axis_label = None, y_axis_label = None):
     color_palette = sns.color_palette("husl", len(conditions_to_plot))
+
+    xlbl = column_one
+    ylbl = column_two
+
+    x_axis_label = x_axis_label if x_axis_label is not None else xlbl
+    y_axis_label = y_axis_label if y_axis_label is not None else f'deviation from modeled {column_two}'
+
     control_condition = conditions_struct[control_condition_id]
-    control_model = get_proportion_model(control_condition[column_one], control_condition[column_two], control_condition['body_seg_str_worm_type'])
+    control_model = get_proportion_model(control_condition[column_one], control_condition[column_two], control_condition['body_seg_str_worm_type'], x_axis_label = xlbl, y_axis_label = ylbl)
 
     for i, condition_id in enumerate(conditions_to_plot):
         condition = conditions_struct[condition_id]
@@ -373,15 +425,15 @@ def plot_deviation_from_model(conditions_struct, column_one, column_two, control
         plt.plot(x, residuals, label=label, color = color_palette[i])
         plt.fill_between(x, residuals - 1.96*std_residuals, residuals + 1.96*std_residuals, color=color_palette[i], alpha=0.2)
 
-    plt.xlabel(column_one)
-    plt.ylabel(f'deviation from model {column_two}')
+    plt.xlabel(x_axis_label)
+    plt.ylabel(y_axis_label)
 
     set_scale(plt.gca(), log_scale)
 
     plt.legend()
     plt.show()
 
-def get_proportion_model_ecdysis(series_one_at_ecdysis, series_two_at_ecdysis, remove_hatch = True):
+def get_proportion_model_ecdysis(series_one_at_ecdysis, series_two_at_ecdysis, remove_hatch = True, x_axis_label = None, y_axis_label = None):
     assert len(series_one_at_ecdysis) == len(series_two_at_ecdysis), "The two series must have the same length."
 
     if remove_hatch:
@@ -400,8 +452,16 @@ def get_proportion_model_ecdysis(series_one_at_ecdysis, series_two_at_ecdysis, r
     series_two_at_ecdysis = np.log(series_two_at_ecdysis)
 
     plt.scatter(series_one_at_ecdysis, series_two_at_ecdysis)
-    plt.xlabel('column one')
-    plt.ylabel('column two')
+    
+    if x_axis_label is not None:
+        plt.xlabel(x_axis_label)
+    else:
+        plt.xlabel('column one')
+
+    if y_axis_label is not None:
+        plt.ylabel(y_axis_label)
+    else:
+        plt.ylabel('column two')
 
     fit = np.polyfit(series_one_at_ecdysis, series_two_at_ecdysis, 3)
     model = np.poly1d(fit)
@@ -436,10 +496,17 @@ def get_deviation_from_model_at_ecdysis(series_one_at_ecdysis, series_two_at_ecd
 
     return x, y, y_err
 
-def plot_deviation_from_model_at_ecdysis(conditions_struct, column_one, column_two, control_condition_id, conditions_to_plot, remove_hatch = True, log_scale = (True, False), legend = None):
+def plot_deviation_from_model_at_ecdysis(conditions_struct, column_one, column_two, control_condition_id, conditions_to_plot, remove_hatch = True, log_scale = (True, False), legend = None, x_axis_label = None, y_axis_label = None):
     color_palette = sns.color_palette("husl", len(conditions_to_plot))
+
+    xlbl = column_one
+    ylbl = column_two
+
+    x_axis_label = x_axis_label if x_axis_label is not None else xlbl
+    y_axis_label = y_axis_label if y_axis_label is not None else f'deviation from modeled {column_two}'
+
     control_condition = conditions_struct[control_condition_id]
-    control_model = get_proportion_model_ecdysis(control_condition[column_one], control_condition[column_two], remove_hatch)
+    control_model = get_proportion_model_ecdysis(control_condition[column_one], control_condition[column_two], remove_hatch, x_axis_label = xlbl, y_axis_label = ylbl)
 
     for i, condition_id in enumerate(conditions_to_plot):
         condition = conditions_struct[condition_id]
@@ -450,8 +517,8 @@ def plot_deviation_from_model_at_ecdysis(conditions_struct, column_one, column_t
         plt.plot(x, y, label=label, color = color_palette[i], marker='o')
         plt.errorbar(x, y, yerr=y_err, color=color_palette[i], fmt='o', capsize=3)
 
-    plt.xlabel(column_one)
-    plt.ylabel(f'deviation from model {column_two}')
+    plt.xlabel(x_axis_label)
+    plt.ylabel(y_axis_label)
 
     set_scale(plt.gca(), log_scale)
 
@@ -459,13 +526,16 @@ def plot_deviation_from_model_at_ecdysis(conditions_struct, column_one, column_t
     plt.show()
 
 
-def plot_normalized_proportions(conditions_struct, column_one, column_two, control_condition_id, conditions_to_plot, aggregation='mean', log_scale = (True, False), legend = None):
+def plot_normalized_proportions(conditions_struct, column_one, column_two, control_condition_id, conditions_to_plot, aggregation='mean', log_scale = (True, False), legend = None, x_axis_label = None, y_axis_label = None):
     color_palette = sns.color_palette("husl", len(conditions_to_plot))
     control_condition = conditions_struct[control_condition_id]
     control_column_one, control_column_two = control_condition[column_one], control_condition[column_two]
 
     aggregation_function = np.nanmean
     control_proportion = aggregation_function(control_column_two / control_column_one, axis=0)
+
+    x_axis_label = x_axis_label if x_axis_label is not None else column_one
+    y_axis_label = y_axis_label if y_axis_label is not None else f'normalized {column_two} to {column_one} ratio'
 
     for i, condition_id in enumerate(conditions_to_plot):
         condition = conditions_struct[condition_id]
@@ -485,8 +555,8 @@ def plot_normalized_proportions(conditions_struct, column_one, column_two, contr
         plt.plot(x, y, label=label, color=color_palette[i])
         plt.errorbar(x, y, yerr=y_err, fmt='o', capsize=3, color=color_palette[i])
     
-    plt.xlabel(column_one)
-    plt.ylabel(f'normalized {column_two} to {column_one} ratio')
+    plt.xlabel(x_axis_label)
+    plt.ylabel(y_axis_label)
     
     set_scale(plt.gca(), log_scale)
 
