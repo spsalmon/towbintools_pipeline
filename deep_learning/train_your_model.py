@@ -16,6 +16,9 @@ import os
 import pytorch_lightning as pl
 import pytorch_lightning.callbacks as callbacks
 
+from towbintools.deep_learning.utils.loss import FocalTverskyLoss, BCELossWithIgnore
+import torch.nn as nn
+
 
 def get_args():
     parser = argparse.ArgumentParser()
@@ -41,6 +44,17 @@ pretrained_encoder = config.get("pretrained_encoder", "efficientnet-b4")
 pretrained_weights = config.get("pretrained_weights", "image-micronet")
 deep_supervision = config.get("deep_supervision", False)
 learning_rate = config.get("learning_rate", 1e-4)
+loss = config.get("loss", "FocalTversky")
+value_to_ignore = config.get("value_to_ignore", None)
+
+if loss == "FocalTversky":
+    criterion = FocalTverskyLoss(ignore_index=value_to_ignore)
+elif loss == "BCE":
+    criterion = BCELossWithIgnore(ignore_index=value_to_ignore)
+elif loss == "CrossEntropy":
+    criterion = nn.CrossEntropyLoss(ignore_index=value_to_ignore)
+else:
+    raise ValueError(f"{loss} loss not implemented yet")
 
 full_normalization_parameters = config.get(
     "normalization_parameters", {"type": "percentile", "lo": 1, "hi": 99, "axis": (-2, -1)}
@@ -109,6 +123,7 @@ if pretrained:
         normalization=full_normalization_parameters,
         learning_rate=learning_rate,
         checkpoint_path=checkpoint_path,
+        criterion=criterion,
     )
 else:
     model = create_segmentation_model(
@@ -119,6 +134,7 @@ else:
         learning_rate=learning_rate,
         checkpoint_path=checkpoint_path,
         deep_supervision=deep_supervision,
+        criterion=criterion,
     )
 
 checkpoint_callback = callbacks.ModelCheckpoint(
