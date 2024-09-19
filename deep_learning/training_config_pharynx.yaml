@@ -1,0 +1,37 @@
+image_directories: ["/mnt/towbin.data/shared/spsalmon/pharynx_database/images/"]
+mask_directories: ["/mnt/towbin.data/shared/spsalmon/pharynx_database/masks/"]
+
+# training_filemap: '/mnt/external.data/TowbinLab/plenart/20221020_Ti2_10x_green_bacteria_wbt150_small_chambers_good/analysis/report/training_filemap.csv'
+
+save_dir: '/mnt/towbin.data/shared/spsalmon/pharynx_database/models'
+model_name: 'full_auto_pharynx_unetplusplus_efficientnetb4'
+
+pretrained: True
+
+continue_training_from_checkpoint: null
+
+n_classes: 1
+channels_to_segment: null
+
+architecture: 'UnetPlusPlus'
+pretrained_encoder: 'efficientnet-b4'
+pretrained_weights: 'image-micronet'
+
+deep_supervision: False
+
+learning_rate: 1.0e-5
+normalization_parameters: {'type': 'percentile', 'lo': 1, 'hi': 99, 'axis': [-2, -1]}
+
+train_on_tiles: False
+tiler_config: {'tile_size':[512, 512], 'tile_step':[256, 256]}
+
+loss: 'BCEWithLogits'
+value_to_ignore: -1
+
+max_epochs: 1000
+batch_size: 5
+accumulate_grad_batches: 1
+num_workers: 32
+
+save_best_k_models: 2
+train_val_split_ratio: 0.25
