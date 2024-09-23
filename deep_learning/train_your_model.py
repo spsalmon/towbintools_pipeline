@@ -143,7 +143,6 @@ checkpoint_callback = callbacks.ModelCheckpoint(
 )
 swa_callback = callbacks.StochasticWeightAveraging(swa_lrs=1e-2)
 
-
 trainer = pl.Trainer(
     max_epochs=max_epochs,
     accelerator="gpu",

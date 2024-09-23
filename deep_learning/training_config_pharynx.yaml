@@ -1,9 +1,9 @@
-image_directories: ["/mnt/towbin.data/shared/spsalmon/pharynx_database/images/"]
-mask_directories: ["/mnt/towbin.data/shared/spsalmon/pharynx_database/masks/"]
+image_directories: ["/mnt/towbin.data/shared/spsalmon/bigger_pharynx_database/images/"]
+mask_directories: ["/mnt/towbin.data/shared/spsalmon/bigger_pharynx_database/masks/"]
 
 # training_filemap: '/mnt/external.data/TowbinLab/plenart/20221020_Ti2_10x_green_bacteria_wbt150_small_chambers_good/analysis/report/training_filemap.csv'
 
-save_dir: '/mnt/towbin.data/shared/spsalmon/pharynx_database/models'
+save_dir: '/mnt/towbin.data/shared/spsalmon/bigger_pharynx_database/models'
 model_name: 'full_auto_pharynx_unetplusplus_efficientnetb4'
 
 pretrained: True
