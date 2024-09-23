@@ -11,7 +11,7 @@ pretrained: True
 continue_training_from_checkpoint: null
 
 n_classes: 1
-channels_to_segment: null
+channels_to_segment: [0]
 
 architecture: 'UnetPlusPlus'
 pretrained_encoder: 'efficientnet-b4'
@@ -25,12 +25,12 @@ normalization_parameters: {'type': 'percentile', 'lo': 1, 'hi': 99, 'axis': [-2,
 train_on_tiles: False
 tiler_config: {'tile_size':[512, 512], 'tile_step':[256, 256]}
 
-loss: 'BCEWithLogits'
+loss: 'BCE'
 value_to_ignore: -1
 
 max_epochs: 1000
-batch_size: 5
-accumulate_grad_batches: 1
+batch_size: 4
+accumulate_grad_batches: 6
 num_workers: 32
 
 save_best_k_models: 2

@@ -6,7 +6,7 @@
 #SBATCH -c 32
 #SBATCH -t 72:00:00
 #SBATCH --mem=64GB
-#SBATCH --gres=gpu:1
+#SBATCH --gres=gpu:rtx6000:1
 
 # Default configuration file
 DEFAULT_CONFIG_FILE="./training_config.yaml"

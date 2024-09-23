@@ -116,6 +116,7 @@ else:
 # initialize model
 if pretrained:
     model = create_pretrained_segmentation_model(
+        input_channels=input_channels,
         n_classes=n_classes,
         architecture=architecture,
         encoder=pretrained_encoder,
