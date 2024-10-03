@@ -146,7 +146,7 @@ swa_callback = callbacks.StochasticWeightAveraging(swa_lrs=1e-2)
 trainer = pl.Trainer(
     max_epochs=max_epochs,
     accelerator="gpu",
-    strategy="ddp_find_unused_parameters_true",
+    strategy="auto",
     callbacks=[checkpoint_callback, swa_callback],
     accumulate_grad_batches=accumulate_grad_batches,
     gradient_clip_val=0.5,
