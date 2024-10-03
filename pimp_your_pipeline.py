@@ -23,7 +23,7 @@ from pipeline_scripts.run_functions import (
     run_custom,
 )
 import argparse
-from pipeline_scripts.building_blocks import build_config_of_building_blocks
+from pipeline_scripts.building_blocks import parse_and_create_building_blocks
 
 
 def get_args():
@@ -86,93 +86,117 @@ def main(config, pad=None):
 
     print('Building the config of the building blocks ...')
 
-    building_blocks = config["building_blocks"]
+    building_blocks = parse_and_create_building_blocks(config)
 
-    blocks_config = build_config_of_building_blocks(building_blocks, config)
+    # building_block_functions = {
+    #     "segmentation": {"func": run_segmentation, "return_subdir": True},
+    #     "straightening": {"func": run_straightening, "return_subdir": True},
+    #     "volume_computation": {"func": run_compute_volume, "return_subdir": False},
+    #     "classification": {
+    #         "func": run_classification,
+    #         "return_subdir": False,
+    #         "column_name_old": "WormType",
+    #         "column_name_new_key": True,
+    #     },
+    #     "molt_detection": {
+    #         "func": run_detect_molts,
+    #         "return_subdir": False,
+    #         "process_molt": True,
+    #     },
+    #     "fluorescence_quantification": {
+    #         "func": run_fluorescence_quantification, "return_subdir": False},
+    #     "custom": {"func": run_custom},
+    # }
 
-    building_block_functions = {
-        "segmentation": {"func": run_segmentation, "return_subdir": True},
-        "straightening": {"func": run_straightening, "return_subdir": True},
-        "volume_computation": {"func": run_compute_volume, "return_subdir": False},
-        "classification": {
-            "func": run_classification,
-            "return_subdir": False,
-            "column_name_old": "WormType",
-            "column_name_new_key": True,
-        },
-        "molt_detection": {
-            "func": run_detect_molts,
-            "return_subdir": False,
-            "process_molt": True,
-        },
-        "fluorescence_quantification": {
-            "func": run_fluorescence_quantification, "return_subdir": False},
-        "custom": {"func": run_custom},
-    }
-
-    for i, building_block in enumerate(building_blocks):
-        block_config = blocks_config[i]
+    for building_block in building_blocks:
         print(f'Running {building_block} ...')
-        if building_block in building_block_functions:
-            func_data = building_block_functions[building_block]
-            result = func_data["func"](experiment_filemap, config, block_config, pad=pad)
+        result = building_block.run(experiment_filemap, config, pad=pad)
 
-            # reload the experiment filemap in case it was modified during the function call
-            experiment_filemap = pd.read_csv(os.path.join(report_subdir, "analysis_filemap.csv"))
+        # reload the experiment filemap in case it was modified during the function call
+        experiment_filemap = pd.read_csv(os.path.join(report_subdir, "analysis_filemap.csv"))
 
-            if building_block == "custom":
-                # check if result is a file or a directory
-                if result is None:
-                    continue
-                elif os.path.isdir(result):
-                    experiment_filemap = add_dir_to_experiment_filemap(
-                        experiment_filemap, result, f'{config["analysis_dir_name"]}/{os.path.basename(os.path.normpath(result))}'
-                    )
-                    experiment_filemap.to_csv(
-                        os.path.join(report_subdir, "analysis_filemap.csv"), index=False
-                    )
-                elif os.path.isfile(result) and result.endswith(".csv"):
-                    experiment_filemap = merge_and_save_csv(experiment_filemap, report_subdir, result)
+        if building_block.return_type == "subdir":
+            experiment_filemap = add_dir_to_experiment_filemap(
+                experiment_filemap, result, f'{config["analysis_dir_name"]}/{os.path.basename(os.path.normpath(result))}'
+            )
+            experiment_filemap.to_csv(
+                os.path.join(report_subdir, "analysis_filemap.csv"), index=False
+            )
 
-            elif func_data.get("return_subdir"):
-                experiment_filemap = add_dir_to_experiment_filemap(
-                    experiment_filemap, result, f'{config["analysis_dir_name"]}/{os.path.basename(os.path.normpath(result))}'
+        elif building_block.return_type == "csv":    
+            if building_block.name == "molt_detection":       
+                experiment_filemap = merge_and_save_csv(
+                    experiment_filemap, report_subdir, result, merge_cols=["Point"]
                 )
-                experiment_filemap.to_csv(
-                    os.path.join(report_subdir, "analysis_filemap.csv"), index=False
+            else:
+                experiment_filemap = merge_and_save_csv(
+                    experiment_filemap, report_subdir, result
                 )
 
-            elif not func_data.get("process_molt"):
-                if func_data.get("column_name_old") is not None:
-                    column_name_new = (
-                        os.path.splitext(os.path.basename(result))[0]
-                        if func_data.get("column_name_new_key")
-                        else func_data.get("column_name_new")
-                    )
-                    experiment_filemap = rename_merge_and_save_csv(
-                        experiment_filemap,
-                        report_subdir,
-                        result,
-                        func_data["column_name_old"],
-                        column_name_new,
-                    )
-                else:
-                    experiment_filemap = merge_and_save_csv(
-                        experiment_filemap, report_subdir, result
-                    )
 
-            elif func_data.get("process_molt"):
-                ecdysis_csv = pd.read_csv(os.path.join(report_subdir, "ecdysis.csv"))
-                if "M1" not in experiment_filemap.columns:
-                    experiment_filemap = experiment_filemap.merge(
-                        ecdysis_csv, on=["Point"], how="left"
-                    )
-                    experiment_filemap.to_csv(
-                        os.path.join(report_subdir, "analysis_filemap.csv"), index=False
-                    )
+    # for i, building_block in enumerate(building_blocks):
+    #     block_config = blocks_config[i]
+    #     print(f'Running {building_block} ...')
+    #     if building_block in building_block_functions:
+    #         func_data = building_block_functions[building_block]
+    #         result = func_data["func"](experiment_filemap, config, block_config, pad=pad)
 
-        else:
-            print(f"Functionality for {building_block} not implemented yet")
+    #         # reload the experiment filemap in case it was modified during the function call
+    #         experiment_filemap = pd.read_csv(os.path.join(report_subdir, "analysis_filemap.csv"))
+
+    #         if building_block == "custom":
+    #             # check if result is a file or a directory
+    #             if result is None:
+    #                 continue
+    #             elif os.path.isdir(result):
+    #                 experiment_filemap = add_dir_to_experiment_filemap(
+    #                     experiment_filemap, result, f'{config["analysis_dir_name"]}/{os.path.basename(os.path.normpath(result))}'
+    #                 )
+    #                 experiment_filemap.to_csv(
+    #                     os.path.join(report_subdir, "analysis_filemap.csv"), index=False
+    #                 )
+    #             elif os.path.isfile(result) and result.endswith(".csv"):
+    #                 experiment_filemap = merge_and_save_csv(experiment_filemap, report_subdir, result)
+
+    #         elif func_data.get("return_subdir"):
+    #             experiment_filemap = add_dir_to_experiment_filemap(
+    #                 experiment_filemap, result, f'{config["analysis_dir_name"]}/{os.path.basename(os.path.normpath(result))}'
+    #             )
+    #             experiment_filemap.to_csv(
+    #                 os.path.join(report_subdir, "analysis_filemap.csv"), index=False
+    #             )
+
+    #         elif not func_data.get("process_molt"):
+    #             if func_data.get("column_name_old") is not None:
+    #                 column_name_new = (
+    #                     os.path.splitext(os.path.basename(result))[0]
+    #                     if func_data.get("column_name_new_key")
+    #                     else func_data.get("column_name_new")
+    #                 )
+    #                 experiment_filemap = rename_merge_and_save_csv(
+    #                     experiment_filemap,
+    #                     report_subdir,
+    #                     result,
+    #                     func_data["column_name_old"],
+    #                     column_name_new,
+    #                 )
+    #             else:
+    #                 experiment_filemap = merge_and_save_csv(
+    #                     experiment_filemap, report_subdir, result
+    #                 )
+
+    #         elif func_data.get("process_molt"):
+    #             ecdysis_csv = pd.read_csv(os.path.join(report_subdir, "ecdysis.csv"))
+    #             if "M1" not in experiment_filemap.columns:
+    #                 experiment_filemap = experiment_filemap.merge(
+    #                     ecdysis_csv, on=["Point"], how="left"
+    #                 )
+    #                 experiment_filemap.to_csv(
+    #                     os.path.join(report_subdir, "analysis_filemap.csv"), index=False
+    #                 )
+
+    #     else:
+    #         print(f"Functionality for {building_block} not implemented yet")
 
 
 pads = get_experiment_pads(config)
