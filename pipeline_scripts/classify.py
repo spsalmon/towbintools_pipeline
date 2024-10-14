@@ -11,7 +11,6 @@ import xgboost as xgb
 def classify_worm_type_from_file_path(
     straightened_mask_path, pixelsize, classifier, classes=["worm", "egg", "error"]
 ):
-    """Compute the volume of a straightened mask."""
     print(straightened_mask_path)
     str_mask = image_handling.read_tiff_file(straightened_mask_path)
     worm_type = classification_tools.classify_worm_type(
@@ -47,6 +46,9 @@ def main(input_pickle, output_file, config, n_jobs):
         for input_file in input_files
     )
     worm_types_dataframe = pd.DataFrame(worm_types)
+
+    # rename the WormType column to the output file
+    worm_types_dataframe.rename(columns={"WormType": os.path.splitext(os.path.basename(output_file))[0]}, inplace=True)
     worm_types_dataframe.to_csv(output_file, index=False)
 
 

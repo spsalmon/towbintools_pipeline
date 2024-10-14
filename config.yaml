@@ -1,4 +1,4 @@
-experiment_dir: "/mnt/external.data/TowbinLab/spsalmon/pipeline_test_folder/"
+experiment_dir: "/mnt/towbin.data/shared/spsalmon/pipeline_test_folder/"
 analysis_dir_name: "analysis"
 
 #########################################################################################################

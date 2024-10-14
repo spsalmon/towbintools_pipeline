@@ -1,5 +1,5 @@
 experiment_dir: "/mnt/towbin.data/shared/plenart/20232707_Ti2_wbt125_measuring_measurement_error_for_organ_size_paper/"
-analysis_dir_name: "analysis_deep_learning"
+analysis_dir_name: "analysis_deep_learning_isolated_pharynx"
 
 building_blocks: ["segmentation", "segmentation", "straightening", "straightening", "volume_computation", "volume_computation", "classification"]
 
@@ -34,14 +34,14 @@ ilastik_project_path: ["/home/igheor/towbintools_pipeline/models/pharynx_str_noC
 ilastik_result_channel: [0]
 
 # straightening parameters
-straightening_source: [['analysis_deep_learning/ch1_seg', null], ['analysis_deep_learning/ch2_seg_edge_based', null]]
-straightening_masks: ['analysis_deep_learning/ch2_seg_edge_based']
+straightening_source: [['analysis_deep_learning_isolated_pharynx/ch1_seg', null], ['analysis_deep_learning_isolated_pharynx/ch2_seg_edge_based', null]]
+straightening_masks: ['analysis_deep_learning_isolated_pharynx/ch1_seg', 'analysis_deep_learning_isolated_pharynx/ch2_seg_edge_based']
 
 # volume computation parameters
-volume_computation_masks: ['analysis_deep_learning/ch1_seg_str', 'analysis_deep_learning/ch2_seg_edge_based_str']
+volume_computation_masks: ['analysis_deep_learning_isolated_pharynx/ch1_seg_str', 'analysis_deep_learning_isolated_pharynx/ch2_seg_edge_based_str']
 
 # classification parameters
-classification_source: ['analysis_deep_learning/ch2_seg_edge_based_str']
+classification_source: ['analysis_deep_learning_isolated_pharynx/ch2_seg_edge_based_str']
 classifier: ["./models/worm_type_classifier.json"]
 
 # molt detection parameters

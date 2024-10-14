@@ -14,7 +14,7 @@ import aicsimageio
 import re
 from time import perf_counter
 
-filemap_path = "/mnt/towbin.data/shared/spsalmon/20240927_174533_724_lipsi_40X_451_405_raga1_delta//analysis/report/pad1/pad1_filemap.csv"
+filemap_path = "/mnt/towbin.data/shared/spsalmon/pipeline_test_folder/analysis/report/analysis_filemap.csv"
 
 filemap = pd.read_csv(filemap_path)
 
@@ -195,7 +195,7 @@ molt_annotator = ui.column(
                 min=300,
                 max=1000,
                 step=10,
-                value=400,
+                value=700,
             )
         ),
         align="center",
@@ -453,10 +453,7 @@ def server(input, output, session):
             return ecdys_filtered, np.log10(value_at_ecdys_filtered), symbols_filtered, colors_filtered, sizes_filtered, widths_filtered
 
         ecdys_list, value_at_ecdys_list, symbols, colors, sizes, widths = get_points_for_value_at_molts()
-        print(f"ecdys_list: {ecdys_list}")
-        print(f"value_at_ecdys_list: {value_at_ecdys_list}")
-        print(f"colors: {colors}")
-
+        
         fig.add_trace(
             go.Scatter(
                 x = ecdys_list,
