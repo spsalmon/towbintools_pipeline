@@ -71,15 +71,15 @@ OPTIONS_MAP = {
     }
 
 class BuildingBlock(ABC):
-    def __init__(self, name, options, block_config, script_path, return_type):
+    def __init__(self, name, options, block_config, return_type):
         self.name = name
         self.options = options
         self.block_config = block_config
-        self.script_path = script_path
+        # self.script_path = script_path
         self.return_type = return_type
         
     def __str__(self):
-        return f"{self.name}: {self.config}"
+        return f"{self.name}: {self.block_config}"
 
     @abstractmethod
     def get_output_name(self, config, pad):
@@ -255,7 +255,7 @@ class VolumeComputationBuildingBlock(BuildingBlock):
         return get_output_name(
             config,
             self.block_config["volume_computation_masks"],
-            "vol",
+            "volume",
             pad=pad,
             return_subdir=False,
         )
