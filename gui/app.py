@@ -14,7 +14,8 @@ import aicsimageio
 import re
 from time import perf_counter
 
-filemap_path = "/mnt/towbin.data/shared/spsalmon/pipeline_test_folder/analysis/report/analysis_filemap.csv"
+# filemap_path = "/mnt/towbin.data/shared/spsalmon/pipeline_test_folder/analysis/report/analysis_filemap.csv"
+filemap_path = "/mnt/towbin.data/shared/kstojanovski/20240212_Orca_10x_yap-1del_col-10-tir_wBT160-186-310-337-380-393_25C_20240212_164059_429/analysis/report/analysis_filemap_test.csv"
 
 filemap = pd.read_csv(filemap_path)
 
