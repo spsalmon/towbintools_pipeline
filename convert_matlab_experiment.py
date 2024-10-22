@@ -93,22 +93,26 @@ def convert_matlab_experiment(experiment_dir, matlab_report_dir, matlab_report_f
 
     return df, save_path
 
-experiment_dir = "/mnt/towbin.data/shared/kstojanovski/20240212_Orca_10x_yap-1del_col-10-tir_wBT160-186-310-337-380-393_25C_20240212_164059_429"
+experiment_dir = "/mnt/towbin.data/shared/igheor/20240304_Ti2_10x_rpl22AID_titration_356_369_25C_20240304_163731_651"
 matlab_report_dir = os.path.join(experiment_dir, "analysis/report/")
-old_matlab_report_files = ["ch1_il_strS_cor_sec2.mat", "ch2_sobel_str_molts_nw_cor_sec2.mat"]
+old_matlab_report_files = ["ch1_il_strS_cor_sec2_validlength.mat", "ch2_sobel_str_molts_nw_cor_sec2_validlength.mat"]
 old_matlab_report_files = [os.path.join(matlab_report_dir, f) for f in old_matlab_report_files]
 better_column_names = ["ch1_seg_str", "ch2_seg_str"]
 
-analysis_to_add = {
-    'ch1_il' : 'ch1_seg',
-    'ch2_sobel' : 'ch2_seg',
-    # 'ch1_il_strS' : 'ch1_seg_str',
-    # 'ch2_sobel_str' : 'ch2_seg_str',
-}
+extract_experiment_time = False
+add_raw = False
+analysis_to_add = None
 
-experiment_filemap, experiment_filemap_path = convert_matlab_experiment(experiment_dir, matlab_report_dir, old_matlab_report_files, better_column_names, add_raw = True, analysis_to_add = analysis_to_add)
+# analysis_to_add = {
+#     'ch1_il' : 'ch1_seg',
+#     'ch2_sobel' : 'ch2_seg',
+#     # 'ch1_il_strS' : 'ch1_seg_str',
+#     # 'ch2_sobel_str' : 'ch2_seg_str',
+# }
 
-if "ExperimentTime" not in experiment_filemap.columns:
+experiment_filemap, experiment_filemap_path = convert_matlab_experiment(experiment_dir, matlab_report_dir, old_matlab_report_files, better_column_names, add_raw = add_raw, analysis_to_add = analysis_to_add)
+
+if "ExperimentTime" not in experiment_filemap.columns and extract_experiment_time:
     experiment_filemap["ExperimentTime"] = get_experiment_time_from_filemap_parallel(experiment_filemap)
     experiment_filemap.to_csv(
         experiment_filemap_path, index=False

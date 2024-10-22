@@ -12,6 +12,7 @@ import statsmodels.api as sm
 import yaml
 import os
 from towbintools.data_analysis import compute_growth_rate_per_larval_stage, correct_series_with_classification, filter_series_with_classification, compute_larval_stage_duration, rescale_and_aggregate, compute_series_at_time_classified
+from collections import defaultdict
 
 # BUILDING THE PLOTTING STRUCTURE
 
@@ -189,6 +190,11 @@ def build_plotting_struct(experiment_dir, filemap_path, config_path, organ_chann
         conditions_struct.append(condition_dict)
 
     conditions_info = [{key : condition[key] for key in conditions_keys} for condition in conditions_struct]
+
+    # sort the conditions and conditions_info by condition_id
+    conditions_struct = sorted(conditions_struct, key=lambda x: x['condition_id'])
+    conditions_info = sorted(conditions_info, key=lambda x: x['condition_id'])
+
     return conditions_struct, conditions_info
 
 
@@ -200,79 +206,149 @@ def remove_unwanted_info(conditions_info):
             condition.pop('condition_id')
     return conditions_info
 
-def combine_experiments(filemap_paths, config_paths, experiment_dirs = None):
-    condition_info_merge_list = []
-    conditions_info_keys = []
+# def combine_experiments(filemap_paths, config_paths, experiment_dirs = None):
+#     condition_info_merge_list = []
+#     conditions_info_keys = []
+#     all_conditions_struct = []
+#     for i, (filemap_path, config_path) in enumerate(zip(filemap_paths, config_paths)):
+#         if experiment_dirs is not None:
+#             experiment_dir = experiment_dirs[i]
+#         else:
+#             experiment_dir = os.path.dirname(filemap_path)
+#         conditions_struct, conditions_info = build_plotting_struct(experiment_dir, filemap_path, config_path)
+
+#         # if all_conditions_struct is empty, just add the conditions
+#         if not all_conditions_struct:
+#             all_conditions_struct.extend(conditions_struct)
+#         # else, extend the conditions but modify the condition_id to be unique
+#         else:
+#             max_condition_id = max([condition['condition_id'] for condition in all_conditions_struct]) + 1
+#             print(f'Max condition id: {max_condition_id}')
+#             for condition in conditions_struct:
+#                 condition['condition_id'] += max_condition_id
+#                 all_conditions_struct.append(condition)
+
+#         experiment_conditions_info_keys = [list(conditions_info[i].keys()) for i in range(len(conditions_info))]
+#         experiment_conditions_info_keys = [item for sublist in experiment_conditions_info_keys for item in sublist]
+#         conditions_info_keys.extend(experiment_conditions_info_keys)
+#         conditions_info_merge = remove_unwanted_info(conditions_info)
+
+#         condition_info_merge_list.extend(conditions_info_merge)
+#     # merge conditions that have the exact same info
+#     conditions_to_merge = []
+#     for i, condition_info in enumerate(condition_info_merge_list):
+#         merge_with = []
+#         for j, other_condition in enumerate(condition_info_merge_list):
+#             if condition_info == other_condition and i != j:
+#                 merge_with.append(j)
+#         if merge_with:
+#             conditions_to_merge.append([i] + merge_with)
+#         else:
+#             conditions_to_merge.append([i])
+
+#     # remove permutations
+#     conditions_to_merge = [sorted(merge) for merge in conditions_to_merge]
+#     conditions_to_merge = list(set([tuple(merge) for merge in conditions_to_merge]))
+#     conditions_to_merge = [list(merge) for merge in conditions_to_merge]
+#     # sort the list of conditions to merge by the first element
+#     conditions_to_merge = sorted(conditions_to_merge, key=lambda x: x[0])
+
+#     print(conditions_to_merge)
+
+#     merged_conditions_struct = []
+
+#     conditions_info_keys = list(set(conditions_info_keys))
+#     fields_not_to_merge = conditions_info_keys
+
+#     for merge in conditions_to_merge:
+#         if len(merge) == 1:
+#             merged_conditions_struct.append(all_conditions_struct[merge[0]])
+#         else:
+#             base_condition = all_conditions_struct[merge[0]]
+#             for condition_index in merge[1:]:
+#                 for key in base_condition.keys():
+#                     if key not in fields_not_to_merge:
+#                         base_condition_data = base_condition[key]
+#                         condition_data = all_conditions_struct[condition_index][key]
+
+#                         if isinstance(base_condition_data, np.ndarray):
+#                             # get the shortest dimension
+#                             smallest = np.argmin([base_condition_data.shape[1], condition_data.shape[1]])
+#                             # add nan to the condition data to match the biggest dimension
+#                             if smallest == 0:
+#                                 base_condition_data = np.pad(base_condition_data, ((0, 0), (0, condition_data.shape[1] - base_condition_data.shape[1])), mode='constant', constant_values=np.nan)
+#                             else:
+#                                 condition_data = np.pad(condition_data, ((0, 0), (0, base_condition_data.shape[1] - condition_data.shape[1])), mode='constant', constant_values=np.nan)
+#                         try:
+#                             base_condition[key] = np.concatenate((base_condition_data, condition_data), axis=0)
+#                         except ValueError as e:
+#                             print(f"Could not concatenate {key} : {e}")
+
+#                 merged_conditions_struct.append(base_condition)
+
+#     # sort the merged conditions by condition_id
+#     merged_conditions_struct = sorted(merged_conditions_struct, key=lambda x: x['condition_id'])
+
+#     # remove gaps in the condition_id
+#     for i in range(len(merged_conditions_struct)):
+#         merged_conditions_struct[i]['condition_id'] = i
+
+#     return merged_conditions_struct
+
+def combine_experiments(filemap_paths, config_paths, experiment_dirs=None):
     all_conditions_struct = []
+    condition_info_merge_list = []
+    conditions_info_keys = set()
+    condition_id_counter = 0
+
+    # Process each experiment
     for i, (filemap_path, config_path) in enumerate(zip(filemap_paths, config_paths)):
-        if experiment_dirs is not None:
-            experiment_dir = experiment_dirs[i]
-        else:
-            experiment_dir = os.path.dirname(filemap_path)
+        experiment_dir = experiment_dirs[i] if experiment_dirs else os.path.dirname(filemap_path)
         conditions_struct, conditions_info = build_plotting_struct(experiment_dir, filemap_path, config_path)
-        all_conditions_struct.extend(conditions_struct)
 
-        experiment_conditions_info_keys = [list(conditions_info[i].keys()) for i in range(len(conditions_info))]
-        experiment_conditions_info_keys = [item for sublist in experiment_conditions_info_keys for item in sublist]
-        conditions_info_keys.extend(experiment_conditions_info_keys)
-        conditions_info_merge = remove_unwanted_info(conditions_info)
+        # Process conditions for this experiment
+        for condition in conditions_struct:
+            condition['condition_id'] = condition_id_counter
+            condition_id_counter += 1
+            all_conditions_struct.append(condition)
 
-        condition_info_merge_list.extend(conditions_info_merge)
+        # Process condition info
+        experiment_conditions_info = remove_unwanted_info(conditions_info)
+        condition_info_merge_list.extend(experiment_conditions_info)
+        conditions_info_keys.update(*[condition.keys() for condition in experiment_conditions_info])
 
-    # merge conditions that have the exact same info
-    conditions_to_merge = []
+    # Merge conditions based on their info
+    condition_dict = defaultdict(list)
     for i, condition_info in enumerate(condition_info_merge_list):
-        merge_with = []
-        for j, other_condition in enumerate(condition_info_merge_list):
-            if condition_info == other_condition and i != j:
-                merge_with.append(j)
-        if merge_with:
-            conditions_to_merge.append([i] + merge_with)
-        else:
-            conditions_to_merge.append([i])
-
-    print(conditions_to_merge)
-
-    # remove permutations
-    conditions_to_merge = [sorted(merge) for merge in conditions_to_merge]
-    conditions_to_merge = list(set([tuple(merge) for merge in conditions_to_merge]))
-    conditions_to_merge = [list(merge) for merge in conditions_to_merge]
-    # sort the list of conditions to merge by the first element
-    conditions_to_merge = sorted(conditions_to_merge, key=lambda x: x[0])
+        key = frozenset(condition_info.items())
+        condition_dict[key].append(i)
 
     merged_conditions_struct = []
+    for indices in condition_dict.values():
+        base_condition = all_conditions_struct[indices[0]]
+        for idx in indices[1:]:
+            for key, value in all_conditions_struct[idx].items():
+                if key not in conditions_info_keys:
+                    if isinstance(value, np.ndarray):
+                        if value.shape[1] > base_condition[key].shape[1]:
+                            base_condition[key] = np.pad(base_condition[key], 
+                                ((0, 0), (0, value.shape[1] - base_condition[key].shape[1])), 
+                                mode='constant', constant_values=np.nan)
+                        elif value.shape[1] < base_condition[key].shape[1]:
+                            value = np.pad(value, 
+                                ((0, 0), (0, base_condition[key].shape[1] - value.shape[1])), 
+                                mode='constant', constant_values=np.nan)
+                    try:
+                        base_condition[key] = np.concatenate((base_condition[key], value), axis=0)
+                    except ValueError as e:
+                        print(f"Could not concatenate {key}: {e}")
 
-    conditions_info_keys = list(set(conditions_info_keys))
-    fields_not_to_merge = conditions_info_keys
+        merged_conditions_struct.append(base_condition)
 
-    for merge in conditions_to_merge:
-        if len(merge) == 1:
-            merged_conditions_struct.append(all_conditions_struct[merge[0]])
-        else:
-            base_condition = all_conditions_struct[merge[0]]
-            print(base_condition.keys())
-            for condition_index in merge[1:]:
-                for key in base_condition.keys():
-                    if key not in fields_not_to_merge:
-                        base_condition_data = base_condition[key]
-                        condition_data = all_conditions_struct[condition_index][key]
-
-                        if isinstance(base_condition_data, np.ndarray):
-                            # get the shortest dimension
-                            smallest = np.argmin([base_condition_data.shape[1], condition_data.shape[1]])
-                            # add nan to the condition data to match the biggest dimension
-                            if smallest == 0:
-                                base_condition_data = np.pad(base_condition_data, ((0, 0), (0, condition_data.shape[1] - base_condition_data.shape[1])), mode='constant', constant_values=np.nan)
-                            else:
-                                condition_data = np.pad(condition_data, ((0, 0), (0, base_condition_data.shape[1] - condition_data.shape[1])), mode='constant', constant_values=np.nan)
-
-                            print(base_condition_data.shape, condition_data.shape)
-                        try:
-                            base_condition[key] = np.concatenate((base_condition_data, condition_data), axis=0)
-                        except ValueError as e:
-                            print(f"Could not concatenate {key} : {e}")
-
-                merged_conditions_struct.append(base_condition)
+    # # Sort and reassign condition IDs
+    # merged_conditions_struct.sort(key=lambda x: x['condition_id'])
+    for i, condition in enumerate(merged_conditions_struct):
+        condition['condition_id'] = i
 
     return merged_conditions_struct
 
@@ -302,9 +378,12 @@ def set_scale(ax, log_scale):
         ax.set_yscale('log' if log_scale[1] else 'linear')
         ax.set_xscale('log' if log_scale[0] else 'linear')
 
-def plot_aggregated_series(conditions_struct, series_column, conditions_to_plot, experiment_time = True, aggregation='mean', n_points=100, time_step = 10, log_scale = True, color_palette = "colorblind", legend = None, y_axis_label = None):
-    color_palette = sns.color_palette(color_palette, len(conditions_to_plot))
-    
+def plot_aggregated_series(conditions_struct, series_column, conditions_to_plot, experiment_time = True, aggregation='mean', n_points=100, time_step = 10, log_scale = True, colors = None, legend = None, y_axis_label = None):
+    if colors is None:
+        color_palette = sns.color_palette("colorblind", len(conditions_to_plot))
+    else:
+        color_palette = colors
+
     def plot_single_series(column: str):
         for i, condition_id in enumerate(conditions_to_plot):
             condition_dict = conditions_struct[condition_id]
@@ -360,8 +439,11 @@ def plot_aggregated_series(conditions_struct, series_column, conditions_to_plot,
 
     plt.show()
 
-def plot_correlation(conditions_struct, column_one, column_two, conditions_to_plot,  log_scale = True, color_palette = "colorblind", legend = None, x_axis_label = None, y_axis_label = None):
-    color_palette = sns.color_palette(color_palette, len(conditions_to_plot))
+def plot_correlation(conditions_struct, column_one, column_two, conditions_to_plot,  log_scale = True, colors = None, legend = None, x_axis_label = None, y_axis_label = None):
+    if colors is None:
+        color_palette = sns.color_palette('colorblind', len(conditions_to_plot))
+    else:
+        color_palette = colors
     
     for i, condition_id in enumerate(conditions_to_plot):
         condition_dict = conditions_struct[condition_id]
@@ -408,8 +490,11 @@ def plot_correlation(conditions_struct, column_one, column_two, conditions_to_pl
     plt.legend()
     plt.show()
 
-def plot_correlation_at_ecdysis(conditions_struct, column_one, column_two, conditions_to_plot, remove_hatch = True, log_scale = True, color_palette = "colorblind", legend = None, x_axis_label = None, y_axis_label = None):
-    color_palette = sns.color_palette(color_palette, len(conditions_to_plot))
+def plot_correlation_at_ecdysis(conditions_struct, column_one, column_two, conditions_to_plot, remove_hatch = True, log_scale = True, colors = None, legend = None, x_axis_label = None, y_axis_label = None):
+    if colors is None:
+        color_palette = sns.color_palette('colorblind', len(conditions_to_plot))
+    else:
+        color_palette = colors
     
     for i, condition_id in enumerate(conditions_to_plot):
 
@@ -710,15 +795,38 @@ def plot_deviation_from_model(conditions_struct, column_one, column_two, control
     plt.legend()
     plt.show()
 
-def get_proportion_model_ecdysis(series_one_at_ecdysis, series_two_at_ecdysis, remove_hatch = True, x_axis_label = None, y_axis_label = None):
+def exclude_arrests_from_series(series_at_ecdysis):
+    filtered_series = np.full(series_at_ecdysis.shape, np.nan)
+    # keep only a value at one ecdys event if the next one is not nan
+    if series_at_ecdysis.shape[0] == 1 or len(series_at_ecdysis.shape) == 1:
+        for i in range(len(series_at_ecdysis)):
+            if i == len(series_at_ecdysis) - 1:
+                filtered_series[i] = series_at_ecdysis[i]
+            elif not np.isnan(series_at_ecdysis[i + 1]):
+                filtered_series[i] = series_at_ecdysis[i]
+        return filtered_series
+    else:
+        for i in range(series_at_ecdysis.shape[0]):
+            for j in range(series_at_ecdysis.shape[1]):
+                if j == series_at_ecdysis.shape[1] - 1:
+                    filtered_series[i, j] = series_at_ecdysis[i, j]
+                elif not np.isnan(series_at_ecdysis[i, j + 1]):
+                    filtered_series[i, j] = series_at_ecdysis[i, j]
+        return filtered_series
+
+def get_proportion_model_ecdysis(series_one_at_ecdysis, series_two_at_ecdysis, remove_hatch = True, x_axis_label = None, y_axis_label = None, exclude_arrests = False):
     assert len(series_one_at_ecdysis) == len(series_two_at_ecdysis), "The two series must have the same length."
 
     if remove_hatch:
         series_one_at_ecdysis = series_one_at_ecdysis[:, 1:]
         series_two_at_ecdysis = series_two_at_ecdysis[:, 1:]
+
+    if exclude_arrests:
+        series_one_at_ecdysis = exclude_arrests_from_series(series_one_at_ecdysis)
+        series_two_at_ecdysis = exclude_arrests_from_series(series_two_at_ecdysis)
+
     series_one_at_ecdysis = np.array(series_one_at_ecdysis).flatten()
     series_two_at_ecdysis = np.array(series_two_at_ecdysis).flatten()
-
     # remove elements that are nan in one of the two arrays
     correct_indices = ~np.isnan(series_one_at_ecdysis) & ~np.isnan(series_two_at_ecdysis)
     series_one_at_ecdysis = series_one_at_ecdysis[correct_indices]
@@ -748,10 +856,14 @@ def get_proportion_model_ecdysis(series_one_at_ecdysis, series_two_at_ecdysis, r
 
     return model
 
-def get_deviation_from_model_at_ecdysis(series_one_at_ecdysis, series_two_at_ecdysis, model, remove_hatch = True):
+def get_deviation_from_model_at_ecdysis(series_one_at_ecdysis, series_two_at_ecdysis, model, remove_hatch = True, exclude_arrests = False):
     if remove_hatch:
         series_one_at_ecdysis = series_one_at_ecdysis[:, 1:]
         series_two_at_ecdysis = series_two_at_ecdysis[:, 1:]
+
+    if exclude_arrests:
+        series_one_at_ecdysis = exclude_arrests_from_series(series_one_at_ecdysis)
+        series_two_at_ecdysis = exclude_arrests_from_series(series_two_at_ecdysis)
 
     # remove elements that are nan in one of the two arrays
     correct_indices = ~np.isnan(series_one_at_ecdysis) & ~np.isnan(series_two_at_ecdysis)
@@ -773,10 +885,14 @@ def get_deviation_from_model_at_ecdysis(series_one_at_ecdysis, series_two_at_ecd
 
     return x, y, y_err
 
-def get_deviation_percentage_from_model_at_ecdysis(series_one_at_ecdysis, series_two_at_ecdysis, model, remove_hatch=True):
+def get_deviation_percentage_from_model_at_ecdysis(series_one_at_ecdysis, series_two_at_ecdysis, model, remove_hatch=True, exclude_arrests=False):
     if remove_hatch:
         series_one_at_ecdysis = series_one_at_ecdysis[:, 1:]
         series_two_at_ecdysis = series_two_at_ecdysis[:, 1:]
+
+    if exclude_arrests:
+        series_one_at_ecdysis = exclude_arrests_from_series(series_one_at_ecdysis)
+        series_two_at_ecdysis = exclude_arrests_from_series(series_two_at_ecdysis)
     
     # remove elements that are nan in one of the two arrays
     correct_indices = ~np.isnan(series_one_at_ecdysis) & ~np.isnan(series_two_at_ecdysis)
@@ -795,8 +911,12 @@ def get_deviation_percentage_from_model_at_ecdysis(series_one_at_ecdysis, series
     
     return x, y, y_err
 
-def plot_deviation_from_model_at_ecdysis(conditions_struct, column_one, column_two, control_condition_id, conditions_to_plot, remove_hatch = True, log_scale = (True, False), legend = None, x_axis_label = None, y_axis_label = None, percentage = True):
-    color_palette = sns.color_palette("husl", len(conditions_to_plot))
+def plot_deviation_from_model_at_ecdysis(conditions_struct, column_one, column_two, control_condition_id, conditions_to_plot, remove_hatch = True, log_scale = (True, False), colors = None, legend = None, x_axis_label = None, y_axis_label = None, percentage = True, exclude_arrests = False):
+    
+    if colors is None:
+        color_palette = sns.color_palette("colorblind", len(conditions_to_plot))
+    else:
+        color_palette = colors
 
     xlbl = column_one
     ylbl = column_two
@@ -805,16 +925,16 @@ def plot_deviation_from_model_at_ecdysis(conditions_struct, column_one, column_t
     y_axis_label = y_axis_label if y_axis_label is not None else f'deviation from modeled {column_two}'
 
     control_condition = conditions_struct[control_condition_id]
-    control_model = get_proportion_model_ecdysis(control_condition[column_one], control_condition[column_two], remove_hatch, x_axis_label = xlbl, y_axis_label = ylbl)
+    control_model = get_proportion_model_ecdysis(control_condition[column_one], control_condition[column_two], remove_hatch, x_axis_label = xlbl, y_axis_label = ylbl, exclude_arrests = exclude_arrests)
 
     for i, condition_id in enumerate(conditions_to_plot):
         condition = conditions_struct[condition_id]
         body_data, pharynx_data = condition[column_one], condition[column_two]
 
         if percentage:
-            x, y, y_err = get_deviation_percentage_from_model_at_ecdysis(body_data, pharynx_data, control_model, remove_hatch)
+            x, y, y_err = get_deviation_percentage_from_model_at_ecdysis(body_data, pharynx_data, control_model, remove_hatch, exclude_arrests)
         else:
-            x, y, y_err = get_deviation_from_model_at_ecdysis(body_data, pharynx_data, control_model, remove_hatch)
+            x, y, y_err = get_deviation_from_model_at_ecdysis(body_data, pharynx_data, control_model, remove_hatch, exclude_arrests)
 
         label = build_legend(condition, legend)
         plt.plot(x, y, label=label, color = color_palette[i], marker='o')

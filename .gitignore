@@ -168,3 +168,6 @@ sbatch_output/*
 *.log
 *.err
 *.out
+
+configs/*
+!configs/config.yaml
