@@ -227,7 +227,6 @@ def get_experiment_time_from_filemap_parallel(experiment_filemap):
     experiment_filemap = experiment_filemap.copy()
     date_result = Parallel(n_jobs=-1)(delayed(get_acquisition_date)(raw) for raw in experiment_filemap['raw'])
     experiment_filemap['date'] = date_result
-
     # in case all acquisition dates are None, return a None filled ExperimentTime column
     if experiment_filemap['date'].isnull().all():
         return pd.Series([np.nan] * len(experiment_filemap))
@@ -235,16 +234,15 @@ def get_experiment_time_from_filemap_parallel(experiment_filemap):
     grouped = experiment_filemap.groupby('Point')
     # get the date of the raw where Time is 0
     try:
-        first_time = grouped.apply(lambda x: x[x['Time'] == 0].iloc[0]['date'], include_groups=False)
+        first_time = grouped.apply(lambda x: x[x['Time'] == 0].iloc[0]['date'])
     except IndexError:
         print('### Error: Time 0 not found for all points, experiment time will be computed from lowest Time value for each point.###')
-        first_time = grouped.apply(lambda x: x[x['Time'] == x['Time'].min()].iloc[0]['date'], include_groups=False)
+        first_time = grouped.apply(lambda x: x[x['Time'] == x['Time'].min()].iloc[0]['date'])
     # iterate over each point and calculate the time difference
     experiment_time = Parallel(n_jobs=-1)(
         delayed(calculate_experiment_time)(point, experiment_filemap, first_time)
         for point in experiment_filemap['Point'].unique()
     )
-
     experiment_time = pd.concat(experiment_time)
     experiment_filemap['ExperimentTime'] = experiment_time
     # keep only the ExperimentTime column
