@@ -8,7 +8,7 @@
 #SBATCH --mem=8GB
 
 # Default configuration file
-DEFAULT_CONFIG_FILE="./configs/config.yaml"
+DEFAULT_CONFIG_FILE="./config.yaml"
 CONFIG_FILE="$DEFAULT_CONFIG_FILE"
 
 # Function to show usage
