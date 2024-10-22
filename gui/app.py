@@ -14,8 +14,9 @@ import aicsimageio
 import re
 from time import perf_counter
 
-filemap_path = "/mnt/towbin.data/shared/spsalmon/20240823_SQUID_10x_yap1_del_dpy/analysis/report/analysis_filemap.csv"
-# filemap_path = "/mnt/towbin.data/shared/spsalmon/20240524_161257_273_LIPSI_40x_397_405_no_crash/analysis/report/pad1/pad1_fake_filemap_annotated.csv"
+# filemap_path = "/mnt/towbin.data/shared/spsalmon/pipeline_test_folder/analysis/report/analysis_filemap.csv"
+filemap_path = "/mnt/towbin.data/shared/kstojanovski/20240212_Orca_10x_yap-1del_col-10-tir_wBT160-186-310-337-380-393_25C_20240212_164059_429/analysis/report/analysis_filemap_test.csv"
+
 filemap = pd.read_csv(filemap_path)
 
 filemap_folder = os.path.dirname(filemap_path)
@@ -121,20 +122,15 @@ print("Adding molts column to filemap if they do not exist...")
 # check if hatch columns exist
 if "HatchTime" not in filemap.columns.tolist():
     filemap["HatchTime"] = np.nan
-    filemap["VolumeAtHatch"] = np.nan
 # check if molt columns exist
 if "M1" not in filemap.columns.tolist():
     filemap["M1"] = np.nan
-    filemap["VolumeAtM1"] = np.nan
 if "M2" not in filemap.columns.tolist():
     filemap["M2"] = np.nan
-    filemap["VolumeAtM2"] = np.nan
 if "M3" not in filemap.columns.tolist():
     filemap["M3"] = np.nan
-    filemap["VolumeAtM3"] = np.nan
 if "M4" not in filemap.columns.tolist():
     filemap["M4"] = np.nan
-    filemap["VolumeAtM4"] = np.nan
 
 
 def save_filemap(filemap=filemap):
@@ -200,7 +196,7 @@ molt_annotator = ui.column(
                 min=300,
                 max=1000,
                 step=10,
-                value=400,
+                value=700,
             )
         ),
         align="center",
@@ -458,10 +454,7 @@ def server(input, output, session):
             return ecdys_filtered, np.log10(value_at_ecdys_filtered), symbols_filtered, colors_filtered, sizes_filtered, widths_filtered
 
         ecdys_list, value_at_ecdys_list, symbols, colors, sizes, widths = get_points_for_value_at_molts()
-        print(f"ecdys_list: {ecdys_list}")
-        print(f"value_at_ecdys_list: {value_at_ecdys_list}")
-        print(f"colors: {colors}")
-
+        
         fig.add_trace(
             go.Scatter(
                 x = ecdys_list,
@@ -516,12 +509,18 @@ def server(input, output, session):
     def m4_text():
         return f"M4 : {str(m4())}"
 
-    def update_ecdys_columns(ecdys_event, time, point):
+    def update_ecdys_columns(ecdys_event, time, point, selected_column):
         data_of_point = filemap.loc[
             filemap["Point"] == point,
         ]
         filemap.loc[filemap["Point"] == int(input.point()), [ecdys_event]] = time
         value_at_ecdys_columns = [column for column in data_of_point.columns.tolist() if f'_at_{ecdys_event}' in column]
+
+        if f'{selected_column}_at_{ecdys_event}' not in value_at_ecdys_columns:
+            print(f"Adding column {selected_column}_at_{ecdys_event} to filemap ...")
+            filemap[f'{selected_column}_at_{ecdys_event}'] = np.nan
+            value_at_ecdys_columns = [column for column in data_of_point.columns.tolist() if f'_at_{ecdys_event}' in column]
+
         value_columns = [column.replace(f'_at_{ecdys_event}', '') for column in value_at_ecdys_columns]
 
         for value_column, value_at_ecdys_column in zip(value_columns, value_at_ecdys_columns):
@@ -541,7 +540,7 @@ def server(input, output, session):
     def set_hatch():
         print("set_hatch")
         new_hatch = float(input.time())
-        update_ecdys_columns('HatchTime', new_hatch, int(input.point()))
+        update_ecdys_columns('HatchTime', new_hatch, int(input.point()), input.column_to_plot())
         hatch.set(new_hatch)
         value_at_hatch.set(filemap.loc[(filemap["Point"] == int(input.point())), f'{input.column_to_plot()}_at_HatchTime'].values[0])
 
@@ -550,7 +549,7 @@ def server(input, output, session):
     def set_m1():
         print("set_m1")
         new_m1 = float(input.time())
-        update_ecdys_columns('M1', new_m1, int(input.point()))
+        update_ecdys_columns('M1', new_m1, int(input.point()), input.column_to_plot())
         m1.set(new_m1)
         value_at_m1.set(filemap.loc[(filemap["Point"] == int(input.point())), f'{input.column_to_plot()}_at_M1'].values[0])
 
@@ -559,7 +558,7 @@ def server(input, output, session):
     def set_m2():
         print("set_m2")
         new_m2 = float(input.time())
-        update_ecdys_columns('M2', new_m2, int(input.point()))
+        update_ecdys_columns('M2', new_m2, int(input.point()), input.column_to_plot())
         m2.set(new_m2)
         value_at_m2.set(filemap.loc[(filemap["Point"] == int(input.point())), f'{input.column_to_plot()}_at_M2'].values[0])
 
@@ -568,7 +567,7 @@ def server(input, output, session):
     def set_m3():
         print("set_m3")
         new_m3 = float(input.time())
-        update_ecdys_columns('M3', new_m3, int(input.point()))
+        update_ecdys_columns('M3', new_m3, int(input.point()), input.column_to_plot())
         m3.set(new_m3)
         value_at_m3.set(filemap.loc[(filemap["Point"] == int(input.point())), f'{input.column_to_plot()}_at_M3'].values[0])
 
@@ -577,7 +576,7 @@ def server(input, output, session):
     def set_m4():
         print("set_m4")
         new_m4 = float(input.time())
-        update_ecdys_columns('M4', new_m4, int(input.point()))
+        update_ecdys_columns('M4', new_m4, int(input.point()), input.column_to_plot())
         m4.set(new_m4)
         value_at_m4.set(filemap.loc[(filemap["Point"] == int(input.point())), f'{input.column_to_plot()}_at_M4'].values[0])
 
@@ -585,7 +584,7 @@ def server(input, output, session):
     @reactive.event(input.reset_hatch)
     def reset_hatch():
         print("reset_hatch")
-        update_ecdys_columns('HatchTime', np.nan, int(input.point()))
+        update_ecdys_columns('HatchTime', np.nan, int(input.point()), input.column_to_plot())
         hatch.set(np.nan)
         value_at_hatch.set(np.nan)
 
@@ -594,7 +593,7 @@ def server(input, output, session):
     @reactive.event(input.reset_m1)
     def reset_m1():
         print("reset_m1")
-        update_ecdys_columns('M1', np.nan, int(input.point()))
+        update_ecdys_columns('M1', np.nan, int(input.point()), input.column_to_plot())
         m1.set(np.nan)
         value_at_m1.set(np.nan)
 
@@ -602,7 +601,7 @@ def server(input, output, session):
     @reactive.event(input.reset_m2)
     def reset_m2():
         print("reset_m2")
-        update_ecdys_columns('M2', np.nan, int(input.point()))
+        update_ecdys_columns('M2', np.nan, int(input.point()), input.column_to_plot())
         m2.set(np.nan)
         value_at_m2.set(np.nan)
 
@@ -610,7 +609,7 @@ def server(input, output, session):
     @reactive.event(input.reset_m3)
     def reset_m3():
         print("reset_m3")
-        update_ecdys_columns('M3', np.nan, int(input.point()))
+        update_ecdys_columns('M3', np.nan, int(input.point()), input.column_to_plot())
         m3.set(np.nan)
         value_at_m3.set(np.nan)
 
@@ -618,7 +617,7 @@ def server(input, output, session):
     @reactive.event(input.reset_m4)
     def reset_m4():
         print("reset_m4")
-        update_ecdys_columns('M4', np.nan, int(input.point()))
+        update_ecdys_columns('M4', np.nan, int(input.point()), input.column_to_plot())
         m4.set(np.nan)
         value_at_m4.set(np.nan)
 

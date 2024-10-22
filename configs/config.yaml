@@ -1,11 +1,11 @@
-experiment_dir: "/mnt/towbin.data/shared/spsalmon/20240823_SQUID_10x_yap1_del_dpy/"
+experiment_dir: "/mnt/towbin.data/shared/spsalmon/pipeline_test_folder/"
 analysis_dir_name: "analysis"
 
 #########################################################################################################
 ################################# IMAGE ANALYSIS PIPELINE CONFIGURATION #################################
 #########################################################################################################
 
-building_blocks: ["segmentation", "segmentation", "straightening", "straightening", "straightening", "volume_computation", "volume_computation", "classification", "molt_detection"]
+building_blocks: ["segmentation", "straightening", "volume_computation", "classification", "molt_detection", "custom"]
 
 rerun_segmentation: [False]
 rerun_straightening: [False]
@@ -18,12 +18,12 @@ rerun_custom_script: [True]
 # segmentation parameters
 segmentation_column: ['raw']
 segmentation_name_suffix: [null]
-segmentation_method: ["edge_based", "edge_based"]
-segmentation_channels: [[0], [1]]
+segmentation_method: ["edge_based"]
+segmentation_channels: [[1]]
 augment_contrast: [False]
 
 # edge-based segmentation parameters
-pixelsize: [1.85]
+pixelsize: [0.65]
 sigma_canny: [1]
 
 # deep learning segmentation parameters
@@ -38,11 +38,11 @@ ilastik_project_path: ["/home/igheor/towbintools_pipeline/models/pharynx_str_noC
 ilastik_result_channel: [0]
 
 # straightening parameters
-straightening_source: [['analysis/ch2_seg', null], ['analysis/ch1_seg', null], ['raw', [0,1,2]]]
+straightening_source: [['analysis/ch2_seg', null]]
 straightening_masks: ['analysis/ch2_seg']
 
 # volume computation parameters
-volume_computation_masks: ['analysis/ch2_seg_str', 'analysis/ch1_seg_str']
+volume_computation_masks: ['analysis/ch2_seg_str']
 
 # classification parameters
 classification_source: ['analysis/ch2_seg_str']
@@ -66,9 +66,9 @@ custom_script_parameters: [["-i testinput"]]
 
 
 # sbatch parameters
-sbatch_memory: 128G
+sbatch_memory: 32G
 sbatch_time: 0-48:00:00
-sbatch_cpus: 16
+sbatch_cpus: 8
 sbatch_gpus: 0
 
 ##########################################################################################################
@@ -77,20 +77,39 @@ sbatch_gpus: 0
 
 group_by: "point_range"
 conditions:
-  - rnai: "EV"
+  - auxin_concentration_um: 0
     strain:
-      - wBT160
-      - wBT415
+      - wBT186
+      - wBT437
+      - wBT438
+      - wBT439
     point_range:
-      - [0, 27]
-      - [59, 68]
-  - rnai: "dpy-1"
+      - [0, 26]
+      - [27, 54]
+      - [55, 86]
+      - [87, 120]
+  - auxin_concentration_um: 10
     strain:  
-      - wBT160
-      - wBT415
+      - wBT186
+      - wBT437
+      - wBT438
+      - wBT439
     point_range:
-      - [28, 58]
-      - [69, 86]
+      - [121, 147]
+      - [148, 176]
+      - [177, 204]
+      - [205, 232]
+  - auxin_concentration_um: 50
+    strain:
+      - wBT186
+      - wBT437
+      - wBT438
+      - wBT439
+    point_range:
+      - [233, 250]
+      - [251, 274]
+      - [275, 298]
+      - [299, 330]
 
 # group_by: "pad"
 # conditions:
