@@ -212,7 +212,8 @@ molt_annotator = ui.column(
                 max=1000,
                 step=10,
                 value=700,
-            )
+            ),
+            ui.input_checkbox("log_scale", "Log scale", value=True),
         ),
         align="center",
     ),
@@ -462,9 +463,7 @@ def server(input, output, session):
                 "M4",
             ],
         ]
-        data_of_point[input.column_to_plot()] = np.log10(
-            data_of_point[input.column_to_plot()]
-        )
+        
         markers = set_marker_shape(
             input.time(),
             data_of_point[worm_type_column],
@@ -514,7 +513,7 @@ def server(input, output, session):
 
             return (
                 ecdys_filtered,
-                np.log10(value_at_ecdys_filtered),
+                value_at_ecdys_filtered,
                 symbols_filtered,
                 colors_filtered,
                 sizes_filtered,
@@ -549,6 +548,8 @@ def server(input, output, session):
             height=input.volume_plot_size(),
             showlegend=False,
         )
+
+        fig.update_yaxes(type="log" if input.log_scale() else "linear")
 
         def update_selected_time(trace, points, selector):
             print("update_selected_time")
