@@ -14,8 +14,7 @@ import aicsimageio
 import re
 from time import perf_counter
 
-# filemap_path = "/mnt/towbin.data/shared/spsalmon/pipeline_test_folder/analysis/report/analysis_filemap.csv"
-filemap_path = "/mnt/towbin.data/shared/kstojanovski/20240212_Orca_10x_yap-1del_col-10-tir_wBT160-186-310-337-380-393_25C_20240212_164059_429/analysis/report/analysis_filemap_test.csv"
+filemap_path = "/mnt/towbin.data/shared/spsalmon/pipeline_test_folder/analysis/report/analysis_filemap.csv"
 
 filemap = pd.read_csv(filemap_path)
 
@@ -25,7 +24,7 @@ filemap_name = filemap_name.split(".")[0]
 
 def get_backup_path(filemap_folder, filemap_name):
     # check if the filemap is already annotated
-    match = re.search(r'annotated_v(\d+)', filemap_name)
+    match = re.search(r'annotated_v(/d+)', filemap_name)
     if not match:
         iteration = 1
     else:
@@ -105,9 +104,16 @@ list_custom_columns = ["None"] + list_custom_columns
 print(f"usual columns : {usual_columns}")
 print(f"custom columns : {list_custom_columns}")
 print(f"all columns : {filemap.columns.tolist()}")
-worm_type_column = [
-    column for column in filemap.columns.tolist() if "worm_type" in column
-][0]
+
+try:
+    worm_type_column = [
+        column for column in filemap.columns.tolist() if "worm_type" in column
+    ][0]
+except IndexError:
+    print("No worm_type column found in the filemap")
+    worm_type_column = "placeholder_worm_type"
+    filemap["placeholder_worm_type"] = "worm"
+
 base_volume_column = [
     column for column in filemap.columns.tolist() if "volume" in column and "_at_" not in column
 ][0]
