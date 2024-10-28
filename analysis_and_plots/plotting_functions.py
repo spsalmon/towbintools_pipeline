@@ -383,19 +383,29 @@ def remove_unwanted_info(conditions_info):
 #     return merged_conditions_struct
 
 
-def combine_experiments(filemap_paths, config_paths, experiment_dirs=None):
+def combine_experiments(filemap_paths, config_paths, experiment_dirs=None, organ_channels=[{"body": 2, "pharynx": 1}]):
     all_conditions_struct = []
     condition_info_merge_list = []
     conditions_info_keys = set()
     condition_id_counter = 0
 
+    if isinstance(organ_channels, dict):
+        organ_channels = [organ_channels]
+        
+    if len(organ_channels) == 1:
+        organ_channels = organ_channels * len(filemap_paths)
+    elif len(organ_channels) != len(filemap_paths):
+        raise ValueError(
+            "Number of organ channels must be equal to the number of experiments."
+        )
+
     # Process each experiment
-    for i, (filemap_path, config_path) in enumerate(zip(filemap_paths, config_paths)):
+    for i, (filemap_path, config_path, organ_channel) in enumerate(zip(filemap_paths, config_paths, organ_channels)):
         experiment_dir = (
             experiment_dirs[i] if experiment_dirs else os.path.dirname(filemap_path)
         )
         conditions_struct, conditions_info = build_plotting_struct(
-            experiment_dir, filemap_path, config_path
+            experiment_dir, filemap_path, config_path, organ_channels=organ_channel,
         )
 
         # Process conditions for this experiment
