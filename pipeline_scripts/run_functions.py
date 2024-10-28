@@ -20,8 +20,8 @@ def run_segmentation(experiment_filemap, config, block_config, pad=None):
         config,
         block_config["segmentation_column"],
         "seg",
-        channels = block_config["segmentation_channels"],
-        pad = pad,
+        channels=block_config["segmentation_channels"],
+        pad=pad,
         return_subdir=True,
         add_raw=False,
         custom_suffix=block_config["segmentation_name_suffix"],
@@ -316,19 +316,18 @@ def run_custom(experiment_filemap, config, block_config, pad=None):
 
     filemap_path = os.path.join(report_subdir, "analysis_filemap.csv")
 
-
     # concatenate the elements of the custom_script_parameters list
     custom_script_parameters = " ".join(custom_script_parameters)
-    
+
     if custom_script_return_type == "subdir":
         output = os.path.join(analysis_subdir, custom_script_name)
         if pad is not None:
             output = os.path.join(output, pad)
         os.makedirs(output, exist_ok=True)
 
-        rerun = (block_config["rerun_custom_script"] or (os.path.exists(output) is False))
+        rerun = block_config["rerun_custom_script"] or (os.path.exists(output) is False)
     elif custom_script_return_type == "csv":
-        output = os.path.join(report_subdir, f'{custom_script_name}.csv')
+        output = os.path.join(report_subdir, f"{custom_script_name}.csv")
         rerun = (block_config["rerun_custom_script"]) or (
             os.path.exists(output) is False
         )
@@ -336,12 +335,14 @@ def run_custom(experiment_filemap, config, block_config, pad=None):
         return None
 
     if rerun:
-        if custom_script_path.endswith('.sh'):
+        if custom_script_path.endswith(".sh"):
             command = f"bash {custom_script_path} -f {experiment_filemap} -o {output} {custom_script_parameters}"
-        elif custom_script_path.endswith('.py'):
+        elif custom_script_path.endswith(".py"):
             command = f"~/.local/bin/micromamba run -n towbintools python3 {custom_script_path} -f {filemap_path} -o {output} {custom_script_parameters}"
         else:
-            print(f'Script type of {custom_script_path} is not supported. The pipeline only supports bash or python scripts.')
+            print(
+                f"Script type of {custom_script_path} is not supported. The pipeline only supports bash or python scripts."
+            )
         sbatch_output_file, sbatch_error_file = run_command(command, "custom", config)
         backup_file(sbatch_output_file, sbatch_backup_dir)
         backup_file(sbatch_error_file, sbatch_backup_dir)

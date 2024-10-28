@@ -1,13 +1,13 @@
-from towbintools.straightening import Warper
-from towbintools.foundation import image_handling, binary_image
-
-import numpy as np
-from tifffile import imwrite
 import os
+
+import cv2
+import numpy as np
+import utils
 from joblib import Parallel, delayed
 from scipy.ndimage import binary_fill_holes
-import utils
-import cv2
+from tifffile import imwrite
+from towbintools.foundation import binary_image, image_handling
+from towbintools.straightening import Warper
 
 
 def mask_preprocessing(mask):
