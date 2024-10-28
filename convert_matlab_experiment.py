@@ -38,10 +38,7 @@ def convert_matlab_experiment(experiment_dir, matlab_report_dir, matlab_report_f
         new_matlab_report["worm_type"] = np.where(new_matlab_report["worm_type"] == 'o', "error", new_matlab_report["worm_type"])
         new_matlab_report["worm_type"] = np.where(new_matlab_report["worm_type"] == ' ', "error", new_matlab_report["worm_type"])
 
-        ecdysis = new_matlab_report["ecdysis"]
-        hatch, M1, M2, M3, M4 = np.split(ecdysis, 5, axis=1)
-
-        point = np.arange(0, hatch.shape[0])
+        point = np.arange(0, new_matlab_report["volume"].shape[0])
         time = np.arange(0, new_matlab_report["volume"].shape[1])
 
         # combine each point with every time
@@ -61,13 +58,31 @@ def convert_matlab_experiment(experiment_dir, matlab_report_dir, matlab_report_f
 
         df = pd.DataFrame(data)
 
-        for point, molts in enumerate(ecdysis):
-            HatchTime, M1, M2, M3, M4 = molts
-            df.loc[df["Point"] == point, "HatchTime"] = HatchTime - 1
-            df.loc[df["Point"] == point, "M1"] = M1 - 1
-            df.loc[df["Point"] == point, "M2"] = M2 - 1
-            df.loc[df["Point"] == point, "M3"] = M3 - 1
-            df.loc[df["Point"] == point, "M4"] = M4 - 1
+        try:
+            ecdysis = new_matlab_report["ecdysis"]
+            hatch, M1, M2, M3, M4 = np.split(ecdysis, 5, axis=1)
+
+            for point, molts in enumerate(ecdysis):
+                HatchTime, M1, M2, M3, M4 = molts
+                # convert to int if not nan
+                if not np.isnan(HatchTime):
+                    HatchTime = int(HatchTime) - 1
+                if not np.isnan(M1):
+                    M1 = int(M1) - 1
+                if not np.isnan(M2):
+                    M2 = int(M2) - 1
+                if not np.isnan(M3):
+                    M3 = int(M3) - 1
+                if not np.isnan(M4):
+                    M4 = int(M4) - 1
+
+                df.loc[df["Point"] == point, "HatchTime"] = HatchTime
+                df.loc[df["Point"] == point, "M1"] = M1
+                df.loc[df["Point"] == point, "M2"] = M2
+                df.loc[df["Point"] == point, "M3"] = M3
+                df.loc[df["Point"] == point, "M4"] = M4
+        except KeyError:
+            print("No molts found in the matlab report")
 
         dfs.append(df)
 
@@ -93,7 +108,7 @@ def convert_matlab_experiment(experiment_dir, matlab_report_dir, matlab_report_f
 
     return df, save_path
 
-experiment_dir = "/mnt/towbin.data/shared/igheor/20240304_Ti2_10x_rpl22AID_titration_356_369_25C_20240304_163731_651"
+experiment_dir = "/mnt/towbin.data/shared/igheor/20230914_Ti2_10x_vhp-1_338_344_186_160_20230914_172832_008"
 matlab_report_dir = os.path.join(experiment_dir, "analysis/report/")
 old_matlab_report_files = ["ch1_il_strS_cor_sec2_validlength.mat", "ch2_sobel_str_molts_nw_cor_sec2_validlength.mat"]
 old_matlab_report_files = [os.path.join(matlab_report_dir, f) for f in old_matlab_report_files]
@@ -112,6 +127,7 @@ analysis_to_add = None
 
 experiment_filemap, experiment_filemap_path = convert_matlab_experiment(experiment_dir, matlab_report_dir, old_matlab_report_files, better_column_names, add_raw = add_raw, analysis_to_add = analysis_to_add)
 
+# remove duplicate columns that have the same name and the same values
 if "ExperimentTime" not in experiment_filemap.columns and extract_experiment_time:
     experiment_filemap["ExperimentTime"] = get_experiment_time_from_filemap_parallel(experiment_filemap)
     experiment_filemap.to_csv(
