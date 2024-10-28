@@ -1,15 +1,17 @@
-import pickle
 import argparse
-from towbintools.foundation import file_handling as file_handling
 import os
-import subprocess
-import numpy as np
-from joblib import Parallel, delayed
+import pickle
 import shutil
+import subprocess
+
+import numpy as np
 import pandas as pd
+from joblib import Parallel, delayed
+from towbintools.foundation import file_handling as file_handling
 from towbintools.foundation.image_handling import get_acquisition_date
 
 # ----BOILERPLATE CODE FOR FILE HANDLING----
+
 
 def backup_file(file_path, destination_dir):
     # Ensure the source file exists
@@ -19,7 +21,9 @@ def backup_file(file_path, destination_dir):
 
     # Ensure the destination directory exists
     if not os.path.exists(destination_dir):
-        print(f"Destination directory does not exist, attempting to create: {destination_dir}")
+        print(
+            f"Destination directory does not exist, attempting to create: {destination_dir}"
+        )
         try:
             os.makedirs(destination_dir)
         except OSError as e:
@@ -28,7 +32,9 @@ def backup_file(file_path, destination_dir):
 
     base_name = os.path.splitext(os.path.basename(file_path))[0]
     file_extension = os.path.splitext(file_path)[1]
-    destination_file_path = os.path.join(destination_dir, f"{base_name}{file_extension}")
+    destination_file_path = os.path.join(
+        destination_dir, f"{base_name}{file_extension}"
+    )
 
     # If a file with the same name exists, append an incrementing number
     i = 1
@@ -47,10 +53,16 @@ def backup_file(file_path, destination_dir):
         print(f"Failed to backup file: {e}")
         return False
 
+
 def get_experiment_pads(config):
     experiment_dir = config["experiment_dir"]
-    pads = [f for f in os.listdir(experiment_dir) if os.path.isdir(os.path.join(experiment_dir, f)) and "pad" in f]
+    pads = [
+        f
+        for f in os.listdir(experiment_dir)
+        if os.path.isdir(os.path.join(experiment_dir, f)) and "pad" in f
+    ]
     return pads
+
 
 def get_and_create_folders_pad(config, pad):
     experiment_dir = config["experiment_dir"]
@@ -67,7 +79,8 @@ def get_and_create_folders_pad(config, pad):
     sbatch_backup_dir = os.path.join(report_subdir, "sbatch_backup")
     os.makedirs(sbatch_backup_dir, exist_ok=True)
 
-    return experiment_dir, raw_subdir, analysis_subdir, report_subdir, sbatch_backup_dir    
+    return experiment_dir, raw_subdir, analysis_subdir, report_subdir, sbatch_backup_dir
+
 
 def get_and_create_folders(config):
     experiment_dir = config["experiment_dir"]
@@ -140,7 +153,7 @@ def process_row_input_output_files(row, columns, output_dir, rerun):
     try:
         output_file = os.path.join(output_dir, os.path.basename(row[columns[0]]))
     except Exception as e:
-        print(f'Raised exception {e} for row {row}')
+        print(f"Raised exception {e} for row {row}")
         return None, None
 
     if (rerun or not os.path.exists(output_file)) and all(
@@ -182,6 +195,7 @@ def get_input_and_output_files(experiment_filemap, columns, output_dir, rerun=Tr
             output_files.append(output_file)
     return input_files, output_files
 
+
 def add_dir_to_experiment_filemap(experiment_filemap, dir_path, subdir_name):
     subdir_filemap = file_handling.get_dir_filemap(dir_path)
     subdir_filemap.rename(columns={"ImagePath": subdir_name}, inplace=True)
@@ -194,67 +208,82 @@ def add_dir_to_experiment_filemap(experiment_filemap, dir_path, subdir_name):
     experiment_filemap = experiment_filemap.replace(np.nan, "", regex=True)
     return experiment_filemap
 
+
 def get_experiment_time_from_filemap(experiment_filemap):
-    print('### Calculating ExperimentTime ###')
-    experiment_filemap['date'] = experiment_filemap['raw'].apply(get_acquisition_date)
+    print("### Calculating ExperimentTime ###")
+    experiment_filemap["date"] = experiment_filemap["raw"].apply(get_acquisition_date)
 
     # in case all acquisition dates are None, return a nan filled ExperimentTime column
-    if experiment_filemap['date'].isnull().all():
+    if experiment_filemap["date"].isnull().all():
         return pd.Series([np.nan] * len(experiment_filemap))
     # grouped by Point value, calculate the time difference between the first time and all other times
-    grouped = experiment_filemap.groupby('Point')
+    grouped = experiment_filemap.groupby("Point")
     # get the date of the raw where Time is 0
     try:
-        first_time = grouped.apply(lambda x: x[x['Time'] == 0].iloc[0]['date'])
+        first_time = grouped.apply(lambda x: x[x["Time"] == 0].iloc[0]["date"])
     except IndexError:
-        print('### Error: Time 0 not found for all points, experiment time will be computed from lowest Time value for each point.###')
-        first_time = grouped.apply(lambda x: x[x['Time'] == x['Time'].min()].iloc[0]['date'])
+        print(
+            "### Error: Time 0 not found for all points, experiment time will be computed from lowest Time value for each point.###"
+        )
+        first_time = grouped.apply(
+            lambda x: x[x["Time"] == x["Time"].min()].iloc[0]["date"]
+        )
 
     # iterate over each point and calculate the time difference
-    for point in experiment_filemap['Point'].unique():
-        print(f'### Processing point {point} ###')
+    for point in experiment_filemap["Point"].unique():
+        print(f"### Processing point {point} ###")
         # Use .loc to ensure you're modifying the original DataFrame
-        point_indices = experiment_filemap['Point'] == point
+        point_indices = experiment_filemap["Point"] == point
         point_data = experiment_filemap.loc[point_indices]
-        experiment_filemap.loc[point_indices, 'ExperimentTime'] = (point_data['date'] - first_time[point]).dt.total_seconds()
-    
+        experiment_filemap.loc[point_indices, "ExperimentTime"] = (
+            point_data["date"] - first_time[point]
+        ).dt.total_seconds()
+
     # keep only the ExperimentTime column
-    return experiment_filemap['ExperimentTime']
+    return experiment_filemap["ExperimentTime"]
+
 
 def get_experiment_time_from_filemap_parallel(experiment_filemap):
-    print('### Calculating ExperimentTime ###')
+    print("### Calculating ExperimentTime ###")
     # copy the filemap to avoid modifying the original
     experiment_filemap = experiment_filemap.copy()
-    date_result = Parallel(n_jobs=-1)(delayed(get_acquisition_date)(raw) for raw in experiment_filemap['raw'])
-    experiment_filemap['date'] = date_result
+    date_result = Parallel(n_jobs=-1)(
+        delayed(get_acquisition_date)(raw) for raw in experiment_filemap["raw"]
+    )
+    experiment_filemap["date"] = date_result
     # in case all acquisition dates are None, return a None filled ExperimentTime column
-    if experiment_filemap['date'].isnull().all():
+    if experiment_filemap["date"].isnull().all():
         return pd.Series([np.nan] * len(experiment_filemap))
     # grouped by Point value, calculate the time difference between the first time and all other times
-    grouped = experiment_filemap.groupby('Point')
+    grouped = experiment_filemap.groupby("Point")
     # get the date of the raw where Time is 0
     try:
-        first_time = grouped.apply(lambda x: x[x['Time'] == 0].iloc[0]['date'])
+        first_time = grouped.apply(lambda x: x[x["Time"] == 0].iloc[0]["date"])
     except IndexError:
-        print('### Error: Time 0 not found for all points, experiment time will be computed from lowest Time value for each point.###')
-        first_time = grouped.apply(lambda x: x[x['Time'] == x['Time'].min()].iloc[0]['date'])
+        print(
+            "### Error: Time 0 not found for all points, experiment time will be computed from lowest Time value for each point.###"
+        )
+        first_time = grouped.apply(
+            lambda x: x[x["Time"] == x["Time"].min()].iloc[0]["date"]
+        )
     # iterate over each point and calculate the time difference
     experiment_time = Parallel(n_jobs=-1)(
         delayed(calculate_experiment_time)(point, experiment_filemap, first_time)
-        for point in experiment_filemap['Point'].unique()
+        for point in experiment_filemap["Point"].unique()
     )
     experiment_time = pd.concat(experiment_time)
-    experiment_filemap['ExperimentTime'] = experiment_time
+    experiment_filemap["ExperimentTime"] = experiment_time
     # keep only the ExperimentTime column
-    return experiment_filemap['ExperimentTime']
+    return experiment_filemap["ExperimentTime"]
+
 
 def calculate_experiment_time(point, experiment_filemap, first_time):
-    point_indices = experiment_filemap['Point'] == point
+    point_indices = experiment_filemap["Point"] == point
     point_data = experiment_filemap.loc[point_indices]
     try:
-        return (point_data['date'] - first_time[point]).dt.total_seconds()
+        return (point_data["date"] - first_time[point]).dt.total_seconds()
     except KeyError:
-        print(f'### Error calculating experiment time for point {point} ###')
+        print(f"### Error calculating experiment time for point {point} ###")
         return pd.Series([np.nan] * len(point_data))
 
 
@@ -293,6 +322,7 @@ def cleanup_files(*filepaths):
         except Exception as e:
             print(f"Error deleting file {filepath}: {e}")
 
+
 # ----BOILERPLATE CODE FOR SLURM----
 
 
@@ -306,7 +336,7 @@ def run_command(command, script_name, config, requires_gpu=False):
             command,
         )
     elif requires_gpu:
-         sbatch_output_file,  sbatch_error_file = create_sbatch_file(
+        sbatch_output_file, sbatch_error_file = create_sbatch_file(
             script_name,
             config["sbatch_cpus"],
             config["sbatch_time"],
@@ -315,7 +345,7 @@ def run_command(command, script_name, config, requires_gpu=False):
             gpus=config["sbatch_gpus"],
         )
     else:
-         sbatch_output_file,  sbatch_error_file = create_sbatch_file(
+        sbatch_output_file, sbatch_error_file = create_sbatch_file(
             script_name,
             config["sbatch_cpus"],
             config["sbatch_time"],
@@ -323,7 +353,7 @@ def run_command(command, script_name, config, requires_gpu=False):
             command,
         )
     subprocess.run(["sbatch", f"./temp_files/batch/{script_name}.sh"])
-    return  sbatch_output_file,  sbatch_error_file
+    return sbatch_output_file, sbatch_error_file
 
 
 def create_sbatch_file(job_name, cores, time_limit, memory, command, gpus=0):
@@ -342,7 +372,7 @@ def create_sbatch_file(job_name, cores, time_limit, memory, command, gpus=0):
 
     with open(f"./temp_files/batch/{job_name}.sh", "w") as file:
         file.write(content)
-    
+
     sbatch_output_file = f"./temp_files/sbatch_output/{job_name}.out"
     sbatch_error_file = f"./temp_files/sbatch_output/{job_name}.err"
     return sbatch_output_file, sbatch_error_file
@@ -375,7 +405,9 @@ def basic_get_args() -> argparse.Namespace:
 
     return parser.parse_args()
 
+
 # ----BOILERPLATE CODE FOR SAVING ----
+
 
 def rename_merge_and_save_csv(
     experiment_filemap,

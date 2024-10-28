@@ -1,11 +1,12 @@
-from towbintools.foundation import image_handling
-from towbintools.classification import classification_tools
 import os
-from joblib import Parallel, delayed
 import re
+
 import pandas as pd
 import utils
 import xgboost as xgb
+from joblib import Parallel, delayed
+from towbintools.classification import classification_tools
+from towbintools.foundation import image_handling
 
 
 def classify_worm_type_from_file_path(
@@ -48,7 +49,10 @@ def main(input_pickle, output_file, config, n_jobs):
     worm_types_dataframe = pd.DataFrame(worm_types)
 
     # rename the WormType column to the output file
-    worm_types_dataframe.rename(columns={"WormType": os.path.splitext(os.path.basename(output_file))[0]}, inplace=True)
+    worm_types_dataframe.rename(
+        columns={"WormType": os.path.splitext(os.path.basename(output_file))[0]},
+        inplace=True,
+    )
     worm_types_dataframe.to_csv(output_file, index=False)
 
 

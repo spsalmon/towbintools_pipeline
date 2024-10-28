@@ -1,22 +1,32 @@
 import os
-import scipy.io as sio
+
+import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-import matplotlib.pyplot as plt
+import scipy.io as sio
 from towbintools.foundation.file_handling import add_dir_to_experiment_filemap
-from pipeline_scripts.utils import (
-    get_experiment_time_from_filemap_parallel,
-)
+
+from pipeline_scripts.utils import get_experiment_time_from_filemap_parallel
 
 KEY_CONVERSION_MAP = {
     "vol": "volume",
     "len": "length",
     "strClass": "worm_type",
-    'ecdys': 'ecdysis',
+    "ecdys": "ecdysis",
 }
 
-def convert_matlab_experiment(experiment_dir, matlab_report_dir, matlab_report_files, column_names, add_raw = False, analysis_to_add = None):
-    matlab_report_files = [os.path.join(matlab_report_dir, f) for f in matlab_report_files]
+
+def convert_matlab_experiment(
+    experiment_dir,
+    matlab_report_dir,
+    matlab_report_files,
+    column_names,
+    add_raw=False,
+    analysis_to_add=None,
+):
+    matlab_report_files = [
+        os.path.join(matlab_report_dir, f) for f in matlab_report_files
+    ]
     dfs = []
     for matlab_report_file, column_name in zip(matlab_report_files, column_names):
         matlab_report = sio.loadmat(matlab_report_file, chars_as_strings=False)
@@ -33,10 +43,24 @@ def convert_matlab_experiment(experiment_dir, matlab_report_dir, matlab_report_f
                 continue
 
         # convert worm_type from [' ', 'w', 'o', 'e'] to ['worm', 'egg', 'error']
-        new_matlab_report["worm_type"] = np.where(new_matlab_report["worm_type"] == 'w', "worm", new_matlab_report["worm_type"])
-        new_matlab_report["worm_type"] = np.where(new_matlab_report["worm_type"] == 'e', "egg", new_matlab_report["worm_type"])
-        new_matlab_report["worm_type"] = np.where(new_matlab_report["worm_type"] == 'o', "error", new_matlab_report["worm_type"])
-        new_matlab_report["worm_type"] = np.where(new_matlab_report["worm_type"] == ' ', "error", new_matlab_report["worm_type"])
+        new_matlab_report["worm_type"] = np.where(
+            new_matlab_report["worm_type"] == "w",
+            "worm",
+            new_matlab_report["worm_type"],
+        )
+        new_matlab_report["worm_type"] = np.where(
+            new_matlab_report["worm_type"] == "e", "egg", new_matlab_report["worm_type"]
+        )
+        new_matlab_report["worm_type"] = np.where(
+            new_matlab_report["worm_type"] == "o",
+            "error",
+            new_matlab_report["worm_type"],
+        )
+        new_matlab_report["worm_type"] = np.where(
+            new_matlab_report["worm_type"] == " ",
+            "error",
+            new_matlab_report["worm_type"],
+        )
 
         point = np.arange(0, new_matlab_report["volume"].shape[0])
         time = np.arange(0, new_matlab_report["volume"].shape[1])
@@ -53,7 +77,7 @@ def convert_matlab_experiment(experiment_dir, matlab_report_dir, matlab_report_f
             "Time": time,
             f"{column_name}_volume": new_matlab_report["volume"].flatten(),
             f"{column_name}_length": new_matlab_report["length"].flatten(),
-            f"{column_name}_worm_type": new_matlab_report["worm_type"].flatten()
+            f"{column_name}_worm_type": new_matlab_report["worm_type"].flatten(),
         }
 
         df = pd.DataFrame(data)
@@ -94,13 +118,16 @@ def convert_matlab_experiment(experiment_dir, matlab_report_dir, matlab_report_f
 
     # add the raw data to the experiment filemap
     if add_raw:
-        df = add_dir_to_experiment_filemap(df, os.path.join(experiment_dir, "raw"), "raw")
+        df = add_dir_to_experiment_filemap(
+            df, os.path.join(experiment_dir, "raw"), "raw"
+        )
 
     # add the analysis data to the experiment filemap
     if analysis_to_add is not None:
         for key, value in analysis_to_add.items():
-            df = add_dir_to_experiment_filemap(df, os.path.join(experiment_dir, 'analysis', key), f'analysis/{value}')
-
+            df = add_dir_to_experiment_filemap(
+                df, os.path.join(experiment_dir, "analysis", key), f"analysis/{value}"
+            )
 
     # save the dataframe to a csv file
     save_path = os.path.join(matlab_report_dir, "analysis_filemap.csv")
@@ -108,10 +135,16 @@ def convert_matlab_experiment(experiment_dir, matlab_report_dir, matlab_report_f
 
     return df, save_path
 
+
 experiment_dir = "/mnt/towbin.data/shared/igheor/20230914_Ti2_10x_vhp-1_338_344_186_160_20230914_172832_008"
 matlab_report_dir = os.path.join(experiment_dir, "analysis/report/")
-old_matlab_report_files = ["ch1_il_strS_cor_sec2_validlength.mat", "ch2_sobel_str_molts_nw_cor_sec2_validlength.mat"]
-old_matlab_report_files = [os.path.join(matlab_report_dir, f) for f in old_matlab_report_files]
+old_matlab_report_files = [
+    "ch1_il_strS_cor_sec2_validlength.mat",
+    "ch2_sobel_str_molts_nw_cor_sec2_validlength.mat",
+]
+old_matlab_report_files = [
+    os.path.join(matlab_report_dir, f) for f in old_matlab_report_files
+]
 better_column_names = ["ch1_seg_str", "ch2_seg_str"]
 
 extract_experiment_time = False
@@ -125,11 +158,18 @@ analysis_to_add = None
 #     # 'ch2_sobel_str' : 'ch2_seg_str',
 # }
 
-experiment_filemap, experiment_filemap_path = convert_matlab_experiment(experiment_dir, matlab_report_dir, old_matlab_report_files, better_column_names, add_raw = add_raw, analysis_to_add = analysis_to_add)
+experiment_filemap, experiment_filemap_path = convert_matlab_experiment(
+    experiment_dir,
+    matlab_report_dir,
+    old_matlab_report_files,
+    better_column_names,
+    add_raw=add_raw,
+    analysis_to_add=analysis_to_add,
+)
 
 # remove duplicate columns that have the same name and the same values
 if "ExperimentTime" not in experiment_filemap.columns and extract_experiment_time:
-    experiment_filemap["ExperimentTime"] = get_experiment_time_from_filemap_parallel(experiment_filemap)
-    experiment_filemap.to_csv(
-        experiment_filemap_path, index=False
+    experiment_filemap["ExperimentTime"] = get_experiment_time_from_filemap_parallel(
+        experiment_filemap
     )
+    experiment_filemap.to_csv(experiment_filemap_path, index=False)

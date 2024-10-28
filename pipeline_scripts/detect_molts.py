@@ -1,10 +1,11 @@
-from towbintools.foundation import detect_molts
-from towbintools.data_analysis import compute_series_at_time_classified
-import numpy as np
 import os
-from joblib import Parallel, delayed
+
+import numpy as np
 import pandas as pd
 import utils
+from joblib import Parallel, delayed
+from towbintools.data_analysis import compute_series_at_time_classified
+from towbintools.foundation import detect_molts
 
 
 def run_detect_molts(
@@ -93,10 +94,10 @@ def compute_other_features_at_molt(
         for molt in ["HatchTime", "M1", "M2", "M3", "M4"]:
             molt_time = float(molt_data_of_point[molt].values[0])
             if not np.isnan(molt_time):
-                features_at_molt[
-                    f"{column}_at_{molt}"
-                ] = compute_series_at_time_classified(
-                    column_data, worm_types, molt_time
+                features_at_molt[f"{column}_at_{molt}"] = (
+                    compute_series_at_time_classified(
+                        column_data, worm_types, molt_time
+                    )
                 )
 
     return features_at_molt
