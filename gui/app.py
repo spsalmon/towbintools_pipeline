@@ -1,21 +1,18 @@
-from shiny import App, render, ui, reactive
-from shinywidgets import output_widget, render_widget
-from towbintools.foundation import image_handling
-from towbintools.data_analysis import compute_series_at_time_classified
-import matplotlib.pyplot as plt
-import pandas as pd
-from joblib import Parallel, delayed
-
-import plotly.express as px
-import plotly.graph_objs as go
-import numpy as np
 import os
-import aicsimageio
 import re
-from time import perf_counter
 
-# filemap_path = "/mnt/towbin.data/shared/spsalmon/pipeline_test_folder/analysis/report/analysis_filemap.csv"
-filemap_path = "/mnt/towbin.data/shared/kstojanovski/20240212_Orca_10x_yap-1del_col-10-tir_wBT160-186-310-337-380-393_25C_20240212_164059_429/analysis/report/analysis_filemap_test.csv"
+import aicsimageio
+import matplotlib.pyplot as plt
+import numpy as np
+import pandas as pd
+import plotly.graph_objs as go
+from shiny import App, reactive, render, ui
+from shinywidgets import output_widget, render_widget
+from towbintools.data_analysis import compute_series_at_time_classified
+from towbintools.foundation import image_handling
+
+filemap_path = "/mnt/towbin.data/shared/spsalmon/pipeline_test_folder/analysis/report/analysis_filemap.csv"
+# filemap_path = "/mnt/towbin.data/shared/igheor/20240927_Ti2_daf16_vhp1_160_186_263_264_25C_20240927_172302_312/analysis/report/analysis_filemap.csv"
 
 filemap = pd.read_csv(filemap_path)
 
@@ -23,9 +20,10 @@ filemap_folder = os.path.dirname(filemap_path)
 filemap_name = os.path.basename(filemap_path)
 filemap_name = filemap_name.split(".")[0]
 
+
 def get_backup_path(filemap_folder, filemap_name):
     # check if the filemap is already annotated
-    match = re.search(r'annotated_v(\d+)', filemap_name)
+    match = re.search(r"annotated_v(/d+)", filemap_name)
     if not match:
         iteration = 1
     else:
@@ -38,6 +36,7 @@ def get_backup_path(filemap_folder, filemap_name):
 
     filemap_save_path = os.path.join(filemap_folder, filemap_save_path)
     return filemap_save_path
+
 
 if "annotated" not in filemap_name:
     filemap_save_path = f"{filemap_name}_annotated.csv"
@@ -85,7 +84,7 @@ usual_columns = [
     "M4",
     "VolumeAtM4",
     "date",
-    "ExperimentTime"
+    "ExperimentTime",
 ]
 
 usual_columns.extend(
@@ -105,17 +104,33 @@ list_custom_columns = ["None"] + list_custom_columns
 print(f"usual columns : {usual_columns}")
 print(f"custom columns : {list_custom_columns}")
 print(f"all columns : {filemap.columns.tolist()}")
-worm_type_column = [
-    column for column in filemap.columns.tolist() if "worm_type" in column
-][0]
+
+try:
+    worm_type_column = [
+        column for column in filemap.columns.tolist() if "worm_type" in column
+    ][0]
+except IndexError:
+    print("No worm_type column found in the filemap")
+    worm_type_column = "placeholder_worm_type"
+    filemap["placeholder_worm_type"] = "worm"
+
 base_volume_column = [
-    column for column in filemap.columns.tolist() if "volume" in column and "_at_" not in column
+    column
+    for column in filemap.columns.tolist()
+    if "volume" in column and "_at_" not in column
 ][0]
 
 
-segmentation_columns = [column for column in filemap.columns.tolist() if "seg" in column 
-                        and "str" not in column and "worm_type" not in column and "volume" 
-                        not in column and "area" not in column and "length" not in column]
+segmentation_columns = [
+    column
+    for column in filemap.columns.tolist()
+    if "seg" in column
+    and "str" not in column
+    and "worm_type" not in column
+    and "volume" not in column
+    and "area" not in column
+    and "length" not in column
+]
 overlay_segmentation_choices = ["None"] + segmentation_columns
 
 print("Adding molts column to filemap if they do not exist...")
@@ -138,6 +153,7 @@ def save_filemap(filemap=filemap):
     filemap.to_csv(filemap_save_path, index=False)
     print("Filemap saved !")
 
+
 print("Initializing the UI ...")
 molt_annotator = ui.column(
     7,
@@ -148,30 +164,35 @@ molt_annotator = ui.column(
             ui.row(ui.output_text("hatch_text")),
             ui.row(ui.input_action_button("set_hatch", "hatch")),
             ui.row(ui.input_action_button("reset_hatch", "Reset Hatch")),
+            ui.row(ui.input_action_button("set_value_at_hatch", "Set value at hatch")),
         ),
         ui.column(
             2,
             ui.row(ui.output_text("m1_text")),
             ui.row(ui.input_action_button("set_m1", "M1")),
             ui.row(ui.input_action_button("reset_m1", "Reset M1")),
+            ui.row(ui.input_action_button("set_value_at_m1", "Set value at M1")),
         ),
         ui.column(
             2,
             ui.row(ui.output_text("m2_text")),
             ui.row(ui.input_action_button("set_m2", "M2")),
             ui.row(ui.input_action_button("reset_m2", "Reset M2")),
+            ui.row(ui.input_action_button("set_value_at_m2", "Set value at M2")),
         ),
         ui.column(
             2,
             ui.row(ui.output_text("m3_text")),
             ui.row(ui.input_action_button("set_m3", "M3")),
             ui.row(ui.input_action_button("reset_m3", "Reset M3")),
+            ui.row(ui.input_action_button("set_value_at_m3", "Set value at M3")),
         ),
         ui.column(
             2,
             ui.row(ui.output_text("m4_text")),
             ui.row(ui.input_action_button("set_m4", "M4")),
             ui.row(ui.input_action_button("reset_m4", "Reset M4")),
+            ui.row(ui.input_action_button("set_value_at_m4", "Set value at M4")),
         ),
         ui.row(
             ui.column(
@@ -197,7 +218,8 @@ molt_annotator = ui.column(
                 max=1000,
                 step=10,
                 value=700,
-            )
+            ),
+            ui.input_checkbox("log_scale", "Log scale", value=True),
         ),
         align="center",
     ),
@@ -219,9 +241,23 @@ timepoint_selector = ui.column(
         ui.column(4, ui.input_selectize("point", "Select point", choices=points)),
         ui.column(4, ui.input_action_button("next_point", "next point")),
     ),
-    ui.row(ui.input_selectize("channel", "Select channel", choices=list_channels, selected=list_channels[1]),
-           ui.input_selectize("channel_overlay", "Overlay channel", choices=list_channels, selected="None"),
-           ui.input_selectize("segmentation_overlay", "Overlay segmentation", choices=overlay_segmentation_choices, selected="None")),
+    ui.row(
+        ui.input_selectize(
+            "channel",
+            "Select channel",
+            choices=list_channels,
+            selected=list_channels[1],
+        ),
+        ui.input_selectize(
+            "channel_overlay", "Overlay channel", choices=list_channels, selected="None"
+        ),
+        ui.input_selectize(
+            "segmentation_overlay",
+            "Overlay segmentation",
+            choices=overlay_segmentation_choices,
+            selected="None",
+        ),
+    ),
     ui.row(
         ui.input_selectize(
             "column_to_plot",
@@ -289,6 +325,121 @@ def set_marker_shape(
     markers = dict(symbol=symbols, size=sizes, color=colors, line=dict(width=widths))
     return markers
 
+def get_points_for_value_at_molts(hatch, m1, m2, m3, m4, value_at_hatch, value_at_m1, value_at_m2, value_at_m3, value_at_m4):
+    ecdys_list = [hatch, m1, m2, m3, m4]
+    value_at_ecdys_list = [value_at_hatch, value_at_m1, value_at_m2, value_at_m3, value_at_m4]
+    symbols = ["cross", "cross", "cross", "cross", "cross"]
+    colors = ["red", "orange", "yellow", "green", "blue"]
+    sizes = [8, 8, 8, 8, 8]
+    widths = [4, 4, 4, 4, 4]
+
+    # Use numpy to handle NaN values efficiently
+    ecdys_array = np.array(ecdys_list)
+    value_at_ecdys_array = np.array(value_at_ecdys_list)
+    valid_mask = np.isfinite(ecdys_array) & np.isfinite(value_at_ecdys_array)
+
+    # Filter arrays using the mask
+    ecdys_filtered = ecdys_array[valid_mask]
+    value_at_ecdys_filtered = value_at_ecdys_array[valid_mask]
+    symbols_filtered = np.array(symbols)[valid_mask]
+    colors_filtered = np.array(colors)[valid_mask]
+    sizes_filtered = np.array(sizes)[valid_mask]
+    widths_filtered = np.array(widths)[valid_mask]
+
+    return (
+        ecdys_filtered,
+        value_at_ecdys_filtered,
+        symbols_filtered,
+        colors_filtered,
+        sizes_filtered,
+        widths_filtered,
+    )
+
+def update_molt_and_ecdysis_columns(ecdys_event, time, point, selected_column):
+    data_of_point = filemap.loc[filemap["Point"] == point]
+    filemap.loc[filemap["Point"] == point, [ecdys_event]] = time
+    value_at_ecdys_columns = [
+        column
+        for column in data_of_point.columns.tolist()
+        if f"_at_{ecdys_event}" in column
+    ]
+
+    if f"{selected_column}_at_{ecdys_event}" not in value_at_ecdys_columns:
+        print(f"Adding column {selected_column}_at_{ecdys_event} to filemap ...")
+        filemap[f"{selected_column}_at_{ecdys_event}"] = np.nan
+        value_at_ecdys_columns = [
+            column
+            for column in data_of_point.columns.tolist()
+            if f"_at_{ecdys_event}" in column
+        ]
+
+    value_columns = [
+        column.replace(f"_at_{ecdys_event}", "")
+        for column in value_at_ecdys_columns
+    ]
+
+    for value_column, value_at_ecdys_column in zip(
+        value_columns, value_at_ecdys_columns
+    ):
+        if np.isnan(time):
+            new_column_value = np.nan
+        else:
+            new_column_value = compute_series_at_time_classified(
+                data_of_point[value_column].values,
+                data_of_point[worm_type_column].values,
+                time,
+            )
+
+        print(
+            f'Old value {value_at_ecdys_column}: {filemap.loc[(filemap["Point"] == point), value_at_ecdys_column].values[0]}'
+        )
+
+        filemap.loc[(filemap["Point"] == point), [value_at_ecdys_column]] = (
+            new_column_value
+        )
+
+        print(
+            f'New value {value_at_ecdys_column}: {filemap.loc[(filemap["Point"] == point), value_at_ecdys_column].values[0]}'
+        )
+
+def correct_ecdysis_columns(ecdys_event, time, point, selected_column):
+    data_of_point = filemap.loc[filemap["Point"] == point]
+    value_at_ecdys_columns = [
+        column
+        for column in data_of_point.columns.tolist()
+        if f"_at_{ecdys_event}" in column
+    ]
+
+    if f"{selected_column}_at_{ecdys_event}" not in value_at_ecdys_columns:
+        print(f"Adding column {selected_column}_at_{ecdys_event} to filemap ...")
+        filemap[f"{selected_column}_at_{ecdys_event}"] = np.nan
+        value_at_ecdys_columns = [
+            column
+            for column in data_of_point.columns.tolist()
+            if f"_at_{ecdys_event}" in column
+        ]
+
+    value_columns = [
+        column.replace(f"_at_{ecdys_event}", "")
+        for column in value_at_ecdys_columns
+    ]
+
+    for value_column, value_at_ecdys_column in zip(
+        value_columns, value_at_ecdys_columns
+    ):
+        new_column_value = data_of_point[data_of_point["Time"] == time][value_column].values[0]
+
+        print(
+            f'Old value {value_at_ecdys_column}: {filemap.loc[(filemap["Point"] == point), value_at_ecdys_column].values[0]}'
+        )
+
+        filemap.loc[(filemap["Point"] == point), [value_at_ecdys_column]] = (
+            new_column_value
+        )
+
+        print(
+            f'New value {value_at_ecdys_column}: {filemap.loc[(filemap["Point"] == point), value_at_ecdys_column].values[0]}')
+
 def server(input, output, session):
     print("Initializing the server ...")
     hatch = reactive.Value("")
@@ -312,12 +463,12 @@ def server(input, output, session):
         images_of_point = images_of_point_paths
         # images_of_point = Parallel(n_jobs=-1)(delayed(image_handling.read_tiff_file)(path) for path in images_of_point_paths['raw'].values.tolist())
         return images_of_point
-    
+
     @reactive.Calc
     def get_segmentation_of_point():
         if input.segmentation_overlay() == "None":
             return []
-        
+
         segmentation_of_point_paths = filemap[filemap["Point"] == int(input.point())][
             input.segmentation_overlay()
         ].values.tolist()
@@ -351,11 +502,36 @@ def server(input, output, session):
         m4.set(hatch_and_molts[4])
 
         try:
-            value_at_hatch.set(filemap.loc[(filemap["Point"] == int(input.point())), f'{input.column_to_plot()}_at_HatchTime'].values[0])
-            value_at_m1.set(filemap.loc[(filemap["Point"] == int(input.point())), f'{input.column_to_plot()}_at_M1'].values[0])
-            value_at_m2.set(filemap.loc[(filemap["Point"] == int(input.point())), f'{input.column_to_plot()}_at_M2'].values[0])
-            value_at_m3.set(filemap.loc[(filemap["Point"] == int(input.point())), f'{input.column_to_plot()}_at_M3'].values[0])
-            value_at_m4.set(filemap.loc[(filemap["Point"] == int(input.point())), f'{input.column_to_plot()}_at_M4'].values[0])
+            value_at_hatch.set(
+                filemap.loc[
+                    (filemap["Point"] == int(input.point())),
+                    f"{input.column_to_plot()}_at_HatchTime",
+                ].values[0]
+            )
+            value_at_m1.set(
+                filemap.loc[
+                    (filemap["Point"] == int(input.point())),
+                    f"{input.column_to_plot()}_at_M1",
+                ].values[0]
+            )
+            value_at_m2.set(
+                filemap.loc[
+                    (filemap["Point"] == int(input.point())),
+                    f"{input.column_to_plot()}_at_M2",
+                ].values[0]
+            )
+            value_at_m3.set(
+                filemap.loc[
+                    (filemap["Point"] == int(input.point())),
+                    f"{input.column_to_plot()}_at_M3",
+                ].values[0]
+            )
+            value_at_m4.set(
+                filemap.loc[
+                    (filemap["Point"] == int(input.point())),
+                    f"{input.column_to_plot()}_at_M4",
+                ].values[0]
+            )
         except KeyError:
             value_at_hatch.set(np.nan)
             value_at_m1.set(np.nan)
@@ -407,9 +583,7 @@ def server(input, output, session):
                 "M4",
             ],
         ]
-        data_of_point[input.column_to_plot()] = np.log10(
-            data_of_point[input.column_to_plot()]
-        )
+        
         markers = set_marker_shape(
             input.time(),
             data_of_point[worm_type_column],
@@ -430,40 +604,24 @@ def server(input, output, session):
             )
         )
 
-        def get_points_for_value_at_molts():
-            ecdys_list = [hatch(), m1(), m2(), m3(), m4()]
-            value_at_ecdys_list = [value_at_hatch(), value_at_m1(), value_at_m2(), value_at_m3(), value_at_m4()]
-            symbols = ["cross", "cross", "cross", "cross", "cross"]
-            colors = ["red", "orange", "yellow", "green", "blue"]
-            sizes = [8, 8, 8, 8, 8]
-            widths = [4, 4, 4, 4, 4]
+        ecdys_list, value_at_ecdys_list, symbols, colors, sizes, widths = (
+            get_points_for_value_at_molts(hatch(), m1(), m2(), m3(), m4(), value_at_hatch(), value_at_m1(), value_at_m2(), value_at_m3(), value_at_m4())
+        )
 
-            # Use numpy to handle NaN values efficiently
-            ecdys_array = np.array(ecdys_list)
-            value_at_ecdys_array = np.array(value_at_ecdys_list)
-            valid_mask = np.isfinite(ecdys_array) & np.isfinite(value_at_ecdys_array)
-
-            # Filter arrays using the mask
-            ecdys_filtered = ecdys_array[valid_mask]
-            value_at_ecdys_filtered = value_at_ecdys_array[valid_mask]
-            symbols_filtered = np.array(symbols)[valid_mask]
-            colors_filtered = np.array(colors)[valid_mask]
-            sizes_filtered = np.array(sizes)[valid_mask]
-            widths_filtered = np.array(widths)[valid_mask]
-
-            return ecdys_filtered, np.log10(value_at_ecdys_filtered), symbols_filtered, colors_filtered, sizes_filtered, widths_filtered
-
-        ecdys_list, value_at_ecdys_list, symbols, colors, sizes, widths = get_points_for_value_at_molts()
-        
         fig.add_trace(
             go.Scatter(
-                x = ecdys_list,
-                y = value_at_ecdys_list,
-                mode = "markers",
-                marker = dict(symbol = symbols, size = sizes, color = colors, line=dict(width=widths, color=colors)),
-                hoverinfo='none',  # Disable hover information
-                hoverlabel=None,   # Disable hover label
-                hoveron=None       # Disable hover interaction
+                x=ecdys_list,
+                y=value_at_ecdys_list,
+                mode="markers",
+                marker=dict(
+                    symbol=symbols,
+                    size=sizes,
+                    color=colors,
+                    line=dict(width=widths, color=colors),
+                ),
+                hoverinfo="none",  # Disable hover information
+                hoverlabel=None,  # Disable hover label
+                hoveron=None,  # Disable hover interaction
             )
         )
 
@@ -474,6 +632,8 @@ def server(input, output, session):
             height=input.volume_plot_size(),
             showlegend=False,
         )
+
+        fig.update_yaxes(type="log" if input.log_scale() else "linear")
 
         def update_selected_time(trace, points, selector):
             print("update_selected_time")
@@ -509,91 +669,93 @@ def server(input, output, session):
     def m4_text():
         return f"M4 : {str(m4())}"
 
-    def update_ecdys_columns(ecdys_event, time, point, selected_column):
-        data_of_point = filemap.loc[
-            filemap["Point"] == point,
-        ]
-        filemap.loc[filemap["Point"] == int(input.point()), [ecdys_event]] = time
-        value_at_ecdys_columns = [column for column in data_of_point.columns.tolist() if f'_at_{ecdys_event}' in column]
-
-        if f'{selected_column}_at_{ecdys_event}' not in value_at_ecdys_columns:
-            print(f"Adding column {selected_column}_at_{ecdys_event} to filemap ...")
-            filemap[f'{selected_column}_at_{ecdys_event}'] = np.nan
-            value_at_ecdys_columns = [column for column in data_of_point.columns.tolist() if f'_at_{ecdys_event}' in column]
-
-        value_columns = [column.replace(f'_at_{ecdys_event}', '') for column in value_at_ecdys_columns]
-
-        for value_column, value_at_ecdys_column in zip(value_columns, value_at_ecdys_columns):
-            if np.isnan(time):
-                new_column_value = np.nan
-            else:
-                new_column_value = compute_series_at_time_classified(data_of_point[value_column].values, data_of_point[worm_type_column].values, time)
-            
-            print(f'Old value {value_at_ecdys_column}: {filemap.loc[(filemap["Point"] == point), value_at_ecdys_column].values[0]}')
-
-            filemap.loc[(filemap["Point"] == point), [value_at_ecdys_column]] = new_column_value
-
-            print(f'Old value {value_at_ecdys_column}: {filemap.loc[(filemap["Point"] == point), value_at_ecdys_column].values[0]}')
-
     @reactive.Effect
     @reactive.event(input.set_hatch)
     def set_hatch():
         print("set_hatch")
         new_hatch = float(input.time())
-        update_ecdys_columns('HatchTime', new_hatch, int(input.point()), input.column_to_plot())
+        update_molt_and_ecdysis_columns(
+            "HatchTime", new_hatch, int(input.point()), input.column_to_plot()
+        )
         hatch.set(new_hatch)
-        value_at_hatch.set(filemap.loc[(filemap["Point"] == int(input.point())), f'{input.column_to_plot()}_at_HatchTime'].values[0])
+        value_at_hatch.set(
+            filemap.loc[
+                (filemap["Point"] == int(input.point())),
+                f"{input.column_to_plot()}_at_HatchTime",
+            ].values[0]
+        )
 
     @reactive.Effect
     @reactive.event(input.set_m1)
     def set_m1():
         print("set_m1")
         new_m1 = float(input.time())
-        update_ecdys_columns('M1', new_m1, int(input.point()), input.column_to_plot())
+        update_molt_and_ecdysis_columns("M1", new_m1, int(input.point()), input.column_to_plot())
         m1.set(new_m1)
-        value_at_m1.set(filemap.loc[(filemap["Point"] == int(input.point())), f'{input.column_to_plot()}_at_M1'].values[0])
+        value_at_m1.set(
+            filemap.loc[
+                (filemap["Point"] == int(input.point())),
+                f"{input.column_to_plot()}_at_M1",
+            ].values[0]
+        )
 
     @reactive.Effect
     @reactive.event(input.set_m2)
     def set_m2():
         print("set_m2")
         new_m2 = float(input.time())
-        update_ecdys_columns('M2', new_m2, int(input.point()), input.column_to_plot())
+        update_molt_and_ecdysis_columns("M2", new_m2, int(input.point()), input.column_to_plot())
         m2.set(new_m2)
-        value_at_m2.set(filemap.loc[(filemap["Point"] == int(input.point())), f'{input.column_to_plot()}_at_M2'].values[0])
+        value_at_m2.set(
+            filemap.loc[
+                (filemap["Point"] == int(input.point())),
+                f"{input.column_to_plot()}_at_M2",
+            ].values[0]
+        )
 
     @reactive.Effect
     @reactive.event(input.set_m3)
     def set_m3():
         print("set_m3")
         new_m3 = float(input.time())
-        update_ecdys_columns('M3', new_m3, int(input.point()), input.column_to_plot())
+        update_molt_and_ecdysis_columns("M3", new_m3, int(input.point()), input.column_to_plot())
         m3.set(new_m3)
-        value_at_m3.set(filemap.loc[(filemap["Point"] == int(input.point())), f'{input.column_to_plot()}_at_M3'].values[0])
+        value_at_m3.set(
+            filemap.loc[
+                (filemap["Point"] == int(input.point())),
+                f"{input.column_to_plot()}_at_M3",
+            ].values[0]
+        )
 
     @reactive.Effect
     @reactive.event(input.set_m4)
     def set_m4():
         print("set_m4")
         new_m4 = float(input.time())
-        update_ecdys_columns('M4', new_m4, int(input.point()), input.column_to_plot())
+        update_molt_and_ecdysis_columns("M4", new_m4, int(input.point()), input.column_to_plot())
         m4.set(new_m4)
-        value_at_m4.set(filemap.loc[(filemap["Point"] == int(input.point())), f'{input.column_to_plot()}_at_M4'].values[0])
+        value_at_m4.set(
+            filemap.loc[
+                (filemap["Point"] == int(input.point())),
+                f"{input.column_to_plot()}_at_M4",
+            ].values[0]
+        )
 
     @reactive.Effect
     @reactive.event(input.reset_hatch)
     def reset_hatch():
         print("reset_hatch")
-        update_ecdys_columns('HatchTime', np.nan, int(input.point()), input.column_to_plot())
+        update_molt_and_ecdysis_columns(
+            "HatchTime", np.nan, int(input.point()), input.column_to_plot()
+        )
         hatch.set(np.nan)
         value_at_hatch.set(np.nan)
-
 
     @reactive.Effect
     @reactive.event(input.reset_m1)
     def reset_m1():
         print("reset_m1")
-        update_ecdys_columns('M1', np.nan, int(input.point()), input.column_to_plot())
+        update_molt_and_ecdysis_columns("M1", np.nan, int(input.point()), input.column_to_plot())
         m1.set(np.nan)
         value_at_m1.set(np.nan)
 
@@ -601,7 +763,7 @@ def server(input, output, session):
     @reactive.event(input.reset_m2)
     def reset_m2():
         print("reset_m2")
-        update_ecdys_columns('M2', np.nan, int(input.point()), input.column_to_plot())
+        update_molt_and_ecdysis_columns("M2", np.nan, int(input.point()), input.column_to_plot())
         m2.set(np.nan)
         value_at_m2.set(np.nan)
 
@@ -609,7 +771,7 @@ def server(input, output, session):
     @reactive.event(input.reset_m3)
     def reset_m3():
         print("reset_m3")
-        update_ecdys_columns('M3', np.nan, int(input.point()), input.column_to_plot())
+        update_molt_and_ecdysis_columns("M3", np.nan, int(input.point()), input.column_to_plot())
         m3.set(np.nan)
         value_at_m3.set(np.nan)
 
@@ -617,9 +779,59 @@ def server(input, output, session):
     @reactive.event(input.reset_m4)
     def reset_m4():
         print("reset_m4")
-        update_ecdys_columns('M4', np.nan, int(input.point()), input.column_to_plot())
+        update_molt_and_ecdysis_columns("M4", np.nan, int(input.point()), input.column_to_plot())
         m4.set(np.nan)
         value_at_m4.set(np.nan)
+
+    @reactive.Effect
+    @reactive.event(input.set_value_at_hatch)
+    def set_value_at_hatch():
+        print("set_value_at_hatch")
+        correct_ecdysis_columns("HatchTime", int(input.time()), int(input.point()), input.column_to_plot())
+        value_at_hatch.set(filemap.loc[
+                (filemap["Point"] == int(input.point())),
+                f"{input.column_to_plot()}_at_HatchTime",
+            ].values[0])
+
+    @reactive.Effect
+    @reactive.event(input.set_value_at_m1)
+    def set_value_at_m1():
+        print("set_value_at_m1")
+        correct_ecdysis_columns("M1", int(input.time()), int(input.point()), input.column_to_plot())
+        value_at_m1.set(filemap.loc[
+                (filemap["Point"] == int(input.point())),
+                f"{input.column_to_plot()}_at_M1",
+            ].values[0])
+
+    @reactive.Effect
+    @reactive.event(input.set_value_at_m2)
+    def set_value_at_m2():
+        print("set_value_at_m2")
+        correct_ecdysis_columns("M2", int(input.time()), int(input.point()), input.column_to_plot())
+        value_at_m2.set(filemap.loc[
+                (filemap["Point"] == int(input.point())),
+                f"{input.column_to_plot()}_at_M2",
+            ].values[0])
+
+    @reactive.Effect
+    @reactive.event(input.set_value_at_m3)
+    def set_value_at_m3():
+        print("set_value_at_m3")
+        correct_ecdysis_columns("M3", int(input.time()), int(input.point()), input.column_to_plot())
+        value_at_m3.set(filemap.loc[
+                (filemap["Point"] == int(input.point())),
+                f"{input.column_to_plot()}_at_M3",
+            ].values[0])
+
+    @reactive.Effect
+    @reactive.event(input.set_value_at_m4)
+    def set_value_at_m4():
+        print("set_value_at_m4")
+        correct_ecdysis_columns("M4", int(input.time()), int(input.point()), input.column_to_plot())
+        value_at_m4.set(filemap.loc[
+                (filemap["Point"] == int(input.point())),
+                f"{input.column_to_plot()}_at_M4",
+            ].values[0])
 
     @reactive.Effect
     @reactive.event(input.custom_annotation)
@@ -723,7 +935,7 @@ def server(input, output, session):
             plot_overlay = True
         else:
             overlay = np.zeros_like(img[channel])
-        
+
         img_to_plot = image_handling.normalize_image(img_to_plot, dest_dtype=np.float64)
 
         if len(segmentation_of_point) > 0:
@@ -732,14 +944,14 @@ def server(input, output, session):
             fig, ax = plt.subplots()
             ax.imshow(img_to_plot, cmap="viridis")
             if plot_overlay:
-                ax.imshow(overlay, cmap = "magma", alpha=0.7)
-            ax.imshow(segmentation.squeeze(), cmap = "gray", alpha=0.3)
+                ax.imshow(overlay, cmap="magma", alpha=0.7)
+            ax.imshow(segmentation.squeeze(), cmap="gray", alpha=0.3)
             return fig
         else:
             fig, ax = plt.subplots()
             ax.imshow(img_to_plot, cmap="viridis")
             if plot_overlay:
-                ax.imshow(overlay, cmap = "magma", alpha=0.7)
+                ax.imshow(overlay, cmap="magma", alpha=0.7)
             return fig
 
     session.on_ended(save_filemap)
@@ -748,6 +960,7 @@ def server(input, output, session):
     @reactive.event(input.close)
     async def _():
         await session.close()
+
 
 print("Creating the app ...")
 app = App(app_ui, server)

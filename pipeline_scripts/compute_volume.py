@@ -1,16 +1,16 @@
-from towbintools.foundation import image_handling, worm_features
-from towbintools.segmentation import segmentation_tools
 import argparse
-import numpy as np
-from tifffile import imwrite
+import logging
 import os
-from joblib import Parallel, delayed
 import re
+
+import numpy as np
 import pandas as pd
 import utils
 import yaml
-
-import logging
+from joblib import Parallel, delayed
+from tifffile import imwrite
+from towbintools.foundation import image_handling, worm_features
+from towbintools.segmentation import segmentation_tools
 
 
 def compute_volume_from_file_path(straightened_mask_path, pixelsize):

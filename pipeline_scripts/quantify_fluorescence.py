@@ -1,14 +1,22 @@
-from towbintools.foundation import image_handling
-from towbintools.quantification import compute_fluorescence_in_mask, compute_background_fluorescence
 import os
-from joblib import Parallel, delayed
 import re
+
 import pandas as pd
 import utils
+from joblib import Parallel, delayed
+from towbintools.foundation import image_handling
+from towbintools.quantification import (
+    compute_background_fluorescence,
+    compute_fluorescence_in_mask,
+)
 
 
 def quantify_fluorescence_from_file_path(
-    source_image_path, source_image_channel, mask_path, aggregation="sum", background_aggregation="median"
+    source_image_path,
+    source_image_channel,
+    mask_path,
+    aggregation="sum",
+    background_aggregation="median",
 ):
     """Quantify the fluorescence of an image inside a mask."""
     source_image = image_handling.read_tiff_file(
@@ -16,12 +24,8 @@ def quantify_fluorescence_from_file_path(
     )
     mask = image_handling.read_tiff_file(mask_path)
 
-    fluo = compute_fluorescence_in_mask(
-        source_image, mask, aggregation=aggregation
-    )
-    fluo_std = compute_fluorescence_in_mask(
-        source_image, mask, aggregation="std"
-    )
+    fluo = compute_fluorescence_in_mask(source_image, mask, aggregation=aggregation)
+    fluo_std = compute_fluorescence_in_mask(source_image, mask, aggregation="std")
     background_fluo = compute_background_fluorescence(
         source_image, mask, aggregation=background_aggregation
     )
@@ -30,7 +34,13 @@ def quantify_fluorescence_from_file_path(
     if match:
         time = int(match.group(1))
         point = int(match.group(2))
-        return {"Time": time, "Point": point, "FluoAggregation": fluo, "FluoStd": fluo_std, "BackgroundFluo": background_fluo}
+        return {
+            "Time": time,
+            "Point": point,
+            "FluoAggregation": fluo,
+            "FluoStd": fluo_std,
+            "BackgroundFluo": background_fluo,
+        }
     else:
         raise ValueError("Could not extract time and point from file name.")
 
@@ -72,8 +82,6 @@ def main(input_pickle, output_file, config, n_jobs):
     )
 
     fluo_dataframe.to_csv(output_file, index=False)
-
-
 
 
 if __name__ == "__main__":

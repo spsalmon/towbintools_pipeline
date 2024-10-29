@@ -231,7 +231,7 @@ def main(input_pickle, output_pickle, config, n_jobs):
             normalization_type = modelz[0].normalization["type"]
             normalization_params = modelz[0].normalization
             if normalization_type == "percentile":
-                try :
+                try:
                     preprocessing_fn = get_prediction_augmentation(
                         normalization_type=normalization_type,
                         lo=normalization_params["lo"],

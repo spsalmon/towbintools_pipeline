@@ -1,39 +1,36 @@
-import yaml
+import argparse
 import os
-from towbintools.foundation import file_handling as file_handling
+
+import numpy as np
 import pandas as pd
+import yaml
+from towbintools.foundation import file_handling as file_handling
+
+from pipeline_scripts.building_blocks import parse_and_create_building_blocks
+from pipeline_scripts.run_functions import (
+    run_classification,
+    run_compute_volume,
+    run_custom,
+    run_detect_molts,
+    run_fluorescence_quantification,
+    run_segmentation,
+    run_straightening,
+)
 from pipeline_scripts.utils import (
-    get_experiment_pads,
-    get_and_create_folders,
     add_dir_to_experiment_filemap,
-    create_temp_folders,
     backup_file,
+    create_temp_folders,
+    get_and_create_folders,
+    get_experiment_pads,
     get_experiment_time_from_filemap_parallel,
     merge_and_save_csv,
     rename_merge_and_save_csv,
 )
-import numpy as np
-from pipeline_scripts.run_functions import (
-    run_segmentation,
-    run_straightening,
-    run_compute_volume,
-    run_classification,
-    run_detect_molts,
-    run_fluorescence_quantification,
-    run_custom,
-)
-import argparse
-from pipeline_scripts.building_blocks import parse_and_create_building_blocks
 
 
 def get_args():
     parser = argparse.ArgumentParser()
-    parser.add_argument(
-        "-c",
-        "--config",
-        help="Path to the config file",
-        required=True
-    )
+    parser.add_argument("-c", "--config", help="Path to the config file", required=True)
     args = parser.parse_args()
     return args
 
@@ -43,6 +40,7 @@ with open(config_file) as f:
     config = yaml.load(f, Loader=yaml.FullLoader)
 
 create_temp_folders()
+
 
 def main(config, pad=None):
     experiment_dir, raw_subdir, analysis_subdir, report_subdir, sbatch_backup_dir = (
@@ -77,14 +75,15 @@ def main(config, pad=None):
 
     # if the ExperimentTime column is not present, create it
     if "ExperimentTime" not in experiment_filemap.columns:
-        print('Computing experiment time ...')
-        experiment_filemap["ExperimentTime"] = get_experiment_time_from_filemap_parallel(experiment_filemap)
+        print("Computing experiment time ...")
+        experiment_filemap["ExperimentTime"] = (
+            get_experiment_time_from_filemap_parallel(experiment_filemap)
+        )
         experiment_filemap.to_csv(
             os.path.join(report_subdir, "analysis_filemap.csv"), index=False
         )
-        
 
-    print('Building the config of the building blocks ...')
+    print("Building the config of the building blocks ...")
 
     building_blocks = parse_and_create_building_blocks(config)
 
@@ -109,22 +108,26 @@ def main(config, pad=None):
     # }
 
     for building_block in building_blocks:
-        print(f'Running {building_block} ...')
+        print(f"Running {building_block} ...")
         result = building_block.run(experiment_filemap, config, pad=pad)
 
         # reload the experiment filemap in case it was modified during the function call
-        experiment_filemap = pd.read_csv(os.path.join(report_subdir, "analysis_filemap.csv"))
+        experiment_filemap = pd.read_csv(
+            os.path.join(report_subdir, "analysis_filemap.csv")
+        )
 
         if building_block.return_type == "subdir":
             experiment_filemap = add_dir_to_experiment_filemap(
-                experiment_filemap, result, f'{config["analysis_dir_name"]}/{os.path.basename(os.path.normpath(result))}'
+                experiment_filemap,
+                result,
+                f'{config["analysis_dir_name"]}/{os.path.basename(os.path.normpath(result))}',
             )
             experiment_filemap.to_csv(
                 os.path.join(report_subdir, "analysis_filemap.csv"), index=False
             )
 
-        elif building_block.return_type == "csv":    
-            if building_block.name == "molt_detection":       
+        elif building_block.return_type == "csv":
+            if building_block.name == "molt_detection":
                 experiment_filemap = merge_and_save_csv(
                     experiment_filemap, report_subdir, result, merge_cols=["Point"]
                 )
@@ -132,7 +135,6 @@ def main(config, pad=None):
                 experiment_filemap = merge_and_save_csv(
                     experiment_filemap, report_subdir, result
                 )
-
 
     # for i, building_block in enumerate(building_blocks):
     #     block_config = blocks_config[i]
