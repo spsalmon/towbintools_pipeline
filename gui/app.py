@@ -12,6 +12,7 @@ from towbintools.data_analysis import compute_series_at_time_classified
 from towbintools.foundation import image_handling
 
 filemap_path = "/mnt/towbin.data/shared/spsalmon/pipeline_test_folder/analysis/report/analysis_filemap.csv"
+# filemap_path = "/mnt/towbin.data/shared/igheor/20240927_Ti2_daf16_vhp1_160_186_263_264_25C_20240927_172302_312/analysis/report/analysis_filemap.csv"
 
 filemap = pd.read_csv(filemap_path)
 
