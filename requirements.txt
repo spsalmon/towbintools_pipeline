@@ -5,3 +5,6 @@ shinywidgets
 plotly
 ipykernel
 towbintools
+starbars
+seaborn
+statsmodels

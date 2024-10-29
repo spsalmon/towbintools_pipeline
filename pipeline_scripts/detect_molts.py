@@ -1,10 +1,11 @@
-from towbintools.foundation import detect_molts
-from towbintools.data_analysis import compute_series_at_time_classified
-import numpy as np
 import os
-from joblib import Parallel, delayed
+
+import numpy as np
 import pandas as pd
 import utils
+from joblib import Parallel, delayed
+from towbintools.data_analysis import compute_series_at_time_classified, smooth_series_classified
+from towbintools.foundation import detect_molts
 
 
 def run_detect_molts(
@@ -17,16 +18,18 @@ def run_detect_molts(
     fit_width=5,
 ):
     data_of_point = analysis_filemap[analysis_filemap["Point"] == point]
-    data_of_point = data_of_point.sort_values(by=["Time"])
-    volumes = data_of_point[volume_column].values
+    volumes = data_of_point[volume_column]
+    # replace '' with np.nan
+    volumes = volumes.replace("", np.nan)
+    volumes = volumes.values.astype(float)
     worm_types = data_of_point[worm_type_column].values
-
     try:
         # Detect molts
         ecdysis, volume_at_ecdysis = detect_molts.find_molts(
             volumes, worm_types, molt_size_range, search_width, fit_width
         )
-    except ValueError:
+    except ValueError as e:
+        print(f"Error in point {point}: {e}")
         # No molt detected
         ecdysis = {
             "hatch_time": np.nan,
@@ -46,6 +49,7 @@ def run_detect_molts(
     volume_names = [
         f"{volume_column}_at_{molt}" for molt in ["HatchTime", "M1", "M2", "M3", "M4"]
     ]
+    print(f"Point {point} done, ecdysis: {ecdysis}")
     return {
         "Point": point,
         "HatchTime": ecdysis["hatch_time"],
@@ -74,13 +78,13 @@ def compute_other_features_at_molt(
     volumes_to_compute = [
         column
         for column in data_of_point.columns
-        if ("volume" in column and "VolumeAt" not in column and column != volume_column)
+        if ("volume" in column and "VolumeAt" not in column and column != volume_column and "at_" not in column)
     ]
     lengths_to_compute = [
-        column for column in data_of_point.columns if ("length" in column)
+        column for column in data_of_point.columns if ("length" in column) and ("at_" not in column)
     ]
     areas_to_compute = [
-        column for column in data_of_point.columns if ("area" in column)
+        column for column in data_of_point.columns if ("area" in column) and ("at_" not in column)
     ]
 
     columns_to_compute = volumes_to_compute + lengths_to_compute + areas_to_compute
@@ -89,15 +93,24 @@ def compute_other_features_at_molt(
     features_at_molt = {"Point": point}
 
     for column in columns_to_compute:
-        column_data = data_of_point[column].values
+        column_data = data_of_point[column]
+        column_data = column_data.replace("", np.nan)
+        column_data = column_data.values.astype(float)
+
         for molt in ["HatchTime", "M1", "M2", "M3", "M4"]:
             molt_time = float(molt_data_of_point[molt].values[0])
-            if not np.isnan(molt_time):
-                features_at_molt[
-                    f"{column}_at_{molt}"
-                ] = compute_series_at_time_classified(
-                    column_data, worm_types, molt_time
-                )
+            try:
+                if not np.isnan(molt_time):
+                    features_at_molt[f"{column}_at_{molt}"] = (
+                        compute_series_at_time_classified(
+                            column_data, worm_types, molt_time
+                        )
+                    )
+                else:
+                    features_at_molt[f"{column}_at_{molt}"] = np.nan
+            except ValueError as e:
+                print(f"Error in point {point}, column {column}, molt {molt}: {e}")
+                features_at_molt[f"{column}_at_{molt}"] = np.nan
 
     return features_at_molt
 

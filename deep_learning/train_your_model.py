@@ -1,23 +1,23 @@
+import argparse
+import os
+
+import pytorch_lightning as pl
+import pytorch_lightning.callbacks as callbacks
+import torch.nn as nn
+import yaml
 from towbintools.deep_learning.deep_learning_tools import (
     create_pretrained_segmentation_model,
     create_segmentation_model,
 )
 from towbintools.deep_learning.utils.augmentation import (
-    get_training_augmentation,
     get_prediction_augmentation,
+    get_training_augmentation,
 )
 from towbintools.deep_learning.utils.dataset import (
-    create_segmentation_training_dataframes_and_dataloaders,
     create_segmentation_dataloaders_from_filemap,
+    create_segmentation_training_dataframes_and_dataloaders,
 )
-import yaml
-import argparse
-import os
-import pytorch_lightning as pl
-import pytorch_lightning.callbacks as callbacks
-
-from towbintools.deep_learning.utils.loss import FocalTverskyLoss, BCELossWithIgnore
-import torch.nn as nn
+from towbintools.deep_learning.utils.loss import BCELossWithIgnore, FocalTverskyLoss
 
 
 def get_args():
@@ -57,12 +57,15 @@ else:
     raise ValueError(f"{loss} loss not implemented yet")
 
 full_normalization_parameters = config.get(
-    "normalization_parameters", {"type": "percentile", "lo": 1, "hi": 99, "axis": (-2, -1)}
+    "normalization_parameters",
+    {"type": "percentile", "lo": 1, "hi": 99, "axis": (-2, -1)},
 )
 
 normalization_type = full_normalization_parameters["type"]
 # remove type from normalization_parameters
-normalization_parameters = {k: v for k, v in full_normalization_parameters.items() if k != "type"}
+normalization_parameters = {
+    k: v for k, v in full_normalization_parameters.items() if k != "type"
+}
 
 train_on_tiles = config.get("train_on_tiles", True)
 tiler_params = config.get(
@@ -89,8 +92,12 @@ if training_filemap is not None:
         num_workers=num_workers,
         channels=channels_to_segment,
         tiler_params=tiler_params,
-        training_transform=get_training_augmentation(normalization_type, **normalization_parameters),
-        validation_transform=get_prediction_augmentation(normalization_type, **normalization_parameters),
+        training_transform=get_training_augmentation(
+            normalization_type, **normalization_parameters
+        ),
+        validation_transform=get_prediction_augmentation(
+            normalization_type, **normalization_parameters
+        ),
     )
 
 else:
@@ -109,8 +116,12 @@ else:
         train_on_tiles=train_on_tiles,
         channels=channels_to_segment,
         tiler_params=tiler_params,
-        training_transform=get_training_augmentation(normalization_type,**normalization_parameters),
-        validation_transform=get_prediction_augmentation(normalization_type, **normalization_parameters),
+        training_transform=get_training_augmentation(
+            normalization_type, **normalization_parameters
+        ),
+        validation_transform=get_prediction_augmentation(
+            normalization_type, **normalization_parameters
+        ),
     )
 
 # initialize model
