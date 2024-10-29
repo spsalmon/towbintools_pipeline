@@ -304,10 +304,14 @@ def pickle_objects(*objects):
     for obj in objects:
         path = obj["path"]
         pickled_path = f"./temp_files/pickles/{path}.pkl"
-        with open(pickled_path, "wb") as f:
-            pickle.dump(obj["obj"], f)
 
-        pickled_paths.append(pickled_path)
+        if hasattr(obj["obj"], "to_pickle"):
+            obj["obj"].to_pickle(pickled_path)
+            pickled_paths.append(pickled_path)
+        else:
+            with open(pickled_path, "wb") as f:
+                pickle.dump(obj["obj"], f)
+            pickled_paths.append(pickled_path)
     return pickled_paths
 
 
