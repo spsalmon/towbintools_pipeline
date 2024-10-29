@@ -4,7 +4,7 @@ import numpy as np
 import pandas as pd
 import utils
 from joblib import Parallel, delayed
-from towbintools.data_analysis import compute_series_at_time_classified
+from towbintools.data_analysis import compute_series_at_time_classified, smooth_series_classified
 from towbintools.foundation import detect_molts
 
 
@@ -78,13 +78,13 @@ def compute_other_features_at_molt(
     volumes_to_compute = [
         column
         for column in data_of_point.columns
-        if ("volume" in column and "VolumeAt" not in column and column != volume_column)
+        if ("volume" in column and "VolumeAt" not in column and column != volume_column and "at_" not in column)
     ]
     lengths_to_compute = [
-        column for column in data_of_point.columns if ("length" in column)
+        column for column in data_of_point.columns if ("length" in column) and ("at_" not in column)
     ]
     areas_to_compute = [
-        column for column in data_of_point.columns if ("area" in column)
+        column for column in data_of_point.columns if ("area" in column) and ("at_" not in column)
     ]
 
     columns_to_compute = volumes_to_compute + lengths_to_compute + areas_to_compute
@@ -99,12 +99,18 @@ def compute_other_features_at_molt(
 
         for molt in ["HatchTime", "M1", "M2", "M3", "M4"]:
             molt_time = float(molt_data_of_point[molt].values[0])
-            if not np.isnan(molt_time):
-                features_at_molt[f"{column}_at_{molt}"] = (
-                    compute_series_at_time_classified(
-                        column_data, worm_types, molt_time
+            try:
+                if not np.isnan(molt_time):
+                    features_at_molt[f"{column}_at_{molt}"] = (
+                        compute_series_at_time_classified(
+                            column_data, worm_types, molt_time
+                        )
                     )
-                )
+                else:
+                    features_at_molt[f"{column}_at_{molt}"] = np.nan
+            except ValueError as e:
+                print(f"Error in point {point}, column {column}, molt {molt}: {e}")
+                features_at_molt[f"{column}_at_{molt}"] = np.nan
 
     return features_at_molt
 
@@ -124,7 +130,7 @@ def main(input_dataframe_path, output_file, config, n_jobs):
             config["molt_detection_worm_type"],
             point,
         )
-        for point in analysis_filemap["Point"].unique()[0:3]
+        for point in analysis_filemap["Point"].unique()
     )
     molts_dataframe = pd.DataFrame(molts_and_volume)
 
@@ -137,7 +143,7 @@ def main(input_dataframe_path, output_file, config, n_jobs):
             config["molt_detection_worm_type"],
             point,
         )
-        for point in analysis_filemap["Point"].unique()[0:3]
+        for point in analysis_filemap["Point"].unique()
     )
 
     other_features_at_molt_dataframe = pd.DataFrame(other_features_at_molt)
