@@ -99,6 +99,35 @@ def get_and_create_folders(config):
 
     return experiment_dir, raw_subdir, analysis_subdir, report_subdir, sbatch_backup_dir
 
+def get_groups(config):
+    try:
+        return config["groups"]
+    except KeyError:
+        return None
+
+def get_filter_rule(groups, run_on_option):
+    if groups is not None:
+        return groups[run_on_option]
+    else:
+        return None
+
+def filter_files_with_filter_rule(file_groups, filter_rule):
+    if filter_rule is not None:
+        if isinstance(file_groups[0], str):
+            return [file_group for file_group in file_groups if filter_rule.lower() in file_group.lower()]
+        else:
+            return [
+                file_group for file_group in file_groups 
+                if all(filter_rule.lower() in file.lower() for file in file_group)
+            ]
+    else:
+        return file_groups
+
+def filter_files_of_group(files, config, run_on_option):
+    groups = get_groups(config)
+    filter_rule = get_filter_rule(groups, run_on_option)
+    print(f"Filtering files with rule: {filter_rule}")
+    return filter_files_with_filter_rule(files, filter_rule)
 
 def get_output_name(
     config,
