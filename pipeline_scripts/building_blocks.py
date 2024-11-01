@@ -12,6 +12,7 @@ from pipeline_scripts.utils import (
     get_output_name,
     pickle_objects,
     run_command,
+    filter_files_of_group,
 )
 
 OPTIONS_MAP = {
@@ -31,6 +32,7 @@ OPTIONS_MAP = {
         "batch_size",
         "ilastik_project_path",
         "ilastik_result_channel",
+        "run_segmentation_on",
     ],
     "straightening": [
         "rerun_straightening",
@@ -97,7 +99,7 @@ class BuildingBlock(ABC):
 
     @abstractmethod
     def run_command(self, command, name, config):
-        pass
+        pass   
 
     def run(self, experiment_filemap, config, pad=None):
         block_config = self.block_config
@@ -190,12 +192,23 @@ class SegmentationBuildingBlock(BuildingBlock):
         )
 
     def get_input_and_output_files(self, config, experiment_filemap, subdir):
-        return get_input_and_output_files_parallel(
+        input_files, output_files = get_input_and_output_files_parallel(
             experiment_filemap,
             [self.block_config["segmentation_column"]],
             subdir,
             rerun=self.block_config["rerun_segmentation"],
         )
+
+        print(len(input_files))
+        input_files = filter_files_of_group(input_files, config, self.block_config["run_segmentation_on"])
+        print(len(input_files))
+
+        print(len(output_files))
+        output_files = filter_files_of_group(output_files, config, self.block_config["run_segmentation_on"])
+        print(len(output_files))
+        
+        return input_files, output_files
+
 
     def create_command(
         self, input_pickle_path, output_pickle_path, pickled_block_config, config
