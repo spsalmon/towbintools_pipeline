@@ -1,4 +1,5 @@
 import os
+import shutil
 from collections import defaultdict
 from itertools import combinations
 
@@ -22,6 +23,14 @@ from towbintools.data_analysis import (
     rescale_and_aggregate,
     rescale_series,
 )
+
+from microfilm.microplot import microshow
+
+from towbintools.foundation.file_handling import get_dir_filemap
+from typing import Dict, List, Tuple, Any
+from towbintools.foundation.image_handling import read_tiff_file
+from tifffile import imwrite
+
 
 # BUILDING THE PLOTTING STRUCTURE
 
@@ -222,7 +231,8 @@ def build_plotting_struct(
         condition_dict["larval_stage_durations_experiment_time"] = (
             larval_stage_durations_experiment_time
         )
-        condition_dict["experiment"] = experiment_dir
+        condition_dict["experiment"] = np.array([experiment_dir]*condition_df['Point'].nunique())[:, np.newaxis]
+        condition_dict["point"] = np.unique(condition_df["Point"].values)[:, np.newaxis]
 
         worm_type_column = [col for col in condition_df.columns if "worm_type" in col][
             0
@@ -291,97 +301,6 @@ def remove_unwanted_info(conditions_info):
         if "condition_id" in condition.keys():
             condition.pop("condition_id")
     return conditions_info
-
-
-# def combine_experiments(filemap_paths, config_paths, experiment_dirs = None):
-#     condition_info_merge_list = []
-#     conditions_info_keys = []
-#     all_conditions_struct = []
-#     for i, (filemap_path, config_path) in enumerate(zip(filemap_paths, config_paths)):
-#         if experiment_dirs is not None:
-#             experiment_dir = experiment_dirs[i]
-#         else:
-#             experiment_dir = os.path.dirname(filemap_path)
-#         conditions_struct, conditions_info = build_plotting_struct(experiment_dir, filemap_path, config_path)
-
-#         # if all_conditions_struct is empty, just add the conditions
-#         if not all_conditions_struct:
-#             all_conditions_struct.extend(conditions_struct)
-#         # else, extend the conditions but modify the condition_id to be unique
-#         else:
-#             max_condition_id = max([condition['condition_id'] for condition in all_conditions_struct]) + 1
-#             print(f'Max condition id: {max_condition_id}')
-#             for condition in conditions_struct:
-#                 condition['condition_id'] += max_condition_id
-#                 all_conditions_struct.append(condition)
-
-#         experiment_conditions_info_keys = [list(conditions_info[i].keys()) for i in range(len(conditions_info))]
-#         experiment_conditions_info_keys = [item for sublist in experiment_conditions_info_keys for item in sublist]
-#         conditions_info_keys.extend(experiment_conditions_info_keys)
-#         conditions_info_merge = remove_unwanted_info(conditions_info)
-
-#         condition_info_merge_list.extend(conditions_info_merge)
-#     # merge conditions that have the exact same info
-#     conditions_to_merge = []
-#     for i, condition_info in enumerate(condition_info_merge_list):
-#         merge_with = []
-#         for j, other_condition in enumerate(condition_info_merge_list):
-#             if condition_info == other_condition and i != j:
-#                 merge_with.append(j)
-#         if merge_with:
-#             conditions_to_merge.append([i] + merge_with)
-#         else:
-#             conditions_to_merge.append([i])
-
-#     # remove permutations
-#     conditions_to_merge = [sorted(merge) for merge in conditions_to_merge]
-#     conditions_to_merge = list(set([tuple(merge) for merge in conditions_to_merge]))
-#     conditions_to_merge = [list(merge) for merge in conditions_to_merge]
-#     # sort the list of conditions to merge by the first element
-#     conditions_to_merge = sorted(conditions_to_merge, key=lambda x: x[0])
-
-#     print(conditions_to_merge)
-
-#     merged_conditions_struct = []
-
-#     conditions_info_keys = list(set(conditions_info_keys))
-#     fields_not_to_merge = conditions_info_keys
-
-#     for merge in conditions_to_merge:
-#         if len(merge) == 1:
-#             merged_conditions_struct.append(all_conditions_struct[merge[0]])
-#         else:
-#             base_condition = all_conditions_struct[merge[0]]
-#             for condition_index in merge[1:]:
-#                 for key in base_condition.keys():
-#                     if key not in fields_not_to_merge:
-#                         base_condition_data = base_condition[key]
-#                         condition_data = all_conditions_struct[condition_index][key]
-
-#                         if isinstance(base_condition_data, np.ndarray):
-#                             # get the shortest dimension
-#                             smallest = np.argmin([base_condition_data.shape[1], condition_data.shape[1]])
-#                             # add nan to the condition data to match the biggest dimension
-#                             if smallest == 0:
-#                                 base_condition_data = np.pad(base_condition_data, ((0, 0), (0, condition_data.shape[1] - base_condition_data.shape[1])), mode='constant', constant_values=np.nan)
-#                             else:
-#                                 condition_data = np.pad(condition_data, ((0, 0), (0, base_condition_data.shape[1] - condition_data.shape[1])), mode='constant', constant_values=np.nan)
-#                         try:
-#                             base_condition[key] = np.concatenate((base_condition_data, condition_data), axis=0)
-#                         except ValueError as e:
-#                             print(f"Could not concatenate {key} : {e}")
-
-#                 merged_conditions_struct.append(base_condition)
-
-#     # sort the merged conditions by condition_id
-#     merged_conditions_struct = sorted(merged_conditions_struct, key=lambda x: x['condition_id'])
-
-#     # remove gaps in the condition_id
-#     for i in range(len(merged_conditions_struct)):
-#         merged_conditions_struct[i]['condition_id'] = i
-
-#     return merged_conditions_struct
-
 
 def combine_experiments(filemap_paths, config_paths, experiment_dirs=None, organ_channels=[{"body": 2, "pharynx": 1}]):
     all_conditions_struct = []
@@ -1143,11 +1062,10 @@ def get_deviation_from_model_at_ecdysis(
         series_two_at_ecdysis = exclude_arrests_from_series(series_two_at_ecdysis)
 
     # remove elements that are nan in one of the two arrays
-    correct_indices = ~np.isnan(series_one_at_ecdysis) & ~np.isnan(
-        series_two_at_ecdysis
-    )
-    series_one_at_ecdysis[~correct_indices] = np.nan
-    series_two_at_ecdysis[~correct_indices] = np.nan
+    for i in range(series_one_at_ecdysis.shape[1]):
+        nan_mask = np.isnan(series_one_at_ecdysis[:, i]) | np.isnan(series_two_at_ecdysis[:, i])
+        series_one_at_ecdysis[:, i][nan_mask] = np.nan
+        series_two_at_ecdysis[:, i][nan_mask] = np.nan
 
     # log transform the data
     series_one_at_ecdysis = np.log(series_one_at_ecdysis)
@@ -1181,11 +1099,10 @@ def get_deviation_percentage_from_model_at_ecdysis(
         series_two_at_ecdysis = exclude_arrests_from_series(series_two_at_ecdysis)
 
     # remove elements that are nan in one of the two arrays
-    correct_indices = ~np.isnan(series_one_at_ecdysis) & ~np.isnan(
-        series_two_at_ecdysis
-    )
-    series_one_at_ecdysis[~correct_indices] = np.nan
-    series_two_at_ecdysis[~correct_indices] = np.nan
+    for i in range(series_one_at_ecdysis.shape[1]):
+        nan_mask = np.isnan(series_one_at_ecdysis[:, i]) | np.isnan(series_two_at_ecdysis[:, i])
+        series_one_at_ecdysis[:, i][nan_mask] = np.nan
+        series_two_at_ecdysis[:, i][nan_mask] = np.nan
 
     # Apply the model to the log-transformed series_one to get expected values
     expected_series_two = np.exp(model(np.log(series_one_at_ecdysis)))
@@ -1268,8 +1185,7 @@ def plot_deviation_from_model_at_ecdysis(
     set_scale(plt.gca(), log_scale)
 
     plt.legend()
-    plt.show()
-
+    plt.show()    
 
 def plot_normalized_proportions(
     conditions_struct,
@@ -1329,3 +1245,383 @@ def plot_normalized_proportions(
 
     plt.legend()
     plt.show()
+
+
+def process_series_data(
+    series_one: np.ndarray,
+    series_two: np.ndarray,
+    point: np.ndarray,
+    ecdysis: np.ndarray,
+    remove_hatch: bool = True,
+    exclude_arrests: bool = False
+) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
+    """
+    Process and clean the input series data.
+    """
+    if remove_hatch:
+        series_one = series_one[:, 1:]
+        series_two = series_two[:, 1:]
+        ecdysis = ecdysis[:, 1:]
+    if exclude_arrests:
+        series_one = exclude_arrests_from_series(series_one)
+        series_two = exclude_arrests_from_series(series_two)
+
+    # Stack point horizontally to match series shape
+    point = np.hstack([point for _ in range(series_one.shape[1])]).astype(float)
+
+    # Remove nan elements
+    for i in range(series_one.shape[1]):
+        nan_mask = np.isnan(series_one[:, i]) | np.isnan(series_two[:, i])
+        series_one[:, i][nan_mask] = np.nan
+        series_two[:, i][nan_mask] = np.nan
+        point[:, i][nan_mask] = np.nan
+
+    return series_one, series_two, point, ecdysis
+
+def process_single_series_data(
+    series: np.ndarray,
+    point: np.ndarray,
+    ecdysis: np.ndarray,
+    remove_hatch: bool = True,
+    exclude_arrests: bool = False
+) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
+    """
+    Process and clean the input single series data.
+    """
+    if remove_hatch:
+        series = series[:, 1:]
+        ecdysis = ecdysis[:, 1:]
+    if exclude_arrests:
+        series = exclude_arrests_from_series(series)
+
+    # Stack point horizontally to match series shape
+    point = np.hstack([point for _ in range(series.shape[1])]).astype(float)
+
+    # Remove nan elements
+    for i in range(series.shape[1]):
+        nan_mask = np.isnan(series[:, i])
+        series[:, i][nan_mask] = np.nan
+        point[:, i][nan_mask] = np.nan
+
+    return series, point, ecdysis
+
+def filter_non_worm_data(
+    data: np.ndarray,
+    worm_type: np.ndarray,
+    ecdysis: np.ndarray
+) -> np.ndarray:
+    """
+    Filter out non-worm data points.
+    """
+    filtered_data = data.copy()
+    for i in range(data.shape[0]):
+        for j in range(data.shape[1]):
+            try:
+                if ~(np.isnan(data[i][j])) and worm_type[i][int(ecdysis[i][j])] != 'worm':
+                    filtered_data[i][j] = np.nan
+            except ValueError:
+                filtered_data[i][j] = np.nan
+    return filtered_data
+
+def setup_image_filemaps(
+    experiment: np.ndarray,
+    img_dir_list: List[str]
+) -> Dict[str, Any]:
+    """
+    Set up file mappings for image directories.
+    """
+    unique_experiment = np.unique(experiment)
+    filemaps = {}
+    
+    for exp in unique_experiment:
+        exp = exp.split('analysis')[0]
+        for img_dir in img_dir_list:
+            img_dir = os.path.join(exp, img_dir)
+            filemap = get_dir_filemap(img_dir)
+            filemaps[img_dir] = filemap
+            
+    return filemaps
+
+def display_image(
+    img_path: str,
+    dpi: int = 200,
+    cmap: str = 'viridis',
+    backup_dir: str = None,
+    backup_file_name: str = None,
+) -> None:
+    """
+    Display an image with the specified parameters.
+    """
+    img = read_tiff_file(img_path)
+
+    if backup_dir is not None:
+        if backup_file_name is not None:
+            shutil.copy(img_path, os.path.join(backup_dir, backup_file_name))
+        else:
+            shutil.copy(img_path, backup_dir)
+    height, width = img.shape[-2:]
+    
+    fig = plt.figure(figsize=(width/dpi, height/dpi), dpi=dpi)
+    plt.imshow(img, interpolation='none', aspect='equal', cmap=cmap)
+    plt.subplots_adjust(left=0, right=1, top=1, bottom=0)
+    plt.axis('off')
+    plt.show()
+
+def display_image_overlay(
+    img_paths: List[str],
+    dpi: int = 200,
+    cmap: List[str] = ['viridis'],
+    backup_dir: str = None,
+    backup_file_name: str = None
+):
+    """
+    Display an overlay of multiple images.
+    """
+    img_list = [read_tiff_file(img_path) for img_path in img_paths]
+
+    if len(cmap) == 1:
+        cmap = cmap * len(img_list)
+
+    stacked_img = np.stack(img_list, axis=0)
+
+    if backup_dir is not None:
+        if backup_file_name is not None:
+            imwrite(os.path.join(backup_dir, backup_file_name), stacked_img)
+        else:
+            img_path = img_paths[0]
+            imwrite(os.path.join(backup_dir, os.path.basename(img_path)), stacked_img)
+
+    # add an empty channel to the image
+    print(stacked_img.shape)
+
+    height, width = stacked_img.shape[-2:]
+    fig, ax = plt.subplots(figsize=(width/dpi, height/dpi), dpi=dpi)
+    microim = microshow(images = stacked_img, fig_scaling = 5, cmaps = cmap, ax = ax, proj_type='max', dpi = dpi,)
+
+def display_sample_images(
+    experiment: str,
+    point: int,
+    ecdysis: int,
+    img_dir_list: List[str],
+    filemaps: Dict[str, Any],
+    dpi: int,
+    overlay: bool = True,
+    cmap: List[str] = ['viridis'],
+    backup_dir: str = None
+) -> None:
+    """
+    Display sample images for a given experiment, point, and ecdysis time.
+    """
+    # Remove analysis suffix from experiment name if present
+    experiment_base = experiment.split('analysis')[0]
+    
+    if isinstance(cmap, str):
+        cmap = [cmap] * len(img_dir_list)
+
+    if overlay:
+        img_paths = []
+        for img_dir in img_dir_list:
+            img_dir_path = os.path.join(experiment_base, img_dir)
+            filemap = filemaps[img_dir_path]
+            
+            # Find matching image path
+            matching_rows = filemap[
+                (filemap['Point'] == point) & 
+                (filemap['Time'] == ecdysis)
+            ]
+            
+            if len(matching_rows) > 0:
+                img_path = matching_rows['ImagePath'].values[0]
+                img_paths.append(img_path)
+        
+        display_image_overlay(img_paths, dpi, cmap, backup_dir)
+    else:
+        for img_dir in img_dir_list:
+            img_dir_path = os.path.join(experiment_base, img_dir)
+            filemap = filemaps[img_dir_path]
+            
+            # Find matching image path
+            matching_rows = filemap[
+                (filemap['Point'] == point) & 
+                (filemap['Time'] == ecdysis)
+            ]
+            
+            if len(matching_rows) > 0:
+                img_path = matching_rows['ImagePath'].values[0]
+                display_image(img_path, dpi, cmap=cmap[0], backup_dir=backup_dir)
+        
+
+def get_most_average_deviations_at_ecdysis(
+    conditions_struct: Dict,
+    column_one: str,
+    column_two: str,
+    img_dir_list: List[str],
+    control_condition_id: str,
+    conditions_to_plot: List[str],
+    remove_hatch: bool = True,
+    exclude_arrests: bool = False,
+    dpi: int = 200,
+    nb_per_condition: int = 1,
+    overlay: bool = True,
+    cmap: List[str] = ['viridis'],
+    backup_dir: str = None,
+    backup_name = None,
+) -> None:
+    """
+    Calculate and display the most average deviations at ecdysis.
+    """
+    control_condition = conditions_struct[control_condition_id]
+    control_model = get_proportion_model_ecdysis(
+        control_condition[column_one],
+        control_condition[column_two],
+        remove_hatch,
+        x_axis_label=column_one,
+        y_axis_label=column_two,
+        exclude_arrests=exclude_arrests,
+    )
+
+    for condition_id in conditions_to_plot:
+        condition = conditions_struct[condition_id]
+        series_one, series_two, point, experiment, ecdysis, worm_type = [
+            condition[key] for key in [column_one, column_two, 'point', 'experiment', 'ecdysis_time_step', 'body_seg_str_worm_type']
+        ]
+
+        filemaps = setup_image_filemaps(experiment, img_dir_list)
+        
+        series_one, series_two, point, ecdysis = process_series_data(
+            series_one, series_two, point, ecdysis, remove_hatch, exclude_arrests
+        )
+
+        # Calculate expected values and deviations
+        expected_series_two = np.exp(control_model(np.log(series_one)))
+        percentage_deviation = ((series_two - expected_series_two) / expected_series_two * 100)
+        percentage_deviation = filter_non_worm_data(percentage_deviation, worm_type, ecdysis)
+        
+        y = np.nanmean(percentage_deviation, axis=0)
+
+        for i in range(percentage_deviation.shape[1]):
+            deviation_molt = percentage_deviation[:, i]
+            mean_deviation = y[i]
+            sorted_idx = np.argsort(np.abs(deviation_molt - mean_deviation))
+            valid_idx = sorted_idx[~np.isnan(deviation_molt[sorted_idx])][:nb_per_condition]
+            
+            for idx in valid_idx:
+                display_sample_images(experiment[idx][0], int(point[idx][i]), 
+                                   int(ecdysis[idx][i]), img_dir_list, filemaps, dpi, overlay=overlay, cmap=cmap, backup_dir=backup_dir)
+
+def get_most_average_proportions_at_ecdysis(
+    conditions_struct: Dict,
+    column_one: str,
+    column_two: str,
+    img_dir_list: List[str],
+    conditions_to_plot: List[str],
+    remove_hatch: bool = True,
+    exclude_arrests: bool = False,
+    dpi: int = 200,
+    nb_per_condition: int = 1,
+    overlay: bool = True,
+    cmap: List[str] = ['viridis'],
+    backup_dir: str = None,
+    backup_name = None,
+) -> None:
+    """
+    Calculate and display the most average proportions at ecdysis.
+    """
+    for condition_id in conditions_to_plot:
+        condition = conditions_struct[condition_id]
+        series_one, series_two, point, experiment, ecdysis, worm_type = [
+            condition[key] for key in [column_one, column_two, 'point', 'experiment', 'ecdysis_time_step', 'body_seg_str_worm_type']
+        ]
+
+        filemaps = setup_image_filemaps(experiment, img_dir_list)
+        
+        series_one, series_two, point, ecdysis = process_series_data(
+            series_one, series_two, point, ecdysis, remove_hatch, exclude_arrests
+        )
+
+        series_one = filter_non_worm_data(series_one, worm_type, ecdysis)
+        series_two = filter_non_worm_data(series_two, worm_type, ecdysis)
+
+        series_one_mean = np.nanmean(series_one, axis=0)
+        series_two_mean = np.nanmean(series_two, axis=0)
+
+        for i in range(series_one.shape[1]):
+            series_one_molt = series_one[:, i]
+            series_two_molt = series_two[:, i]
+
+            series_one_mean_molt = series_one_mean[i]
+            series_two_mean_molt = series_two_mean[i]
+
+            distance_series_one = np.abs(series_one_molt - series_one_mean_molt)/series_one_mean_molt
+            distance_series_two = np.abs(series_two_molt - series_two_mean_molt)/series_two_mean_molt
+
+            distance_score = distance_series_one + distance_series_two
+    
+            sorted_idx = np.argsort(distance_score)
+            valid_idx = sorted_idx[:nb_per_condition]
+            
+            for idx in valid_idx:
+                display_sample_images(
+                    experiment[idx][0],
+                    int(point[idx][i]),
+                    int(ecdysis[idx][i]),
+                    img_dir_list,
+                    filemaps,
+                    dpi,
+                    overlay=overlay,
+                    cmap=cmap,
+                )
+
+def get_most_average_size_at_ecdysis(
+    conditions_struct: Dict,
+    column : str,
+    img_dir_list: List[str],
+    conditions_to_plot: List[str],
+    remove_hatch: bool = True,
+    exclude_arrests: bool = False,
+    dpi: int = 200,
+    nb_per_condition: int = 1,
+    overlay: bool = True,
+    cmap: List[str] = ['viridis'],
+    backup_dir: str = None,
+    backup_name = None,
+) -> None:
+    """
+    Calculate and display the most average sizes at ecdysis.
+    """
+    for condition_id in conditions_to_plot:
+        condition = conditions_struct[condition_id]
+        series, point, experiment, ecdysis, worm_type = [
+            condition[key] for key in [column, 'point', 'experiment', 'ecdysis_time_step', 'body_seg_str_worm_type']
+        ]
+
+        filemaps = setup_image_filemaps(experiment, img_dir_list)
+        
+        series, point, ecdysis = process_single_series_data(
+            series, point, ecdysis, remove_hatch, exclude_arrests
+        )
+
+        series = filter_non_worm_data(series, worm_type, ecdysis)
+
+        series_mean = np.nanmean(series, axis=0)
+
+        for i in range(series.shape[1]):
+            series_molt = series[:, i]
+            series_mean_molt = series_mean[i]
+
+            distance_score = np.abs(series_molt - series_mean_molt)
+    
+            sorted_idx = np.argsort(distance_score)
+            valid_idx = sorted_idx[:nb_per_condition]
+            
+            for idx in valid_idx:
+                display_sample_images(
+                    experiment[idx][0],
+                    int(point[idx][i]),
+                    int(ecdysis[idx][i]),
+                    img_dir_list,
+                    filemaps,
+                    dpi,
+                    overlay=overlay,
+                    cmap=cmap,
+                )
