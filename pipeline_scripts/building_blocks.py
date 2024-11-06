@@ -572,6 +572,8 @@ def parse_building_blocks_config(config):
             block_options["name"] = building_block_name
 
             blocks_config[i] = block_options
+        else:
+            raise ValueError(f"Unknown building block name : {building_block_name}")
 
     return blocks_config
 
