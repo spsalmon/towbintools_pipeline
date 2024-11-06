@@ -71,6 +71,10 @@ OPTIONS_MAP = {
     ],
 }
 
+POTENTIALLY_MISSING_OPTIONS = {
+    "run_segmentation_on": None,
+}
+
 
 class BuildingBlock(ABC):
     def __init__(self, name, options, block_config, return_type):
@@ -532,12 +536,21 @@ def parse_building_blocks_config(config):
             options = OPTIONS_MAP[building_block_name]
             # assert options
             for option in options:
-                assert (
-                    len(config[option])
-                    == len(building_block_counts[building_block_name])
-                    or len(config[option]) == 1
-                ), f"{config[option]} The number of {option} options ({len(config[option])}) does not match the number of {building_block_name} building blocks ({len(building_block_counts[building_block_name])})"
+                try:
+                    assert (
+                        len(config[option])
+                        == len(building_block_counts[building_block_name])
+                        or len(config[option]) == 1
+                    ), f"{config[option]} The number of {option} options ({len(config[option])}) does not match the number of {building_block_name} building blocks ({len(building_block_counts[building_block_name])})"
 
+                except KeyError:
+                    if option in POTENTIALLY_MISSING_OPTIONS:
+                        config_copy[option] = POTENTIALLY_MISSING_OPTIONS[option]
+                    else:
+                        raise KeyError(
+                            f"{option} is not in the config file, but is required for the {building_block_name} building block."
+                        )
+                        
             # expand single options to match the number of blocks
             for option in options:
                 if len(config_copy[option]) == 1:
