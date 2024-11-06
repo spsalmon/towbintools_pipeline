@@ -106,7 +106,7 @@ def get_groups(config):
         return None
 
 def get_filter_rule(groups, run_on_option):
-    if groups is not None:
+    if (groups is not None) or (run_on_option is not None):
         return groups[run_on_option]
     else:
         return None
