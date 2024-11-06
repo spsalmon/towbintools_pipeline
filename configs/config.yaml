@@ -21,6 +21,7 @@ segmentation_name_suffix: [null]
 segmentation_method: ["edge_based"]
 segmentation_channels: [[1]]
 augment_contrast: [False]
+run_segmentation_on: [null]
 
 # edge-based segmentation parameters
 pixelsize: [0.65]
