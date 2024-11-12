@@ -1,0 +1,5 @@
+seaborn
+statsmodels
+plotly
+ipykernel
+numba
