@@ -1,0 +1,19 @@
+name: towbintools
+channels:
+  - pytorch
+  - nvidia
+  - conda-forge
+  - ilastik-forge
+dependencies:
+  - python=3.9
+  - pytorch
+  - torchvision
+  - torchaudio
+  - pytorch-cuda=11.8
+  - imagecodecs
+  - ilastik-core
+  - poetry
+  - seaborn
+  - statsmodels
+  - plotly
+  - ipykernel
