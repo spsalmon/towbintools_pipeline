@@ -72,7 +72,7 @@ OPTIONS_MAP = {
 }
 
 POTENTIALLY_MISSING_OPTIONS = {
-    "run_segmentation_on": None,
+    "run_segmentation_on": [None],
 }
 
 
