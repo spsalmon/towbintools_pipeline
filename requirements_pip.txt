@@ -2,10 +2,7 @@ pyyaml
 pretrained-microscopy-models @ git+https://github.com/nasa/pretrained-microscopy-models
 shiny
 shinywidgets
-plotly
-ipykernel
 towbintools
 starbars
-seaborn
-statsmodels
 microfilm
+numpy>=1.22,<1.27
