@@ -2,8 +2,6 @@ import os
 import shutil
 from collections import defaultdict
 from itertools import combinations
-
-import matplotlib.patches as mpatches
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
@@ -14,11 +12,8 @@ import yaml
 from scipy.interpolate import make_interp_spline
 from scipy.stats import mannwhitneyu
 from towbintools.data_analysis import (
-    aggregate_interpolated_series,
-    compute_growth_rate_per_larval_stage,
     compute_larval_stage_duration,
     compute_series_at_time_classified,
-    correct_series_with_classification,
     filter_series_with_classification,
     rescale_and_aggregate,
     rescale_series,
@@ -234,6 +229,7 @@ def build_plotting_struct(
         condition_dict["experiment"] = np.array([experiment_dir]*condition_df['Point'].nunique())[:, np.newaxis]
         condition_dict["point"] = np.unique(condition_df["Point"].values)[:, np.newaxis]
 
+        # TEMPORARY, ONLY WORKS WITH SINGLE CLASSIFICATION, FIND A WAY TO GENERALIZE
         worm_type_column = [col for col in condition_df.columns if "worm_type" in col][
             0
         ]
@@ -245,7 +241,7 @@ def build_plotting_struct(
             organ_columns = [
                 col for col in condition_df.columns if col.startswith(organ_channel)
             ]
-            organ_columns = [col for col in organ_columns if not ("_at_" in col)]
+            organ_columns = [col for col in organ_columns if "_at_" not in col]
             renamed_organ_columns = [
                 col.replace(organ_channel, organ) for col in organ_columns
             ]
@@ -259,7 +255,7 @@ def build_plotting_struct(
 
             # remove any column with worm_type in it
             renamed_organ_columns = [
-                col for col in renamed_organ_columns if not ("worm_type" in col)
+                col for col in renamed_organ_columns if "worm_type" not in col
             ]
             for column in renamed_organ_columns:
                 condition_dict[f"{column}_at_ecdysis"] = np.stack(
@@ -451,12 +447,15 @@ def plot_aggregated_series(
                     "larval_stage_durations_time_step"
                 ]
 
+            # TEMPORARY, ONLY WORKS WITH SINGLE CLASSIFICATION, FIND A WAY TO GENERALIZE
+            worm_type_key = [key for key in condition_dict.keys() if "worm_type" in key][0]
+
             rescaled_time, aggregated_series, _, ste_series = rescale_and_aggregate(
                 condition_dict[column],
                 time,
                 condition_dict["ecdysis_time_step"],
                 larval_stage_durations,
-                condition_dict["body_seg_str_worm_type"],
+                condition_dict[worm_type_key],
                 aggregation=aggregation,
             )
 
@@ -518,12 +517,14 @@ def plot_correlation(
     for i, condition_id in enumerate(conditions_to_plot):
         condition_dict = conditions_struct[condition_id]
 
+        # TEMPORARY, ONLY WORKS WITH SINGLE CLASSIFICATION, FIND A WAY TO GENERALIZE
+        worm_type_key = [key for key in condition_dict.keys() if "worm_type" in key][0]
         _, aggregated_series_one, _, _ = rescale_and_aggregate(
             condition_dict[column_one],
             condition_dict["time"],
             condition_dict["ecdysis_time_step"],
             condition_dict["larval_stage_durations_time_step"],
-            condition_dict["body_seg_str_worm_type"],
+            condition_dict[worm_type_key],
             aggregation="mean",
         )
 
@@ -532,7 +533,7 @@ def plot_correlation(
             condition_dict["time"],
             condition_dict["ecdysis_time_step"],
             condition_dict["larval_stage_durations_time_step"],
-            condition_dict["body_seg_str_worm_type"],
+            condition_dict[worm_type_key],
             aggregation="mean",
         )
 
@@ -769,11 +770,13 @@ def plot_growth_curves_individuals(
 
     for i, condition_id in enumerate(conditions_to_plot):
         condition_dict = conditions_struct[condition_id]
+        # TEMPORARY, ONLY WORKS WITH SINGLE CLASSIFICATION, FIND A WAY TO GENERALIZE
+        worm_type_key = [key for key in condition_dict.keys() if "worm_type" in key][0]
 
         for j in range(len(condition_dict[column])):
             time = condition_dict["time"][j]
             data = condition_dict[column][j]
-            worm_type = condition_dict["body_seg_str_worm_type"][j]
+            worm_type = condition_dict[worm_type_key][j]
 
             filtered_data = filter_series_with_classification(data, worm_type)
 
@@ -927,10 +930,14 @@ def plot_deviation_from_model(
     )
 
     control_condition = conditions_struct[control_condition_id]
+
+    # TEMPORARY, ONLY WORKS WITH SINGLE CLASSIFICATION, FIND A WAY TO GENERALIZE
+    worm_type_key = [key for key in control_condition.keys() if "worm_type" in key][0]
+
     control_model = get_proportion_model(
         control_condition[column_one],
         control_condition[column_two],
-        control_condition["body_seg_str_worm_type"],
+        control_condition[worm_type_key],
         x_axis_label=xlbl,
         y_axis_label=ylbl,
     )
@@ -946,7 +953,7 @@ def plot_deviation_from_model(
             time,
             ecdysis,
             control_model,
-            condition["body_seg_str_worm_type"],
+            condition[worm_type_key],
         )
 
         label = build_legend(condition, legend)
@@ -1482,8 +1489,11 @@ def get_most_average_deviations_at_ecdysis(
 
     for condition_id in conditions_to_plot:
         condition = conditions_struct[condition_id]
+
+        # TEMPORARY, ONLY WORKS WITH SINGLE CLASSIFICATION, FIND A WAY TO GENERALIZE
+        worm_type_key = [key for key in condition.keys() if "worm_type" in key][0]
         series_one, series_two, point, experiment, ecdysis, worm_type = [
-            condition[key] for key in [column_one, column_two, 'point', 'experiment', 'ecdysis_time_step', 'body_seg_str_worm_type']
+            condition[key] for key in [column_one, column_two, 'point', 'experiment', 'ecdysis_time_step', worm_type_key]
         ]
 
         filemaps = setup_image_filemaps(experiment, img_dir_list)
@@ -1529,8 +1539,10 @@ def get_most_average_proportions_at_ecdysis(
     """
     for condition_id in conditions_to_plot:
         condition = conditions_struct[condition_id]
+        # TEMPORARY, ONLY WORKS WITH SINGLE CLASSIFICATION, FIND A WAY TO GENERALIZE
+        worm_type_key = [key for key in condition.keys() if "worm_type" in key][0]
         series_one, series_two, point, experiment, ecdysis, worm_type = [
-            condition[key] for key in [column_one, column_two, 'point', 'experiment', 'ecdysis_time_step', 'body_seg_str_worm_type']
+            condition[key] for key in [column_one, column_two, 'point', 'experiment', 'ecdysis_time_step', worm_type_key]
         ]
 
         filemaps = setup_image_filemaps(experiment, img_dir_list)
@@ -1591,8 +1603,11 @@ def get_most_average_size_at_ecdysis(
     """
     for condition_id in conditions_to_plot:
         condition = conditions_struct[condition_id]
+        # TEMPORARY, ONLY WORKS WITH SINGLE CLASSIFICATION, FIND A WAY TO GENERALIZE
+        worm_type_key = [key for key in condition.keys() if "worm_type" in key][0]
+
         series, point, experiment, ecdysis, worm_type = [
-            condition[key] for key in [column, 'point', 'experiment', 'ecdysis_time_step', 'body_seg_str_worm_type']
+            condition[key] for key in [column, 'point', 'experiment', 'ecdysis_time_step', worm_type_key]
         ]
 
         filemaps = setup_image_filemaps(experiment, img_dir_list)
