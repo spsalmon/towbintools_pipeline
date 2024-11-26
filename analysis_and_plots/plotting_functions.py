@@ -638,14 +638,18 @@ def boxplot_at_molt(
     conditions_to_plot,
     log_scale: bool = True,
     figsize: tuple = None,
-    color_palette="colorblind",
+    colors=None,
     plot_significance: bool = False,
     legend=None,
     y_axis_label=None,
     titles=None,
 ):
 
-    color_palette = sns.color_palette(color_palette, len(conditions_to_plot))
+    if colors is None:
+        color_palette = sns.color_palette("colorblind", len(conditions_to_plot))
+    else:
+        color_palette = colors
+
     # Prepare data
     data_list = []
     for condition_id in conditions_to_plot:
@@ -750,6 +754,130 @@ def boxplot_at_molt(
     plt.tight_layout()
     plt.show()
 
+def plot_developmental_success(
+    conditions_struct,
+    conditions_to_plot,
+    colors=None,
+    figsize=None,
+    legend=None,
+):
+    if colors is None:
+        color_palette = sns.color_palette("colorblind", len(conditions_to_plot))
+    else:
+        color_palette = colors
+
+    if figsize is None:
+        figsize = (5*4, 6)
+
+    fig, ax = plt.subplots(1, 4, figsize=figsize)
+
+    for i, condition_id in enumerate(conditions_to_plot):
+        condition_dict = conditions_struct[condition_id]
+
+        ecdysis = condition_dict["ecdysis_time_step"]
+
+        m1_completion = ~np.isnan(ecdysis[:, 1])    
+        m2_completion = np.logical_and(~np.isnan(ecdysis[:, 2]), ~np.isnan(ecdysis[:, 1]))
+        m3_completion = np.logical_and(~np.isnan(ecdysis[:, 3]), ~np.isnan(ecdysis[:, 2]))
+        m4_completion = np.logical_and(~np.isnan(ecdysis[:, 4]), ~np.isnan(ecdysis[:, 3]))
+
+        m1_completion_rate = np.sum(m1_completion) / len(ecdysis)
+        m2_completion_rate = np.sum(m2_completion) / len(ecdysis)
+        m3_completion_rate = np.sum(m3_completion) / len(ecdysis)
+        m4_completion_rate = np.sum(m4_completion) / len(ecdysis)
+
+        label = build_legend(condition_dict, legend)
+        ax[0].bar(i, m1_completion_rate, color=color_palette[i], label=label, edgecolor='black', linewidth=2)
+        ax[1].bar(i, m2_completion_rate, color=color_palette[i], label=label, edgecolor='black', linewidth=2)
+        ax[2].bar(i, m3_completion_rate, color=color_palette[i], label=label, edgecolor='black', linewidth=2)
+        ax[3].bar(i, m4_completion_rate, color=color_palette[i], label=label, edgecolor='black', linewidth=2)
+
+    ax[0].set_title("M1")
+    ax[1].set_title("M2")
+    ax[2].set_title("M3")
+    ax[3].set_title("M4")
+
+    ax[0].set_ylabel("Successful molts (%)")
+
+    # remove ticks
+    for i in range(4):
+        ax[i].tick_params(
+            axis="x", which="both", bottom=False, top=False, labelbottom=False
+        )
+
+    plt.legend()
+    plt.show()
+
+def plot_arrests(
+    conditions_struct,
+    conditions_to_plot,
+    colors=None,
+    figsize=None,
+    legend=None,
+):
+    if colors is None:
+        color_palette = sns.color_palette("colorblind", len(conditions_to_plot))
+    else:
+        color_palette = colors
+
+    if figsize is None:
+        figsize = (5*4, 6)
+
+    fig, ax = plt.subplots(1, 4, figsize=figsize)
+
+    for i, condition_id in enumerate(conditions_to_plot):
+        condition_dict = conditions_struct[condition_id]
+
+        ecdysis = condition_dict["ecdysis_time_step"]
+
+        # m1_arrest = np.isnan(ecdysis[:, 1])
+        # m2_arrest = np.logical_and(np.isnan(ecdysis[:, 2]), ~m1_arrest)
+        # m3_arrest = np.logical_and(np.isnan(ecdysis[:, 3]), ~m2_arrest)
+        # m4_arrest = np.logical_and(np.isnan(ecdysis[:, 4]), ~m3_arrest)
+
+
+        # l1_arrest_rate = np.sum(m1_arrest) / len(ecdysis)
+        # l2_arrest_rate = np.sum(m2_arrest) / np.sum(~m1_arrest)
+        # l3_arrest_rate = np.sum(m3_arrest) / np.sum(~m2_arrest)
+        # l4_arrest_rate = np.sum(m4_arrest) / np.sum(~m3_arrest)
+
+        m1_arrest = np.isnan(ecdysis[:, 1])  # arrested in L1
+        m2_arrest = np.logical_and(np.isnan(ecdysis[:, 2]), ~np.isnan(ecdysis[:, 1]))  # passed L1 but arrested in L2
+        m3_arrest = np.logical_and(np.isnan(ecdysis[:, 3]), ~np.isnan(ecdysis[:, 2]))  # passed L2 but arrested in L3
+        m4_arrest = np.logical_and(np.isnan(ecdysis[:, 4]), ~np.isnan(ecdysis[:, 3]))  # passed L3 but arrested in L4
+
+        # Calculate rates - each rate is: number arrested in stage / number that entered that stage
+        l1_arrest_rate = np.sum(m1_arrest) / len(ecdysis)  # all animals enter L1
+        l2_arrest_rate = np.sum(m2_arrest) / np.sum(~np.isnan(ecdysis[:, 1]))  # only L1 completers enter L2
+        l3_arrest_rate = np.sum(m3_arrest) / np.sum(~np.isnan(ecdysis[:, 2]))  # only L2 completers enter L3
+        l4_arrest_rate = np.sum(m4_arrest) / np.sum(~np.isnan(ecdysis[:, 3]))  # only L3 completers enter L4
+
+        print(np.sum(m1_arrest), np.sum(m2_arrest), np.sum(m3_arrest), np.sum(m4_arrest))
+        print(len(ecdysis), np.sum(~m1_arrest), np.sum(~m2_arrest), np.sum(~m3_arrest))
+
+        label = build_legend(condition_dict, legend)
+
+        ax[0].bar(i, l1_arrest_rate, color=color_palette[i], label=label, edgecolor='black', linewidth=2)
+        ax[1].bar(i, l2_arrest_rate, color=color_palette[i], label=label, edgecolor='black', linewidth=2)
+        ax[2].bar(i, l3_arrest_rate, color=color_palette[i], label=label, edgecolor='black', linewidth=2)
+        ax[3].bar(i, l4_arrest_rate, color=color_palette[i], label=label, edgecolor='black', linewidth=2)
+
+
+    ax[0].set_title("L1")
+    ax[1].set_title("L2")
+    ax[2].set_title("L3")
+    ax[3].set_title("L4")
+
+    ax[0].set_ylabel("Arrest rate (%)")
+
+    # remove ticks
+    for i in range(4):
+        ax[i].tick_params(
+            axis="x", which="both", bottom=False, top=False, labelbottom=False
+        )
+
+    plt.legend()
+    plt.show()
 
 def plot_growth_curves_individuals(
     conditions_struct,
