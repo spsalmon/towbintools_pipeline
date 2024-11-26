@@ -6,3 +6,5 @@ towbintools
 starbars
 microfilm
 numpy>=1.22,<1.27
+napari-convpaint
+napari-convpaint[cellpose]
