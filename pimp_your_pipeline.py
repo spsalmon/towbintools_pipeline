@@ -103,10 +103,15 @@ def main(config, pad=None):
         )
 
         if building_block.return_type == "subdir":
+            if pad:
+                column_name = f'{config["analysis_dir_name"]}/{os.path.dirname(os.path.normpath(result))}'
+            else:
+                column_name = f'{config["analysis_dir_name"]}/{os.path.basename(os.path.normpath(result))}'
+
             experiment_filemap = add_dir_to_experiment_filemap(
                 experiment_filemap,
                 result,
-                f'{config["analysis_dir_name"]}/{os.path.basename(os.path.normpath(result))}',
+                column_name,
             )
             experiment_filemap.to_csv(
                 os.path.join(report_subdir, "analysis_filemap.csv"), index=False
