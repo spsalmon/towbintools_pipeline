@@ -47,6 +47,11 @@ def main(config, pad=None):
         get_and_create_folders(config)
     )
 
+    if pad:
+        raw_subdir = os.path.join(raw_subdir, pad)
+        report_subdir = os.path.join(report_subdir, pad)
+        sbatch_backup_dir = os.path.join(sbatch_backup_dir, pad)
+
     # add the directories to the config dictionary for easy access
     config["raw_subdir"] = raw_subdir
     config["analysis_subdir"] = analysis_subdir
@@ -119,6 +124,7 @@ def main(config, pad=None):
 
 pads = get_experiment_pads(config)
 
+print(f"Running the pipeline for pads: {pads}")
 if not pads:
     main(config)
 else:
