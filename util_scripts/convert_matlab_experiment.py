@@ -6,6 +6,10 @@ import pandas as pd
 import scipy.io as sio
 from towbintools.foundation.file_handling import add_dir_to_experiment_filemap
 
+import sys
+from pathlib import Path
+
+sys.path.append(str(Path(__file__).parent.parent))
 from pipeline_scripts.utils import get_experiment_time_from_filemap_parallel
 
 KEY_CONVERSION_MAP = {
