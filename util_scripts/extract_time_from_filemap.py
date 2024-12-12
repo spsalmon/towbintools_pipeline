@@ -3,6 +3,9 @@ import os
 import pandas as pd
 from towbintools.foundation import file_handling as file_handling
 
+import sys
+from pathlib import Path
+sys.path.append(str(Path(__file__).parent.parent))
 from pipeline_scripts.utils import get_experiment_time_from_filemap_parallel
 
 experiment_path = "/mnt/towbin.data/shared/plenart/20231112_CREST_10X_wBT318_gradual_24-92h_20_degrees/"
