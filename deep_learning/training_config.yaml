@@ -30,5 +30,6 @@ batch_size: 5
 accumulate_grad_batches: 1
 num_workers: 32
 
-save_best_k_models: 2
+save_best_k_models: 1
 train_val_split_ratio: 0.25
+train_test_split_ratio: 0.1
