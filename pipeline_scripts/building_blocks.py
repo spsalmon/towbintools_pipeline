@@ -217,7 +217,13 @@ class SegmentationBuildingBlock(BuildingBlock):
     def create_command(
         self, input_pickle_path, output_pickle_path, pickled_block_config, config
     ):
-        command = f"~/.local/bin/micromamba run -n towbintools python3 ./pipeline_scripts/segment.py -i {input_pickle_path} -o {output_pickle_path} -c {pickled_block_config} -j {config['sbatch_cpus']}"
+        NON_LEARNING_METHODS = ["double_threshold", "edge_based"]
+        LEARNING_BASED_METHODS = ["deep_learning", "ilastik"]
+
+        if self.block_config["segmentation_method"] in NON_LEARNING_METHODS:
+            command = f"~/.local/bin/micromamba run -n towbintools python3 ./pipeline_scripts/non_learning_segment.py -i {input_pickle_path} -o {output_pickle_path} -c {pickled_block_config} -j {config['sbatch_cpus']}"
+        elif self.block_config["segmentation_method"] in LEARNING_BASED_METHODS:
+            command = f"~/.local/bin/micromamba run -n towbintools python3 ./pipeline_scripts/learning_based_segment.py -i {input_pickle_path} -o {output_pickle_path} -c {pickled_block_config} -j {config['sbatch_cpus']}"
         return command
 
     def run_command(self, command, name, config):

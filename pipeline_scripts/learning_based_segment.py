@@ -11,67 +11,20 @@ from tifffile import imwrite
 from towbintools.deep_learning.deep_learning_tools import (
     load_segmentation_model_from_checkpoint,
 )
-from towbintools.deep_learning.utils.augmentation import get_prediction_augmentation
+from towbintools.deep_learning.utils.augmentation import get_prediction_augmentation_from_model
 from towbintools.foundation import image_handling
 from towbintools.segmentation import segmentation_tools
 from xarray import DataArray
+from towbintools.deep_learning.utils.dataset import SegmentationPredictionDataset
+from torch.utils.data import DataLoader
 
 logging.basicConfig(level=logging.INFO)
-
-
-def segment_and_save(
-    image_path,
-    output_path,
-    method,
-    augment_contrast=False,
-    clip_limit=5,
-    channels=None,
-    pixelsize=None,
-    sigma_canny=1,
-    preprocessing_fn=None,
-    model=None,
-    tiler=None,
-    RGB=False,
-    activation=None,
-    device=None,
-    batch_size=-1,
-    is_zstack=False,
-):
-    """Segment image and save to output_path."""
-    try:
-        image = image_handling.read_tiff_file(
-            image_path, channels_to_keep=channels
-        ).squeeze()
-        if augment_contrast:
-            image = image_handling.augment_contrast(image, clip_limit=clip_limit)
-
-        mask = segmentation_tools.segment_image(
-            image,
-            method,
-            pixelsize=pixelsize,
-            sigma_canny=sigma_canny,
-            preprocessing_fn=preprocessing_fn,
-            model=model,
-            device=device,
-            tiler=tiler,
-            RGB=RGB,
-            activation=activation,
-            batch_size=batch_size,
-            is_zstack=is_zstack,
-        )
-
-        imwrite(output_path, mask.astype(np.uint8), compression="zlib", ome=True)
-    except Exception as e:
-        logging.error(f"Caught exception while segmenting {image_path}: {e}")
-        return False
-
 
 def segment_image_ilastik(image, pipeline, result_channel=0):
     """Segment image using ilastik pipeline."""
     image = DataArray(image, dims=["y", "x"])
     mask = pipeline.get_probabilities(image)[..., result_channel] > 0.5
     return mask
-
 
 def segment_and_save_ilastik(
     image_path,
@@ -110,6 +63,16 @@ def segment_and_save_ilastik(
         logging.error(f"Caught exception while segmenting {image_path}: {e}")
         return False
 
+def reshape_images_to_original_shape(images, original_shapes, padded_or_cropped = "pad"):
+    reshaped_images = []
+    for image, original_shape in zip(images, original_shapes):
+        if padded_or_cropped == "pad":
+            reshaped_image = image_handling.crop_to_dim_equally(image, original_shape[-2], original_shape[-1])
+        elif padded_or_cropped == "crop":
+            reshaped_image = image_handling.pad_to_dim_equally(image, original_shape[-2], original_shape[-1])
+        reshaped_images.append(reshaped_image)
+    return reshaped_images
+
 
 def main(input_pickle, output_pickle, config, n_jobs):
     """Main function."""
@@ -119,173 +82,38 @@ def main(input_pickle, output_pickle, config, n_jobs):
 
     is_zstack = image_handling.check_if_zstack(input_files[0][0])
 
-    if config["segmentation_method"] == "edge_based":
-        Parallel(n_jobs=n_jobs)(
-            delayed(segment_and_save)(
-                input_file,
-                output_path,
-                method=config["segmentation_method"],
-                augment_contrast=config["augment_contrast"],
-                channels=config["segmentation_channels"],
-                pixelsize=config["pixelsize"],
-                sigma_canny=config["sigma_canny"],
-                is_zstack=is_zstack,
-            )
-            for input_file, output_path in zip(input_files, output_files)
-        )
+    if config["segmentation_method"] == "deep_learning":
+        # Load the model
+        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        model = load_segmentation_model_from_checkpoint(config["model_path"]).to(device)
+        preprocessing_fn = get_prediction_augmentation_from_model(model)
+        batch_size = config["batch_size"]
+        dataset = SegmentationPredictionDataset(input_files, config['segmentation_channels'], preprocessing_fn)
+        dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=False, num_workers=n_jobs//2, pin_memory=True, collate_fn=dataset.collate_fn)
 
-    elif config["segmentation_method"] == "double_threshold":
-        Parallel(n_jobs=n_jobs)(
-            delayed(segment_and_save)(
-                input_file,
-                output_path,
-                method=config["segmentation_method"],
-                channels=config["segmentation_channels"],
-                is_zstack=is_zstack,
-            )
-            for input_file, output_path in zip(input_files, output_files)
-        )
+        # Make predictions
+        model.eval()
 
-    elif config["segmentation_method"] == "deep_learning":
-        device_count = 1
-        if torch.cuda.is_available():
-            device_count = torch.cuda.device_count()
-            if device_count > 1:
-                logging.info(f"Using {device_count} GPUs")
-                devices = [torch.device(f"cuda:{i}") for i in range(device_count)]
-            else:
-                devices = [torch.device("cuda:0")]
-        else:
-            devices = [torch.device("cpu")]
+        def save_prediction(prediction, output_path):
+            imwrite(output_path, prediction, compression="zlib")
 
-        tiler_config = config["tiler_config"]
+        with torch.no_grad():
+            for i, batch in enumerate(dataloader):
+                image_paths, images, image_shapes = batch
+                images = torch.from_numpy(images)
+                images = images.to(device)
+                predictions = model(images)
+                predictions = predictions.cpu().numpy()
+                predictions = np.squeeze(predictions) > 0.5
+                predictions = predictions.astype(np.uint8)
 
-        tile_size = tiler_config[0]
-        tile_step = tiler_config[1]
+                # Reshape predictions to original shape
+                predictions = reshape_images_to_original_shape(predictions, image_shapes, padded_or_cropped="pad")
 
-        first_image_shape = image_handling.read_tiff_file(input_files[0], [1]).shape[
-            -2:
-        ]
-        tiler = ImageSlicer(
-            image_shape=first_image_shape,
-            tile_size=tile_size,
-            tile_step=tile_step,
-            weight="pyramid",
-        )
-
-        if len(devices) == 1:
-            device = devices[0]
-            model = load_segmentation_model_from_checkpoint(config["model_path"]).to(
-                device
-            )
-            model.eval()
-            model.freeze()
-            # except KeyError:
-            #     raise KeyError('The model path does not correspond to a valid model architecture.')
-
-            normalization_type = model.normalization["type"]
-            normalization_params = model.normalization
-            if normalization_type == "percentile":
-                preprocessing_fn = get_prediction_augmentation(
-                    normalization_type=normalization_type,
-                    lo=normalization_params["lo"],
-                    hi=normalization_params["hi"],
+                # Save predictions
+                Parallel(n_jobs=n_jobs//2, prefer="threads")(
+                    delayed(save_prediction)(prediction, output_path) for prediction, output_path in zip(predictions, output_files)
                 )
-            elif normalization_type == "mean_std":
-                preprocessing_fn = get_prediction_augmentation(
-                    normalization_type=normalization_type,
-                    mean=normalization_params["mean"],
-                    std=normalization_params["std"],
-                )
-            elif normalization_type == "data_range":
-                preprocessing_fn = get_prediction_augmentation(
-                    normalization_type=normalization_type
-                )
-            else:
-                preprocessing_fn = None
-
-            output = [
-                segment_and_save(
-                    input_file,
-                    output_path,
-                    method=config["segmentation_method"],
-                    augment_contrast=config["augment_contrast"],
-                    channels=config["segmentation_channels"],
-                    model=model,
-                    tiler=tiler,
-                    RGB=config["RGB"],
-                    preprocessing_fn=preprocessing_fn,
-                    activation=config["activation_layer"],
-                    device=device,
-                    batch_size=config["batch_size"],
-                    is_zstack=is_zstack,
-                )
-                for input_file, output_path in zip(input_files, output_files)
-            ]
-
-        else:
-            modelz = [
-                load_segmentation_model_from_checkpoint(config["model_path"]).to(device)
-                for device in devices
-            ]
-            normalization_type = modelz[0].normalization["type"]
-            normalization_params = modelz[0].normalization
-            if normalization_type == "percentile":
-                try:
-                    preprocessing_fn = get_prediction_augmentation(
-                        normalization_type=normalization_type,
-                        lo=normalization_params["lo"],
-                        hi=normalization_params["hi"],
-                        axis=normalization_params["axis"],
-                    )
-                except KeyError:
-                    preprocessing_fn = get_prediction_augmentation(
-                        normalization_type=normalization_type,
-                        lo=normalization_params["lo"],
-                        hi=normalization_params["hi"],
-                    )
-            elif normalization_type == "mean_std":
-                preprocessing_fn = get_prediction_augmentation(
-                    normalization_type=normalization_type,
-                    mean=normalization_params["mean"],
-                    std=normalization_params["std"],
-                )
-            elif normalization_type == "data_range":
-                preprocessing_fn = get_prediction_augmentation(
-                    normalization_type=normalization_type
-                )
-            else:
-                preprocessing_fn = None
-
-            for model in modelz:
-                model.eval()
-                model.freeze()
-
-            def process_on_gpu(input_data, output_path, gpu_id):
-                device = devices[gpu_id]
-                model = modelz[gpu_id]
-                return segment_and_save(
-                    input_data,
-                    output_path,
-                    method=config["segmentation_method"],
-                    augment_contrast=config["augment_contrast"],
-                    channels=config["segmentation_channels"],
-                    model=model,
-                    tiler=tiler,
-                    RGB=config["RGB"],
-                    preprocessing_fn=preprocessing_fn,
-                    activation=config["activation_layer"],
-                    device=device,
-                    batch_size=config["batch_size"],
-                    is_zstack=is_zstack,
-                )
-
-            Parallel(n_jobs=device_count, backend="threading")(
-                delayed(process_on_gpu)(input_file, output_path, i % device_count)
-                for i, (input_file, output_path) in enumerate(
-                    zip(input_files, output_files)
-                )
-            )
 
     elif config["segmentation_method"] == "ilastik":
         Parallel(n_jobs=n_jobs)(
