@@ -4,7 +4,7 @@
 #SBATCH -o train.out
 #SBATCH -e train.err
 #SBATCH -c 32
-#SBATCH -t 72:00:00
+#SBATCH -t 24:00:00
 #SBATCH --mem=64GB
 #SBATCH --gres=gpu:rtx6000:1
 
