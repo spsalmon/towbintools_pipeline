@@ -19,7 +19,7 @@ pretrained_weights: 'image-micronet'
 
 deep_supervision: False
 
-learning_rate: 1.0e-5
+learning_rate: 1.0e-4
 normalization_parameters: {'type': 'percentile', 'lo': 1, 'hi': 99, 'axis': [-2, -1]}
 
 train_on_tiles: True

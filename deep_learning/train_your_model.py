@@ -3,6 +3,7 @@ import os
 
 import pytorch_lightning as pl
 import pytorch_lightning.callbacks as callbacks
+import pytorch_lightning.loggers as pl_loggers
 import torch.nn as nn
 import yaml
 from towbintools.deep_learning.deep_learning_tools import (
@@ -18,7 +19,6 @@ from towbintools.deep_learning.utils.dataset import (
     create_segmentation_training_dataframes_and_dataloaders,
 )
 from towbintools.deep_learning.utils.loss import BCELossWithIgnore, FocalTverskyLoss
-from lightning.pytorch import loggers as pl_loggers
 
 
 def get_args():
@@ -161,9 +161,7 @@ checkpoint_callback = callbacks.ModelCheckpoint(
 swa_callback = callbacks.StochasticWeightAveraging(swa_lrs=1e-2)
 
 # configure logger
-log_dir = os.path.join(model_save_dir, "lightning_tb_logs")
-os.makedirs(log_dir, exist_ok=True)
-logger = pl_loggers.TensorBoardLogger(log_dir, name=model_name)
+logger = pl_loggers.TensorBoardLogger(model_save_dir)
 
 trainer = pl.Trainer(
     max_epochs=max_epochs,

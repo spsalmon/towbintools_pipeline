@@ -29,6 +29,7 @@ sigma_canny: [1]
 
 # deep learning segmentation parameters
 model_path: ["/home/spsalmon/towbintools/towbintools/deep_learning/unet_confocal/epoch=105-step=16854.ckpt"]
+predict_on_tiles: [True]
 tiler_config: [[[512, 512], [256, 256]]]
 RGB: [True]
 activation_layer: [null]
