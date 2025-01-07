@@ -5,9 +5,11 @@ analysis_dir_name: "analysis"
 ################################# IMAGE ANALYSIS PIPELINE CONFIGURATION #################################
 #########################################################################################################
 
+get_experiment_time: True
+
 building_blocks: ["segmentation", "straightening", "volume_computation", "classification", "molt_detection", "custom"]
 
-rerun_segmentation: [True]
+rerun_segmentation: [False]
 rerun_straightening: [False]
 rerun_volume_computation: [False]
 rerun_classification: [False]
