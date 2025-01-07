@@ -103,6 +103,9 @@ def main(input_pickle, output_pickle, config, n_jobs):
                 images = torch.from_numpy(images)
                 images = images.to(device)
                 predictions = model(images)
+
+                # TODO: Add option to use activation layer from config
+                
                 predictions = predictions.cpu().numpy()
                 predictions = np.squeeze(predictions) > 0.5
                 predictions = predictions.astype(np.uint8)
