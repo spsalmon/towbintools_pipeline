@@ -25,7 +25,7 @@ OPTIONS_MAP = {
         "pixelsize",
         "gaussian_filter_sigma",
         "model_path",
-        "predit_on_tiles",
+        "predict_on_tiles",
         "tiler_config",
         "RGB",
         "activation_layer",
@@ -103,6 +103,7 @@ DEFAULT_OPTIONS = {
     "fluorescence_quantification":
         {
             "rerun_fluorescence_quantification": [False],
+            "fluorescence_quantification_aggregation": ["median"],
             "fluorescence_background_aggregation": ["median"],
         },
     "custom":
@@ -262,6 +263,10 @@ class SegmentationBuildingBlock(BuildingBlock):
             command = f"~/.local/bin/micromamba run -n towbintools python3 ./pipeline_scripts/non_learning_segment.py -i {input_pickle_path} -o {output_pickle_path} -c {pickled_block_config} -j {config['sbatch_cpus']}"
         elif self.block_config["segmentation_method"] in LEARNING_BASED_METHODS:
             command = f"~/.local/bin/micromamba run -n towbintools python3 ./pipeline_scripts/learning_based_segment.py -i {input_pickle_path} -o {output_pickle_path} -c {pickled_block_config} -j {config['sbatch_cpus']}"
+        else:
+            raise ValueError(
+                f"Segmentation method {self.block_config['segmentation_method']} not supported."
+            )
         return command
 
     def run_command(self, command, name, config):
@@ -590,6 +595,7 @@ def parse_building_blocks_config(config):
                 except KeyError:
                     if option in DEFAULT_OPTIONS[building_block_name]:
                         config_copy[option] = DEFAULT_OPTIONS[building_block_name][option]
+                        print(f'{option} not found in config file, using default value: {config_copy[option]}')
                     else:
                         raise KeyError(
                             f"{option} is not in the config file, but is required for the {building_block_name} building block."
@@ -598,7 +604,7 @@ def parse_building_blocks_config(config):
             # expand single options to match the number of blocks
             for option in options:
                 if len(config_copy[option]) == 1:
-                    config_copy[option] = config[option] * len(
+                    config_copy[option] = config_copy[option] * len(
                         building_block_counts[building_block_name]
                     )
 
