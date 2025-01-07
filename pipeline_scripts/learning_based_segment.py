@@ -105,7 +105,7 @@ def main(input_pickle, output_pickle, config, n_jobs):
                 predictions = model(images)
 
                 # TODO: Add option to use activation layer from config
-                
+
                 predictions = predictions.cpu().numpy()
                 predictions = np.squeeze(predictions) > 0.5
                 predictions = predictions.astype(np.uint8)
@@ -117,6 +117,9 @@ def main(input_pickle, output_pickle, config, n_jobs):
                 Parallel(n_jobs=n_jobs//2, prefer="threads")(
                     delayed(save_prediction)(prediction, output_path) for prediction, output_path in zip(predictions, output_files)
                 )
+
+                # remove the output paths that have been processed
+                output_files = output_files[len(image_paths):]
 
     elif config["segmentation_method"] == "ilastik":
         Parallel(n_jobs=n_jobs)(

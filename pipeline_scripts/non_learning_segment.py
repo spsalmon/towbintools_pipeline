@@ -5,8 +5,8 @@ import numpy as np
 import utils
 from joblib import Parallel, delayed
 from tifffile import imwrite
-from towbintools.foundation import image_handling
-from towbintools.segmentation import segmentation_tools
+from towbintools.foundation.image_handling import read_tiff_file, check_if_zstack
+from towbintools.segmentation.segmentation_tools import segment_image
 
 logging.basicConfig(level=logging.INFO)
 
@@ -22,11 +22,11 @@ def segment_and_save(
 ):
     """Segment image and save to output_path."""
     try:
-        image = image_handling.read_tiff_file(
+        image = read_tiff_file(
             image_path, channels_to_keep=channels
         ).squeeze()
 
-        mask = segmentation_tools.segment_image(
+        mask = segment_image(
             image,
             method,
             pixelsize=pixelsize,
@@ -45,7 +45,7 @@ def main(input_pickle, output_pickle, config, n_jobs):
     input_files, output_files = utils.load_pickles(input_pickle, output_pickle)
     os.makedirs(os.path.dirname(output_files[0]), exist_ok=True)
 
-    is_zstack = image_handling.check_if_zstack(input_files[0][0])
+    is_zstack = check_if_zstack(input_files[0][0])
 
     if config["segmentation_method"] == "edge_based":
         Parallel(n_jobs=n_jobs)(
