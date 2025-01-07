@@ -83,6 +83,8 @@ def main(input_pickle, output_pickle, config, n_jobs):
     is_zstack = image_handling.check_if_zstack(input_files[0][0])
 
     if config["segmentation_method"] == "deep_learning":
+        if config["model_path"] is None:
+            raise ValueError("model_path must be set in the config file for deep learning segmentation.")
         # Load the model
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         model = load_segmentation_model_from_checkpoint(config["model_path"]).to(device)
@@ -122,6 +124,8 @@ def main(input_pickle, output_pickle, config, n_jobs):
                 output_files = output_files[len(image_paths):]
 
     elif config["segmentation_method"] == "ilastik":
+        if config["ilastik_project_path"] is None:
+            raise ValueError("ilastik_project_path must be set in the config file for ilastik segmentation.")
         Parallel(n_jobs=n_jobs)(
             delayed(segment_and_save_ilastik)(
                 input_file,

@@ -13,34 +13,20 @@ from towbintools.foundation import image_handling, worm_features
 from towbintools.segmentation import segmentation_tools
 
 
-def compute_volume_from_file_path(straightened_mask_path, pixelsize):
+def compute_morphological_features_from_file_path(straightened_mask_path, pixelsize, features):
     """Compute the volume of a straightened mask."""
-    logging.info(straightened_mask_path)
     str_mask = image_handling.read_tiff_file(straightened_mask_path)
-    volume = worm_features.compute_worm_volume(str_mask, pixelsize)
-    length = worm_features.compute_worm_length(str_mask, pixelsize)
-    area = worm_features.compute_worm_area(str_mask, pixelsize)
 
-    # replace volume and length with NaN if it is 0
-    if volume == 0:
-        volume = np.nan
-    if length == 0:
-        length = np.nan
-    if area == 0:
-        area = np.nan
+    features = worm_features.compute_worm_morphological_features(str_mask, pixelsize, features)
 
     pattern = re.compile(r"Time(\d+)_Point(\d+)")
     match = pattern.search(straightened_mask_path)
     if match:
         time = int(match.group(1))
         point = int(match.group(2))
-        return {
-            "Time": time,
-            "Point": point,
-            "Volume": volume,
-            "Length": length,
-            "Area": area,
-        }
+        features["Time"] = time
+        features["Point"] = point
+        return features
     else:
         raise ValueError("Could not extract time and point from file name.")
 
@@ -52,24 +38,25 @@ def main(input_pickle, output_file, config, n_jobs):
     input_files = utils.load_pickles(input_pickle)[0]
     logging.info(f"Computing volume for {len(input_files)} files.")
 
+
     os.makedirs(os.path.dirname(output_file), exist_ok=True)
-    volumes = Parallel(n_jobs=n_jobs)(
-        delayed(compute_volume_from_file_path)(input_file, config["pixelsize"])
+    morphological_features = Parallel(n_jobs=n_jobs)(
+        delayed(compute_morphological_features_from_file_path)(input_file, config["pixelsize"], config["morphological_features"])
         for input_file in input_files
     )
-    volume_dataframe = pd.DataFrame(volumes)
+    morphological_features_dataframe = pd.DataFrame(morphological_features)
 
     # rename columns to match the rest of the pipeline
     output_file_basename = os.path.basename(output_file).split("_volume.csv")[0]
-    volume_dataframe.rename(
-        columns={
-            "Volume": f"{output_file_basename}_volume",
-            "Length": f"{output_file_basename}_length",
-            "Area": f"{output_file_basename}_area",
-        },
-        inplace=True,
-    )
-    volume_dataframe.to_csv(output_file, index=False)
+    for feature in config["morphological_features"]:
+        morphological_features_dataframe.rename(
+            columns={
+                feature: f"{output_file_basename}_{feature}",
+            },
+            inplace=True,
+        )
+
+    morphological_features_dataframe.to_csv(output_file, index=False)
 
 
 if __name__ == "__main__":
