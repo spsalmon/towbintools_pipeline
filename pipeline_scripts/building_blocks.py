@@ -74,6 +74,7 @@ OPTIONS_MAP = {
 DEFAULT_OPTIONS = {
     "segmentation":
         {
+            # default options for segmentation, allows user to make their config file shorter
             "rerun_segmentation": [False],
             "segmentation_column": ["raw"],
             "segmentation_name_suffix": [None],
@@ -82,7 +83,14 @@ DEFAULT_OPTIONS = {
             "tiler_config": [None],
             "RGB": [False],
             "activation_layer": [None],
+            
+            # default options for segmentation that are either almost never used, or allow the user to make their config file shorter
+            # if some of those options are missing, some methods will not work (ie. ilastik if ilaistk_project_path is missing)
             "run_segmentation_on": [None],
+            "ilaistk_project_path": [None],
+            "ilastik_result_channel": [None],
+            "model_path": [None],
+            "batch_size": [1],
         },
     "straightening":
         {

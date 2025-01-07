@@ -58,6 +58,8 @@ def main(config, pad=None):
     config["report_subdir"] = report_subdir
     config["sbatch_backup_dir"] = sbatch_backup_dir
 
+    extract_experiment_time = config.get("extract_experiment_time", True)
+
     # copy the config file to the report folder
     # if it already exists, change the name of the new one by adding a number
     config_dir = os.path.join(report_subdir, "config")
@@ -79,7 +81,7 @@ def main(config, pad=None):
         experiment_filemap = experiment_filemap.replace(np.nan, "", regex=True)
 
     # if the ExperimentTime column is not present, create it
-    if "ExperimentTime" not in experiment_filemap.columns:
+    if ("ExperimentTime" not in experiment_filemap.columns) and extract_experiment_time:
         print("Computing experiment time ...")
         experiment_filemap["ExperimentTime"] = (
             get_experiment_time_from_filemap_parallel(experiment_filemap)
