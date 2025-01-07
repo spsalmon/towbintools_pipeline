@@ -25,6 +25,7 @@ OPTIONS_MAP = {
         "pixelsize",
         "gaussian_filter_sigma",
         "model_path",
+        "predit_on_tiles",
         "tiler_config",
         "RGB",
         "activation_layer",
@@ -70,9 +71,47 @@ OPTIONS_MAP = {
     ],
 }
 
-POTENTIALLY_MISSING_OPTIONS = {
-    "run_segmentation_on": [None],
+DEFAULT_OPTIONS = {
+    "segmentation":
+        {
+            "rerun_segmentation": [False],
+            "segmentation_column": ["raw"],
+            "segmentation_name_suffix": [None],
+            "gaussian_filter_sigma": [1.0],
+            "predict_on_tiles": [False],
+            "tiler_config": [None],
+            "RGB": [False],
+            "activation_layer": [None],
+            "run_segmentation_on": [None],
+        },
+    "straightening":
+        {
+            "rerun_straightening": [False],
+        },
+    "volume_computation":
+        {
+            "rerun_volume_computation": [False],
+        },
+    "classification":
+        {
+            "rerun_classification": [False],
+        },
+    "molt_detection":
+        {
+            "rerun_molt_detection": [False],
+        },
+    "fluorescence_quantification":
+        {
+            "rerun_fluorescence_quantification": [False],
+            "fluorescence_background_aggregation": ["median"],
+        },
+    "custom":
+        {
+            "rerun_custom_script": [False],
+        },
 }
+
+
 
 
 class BuildingBlock(ABC):
@@ -549,8 +588,8 @@ def parse_building_blocks_config(config):
                     ), f"{config[option]} The number of {option} options ({len(config[option])}) does not match the number of {building_block_name} building blocks ({len(building_block_counts[building_block_name])})"
 
                 except KeyError:
-                    if option in POTENTIALLY_MISSING_OPTIONS:
-                        config_copy[option] = POTENTIALLY_MISSING_OPTIONS[option]
+                    if option in DEFAULT_OPTIONS[building_block_name]:
+                        config_copy[option] = DEFAULT_OPTIONS[building_block_name][option]
                     else:
                         raise KeyError(
                             f"{option} is not in the config file, but is required for the {building_block_name} building block."
