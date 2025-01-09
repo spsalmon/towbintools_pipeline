@@ -47,11 +47,18 @@ def main(config, pad=None):
         get_and_create_folders(config)
     )
 
+    if pad:
+        raw_subdir = os.path.join(raw_subdir, pad)
+        report_subdir = os.path.join(report_subdir, pad)
+        sbatch_backup_dir = os.path.join(sbatch_backup_dir, pad)
+
     # add the directories to the config dictionary for easy access
     config["raw_subdir"] = raw_subdir
     config["analysis_subdir"] = analysis_subdir
     config["report_subdir"] = report_subdir
     config["sbatch_backup_dir"] = sbatch_backup_dir
+
+    extract_experiment_time = config.get("extract_experiment_time", True)
 
     # copy the config file to the report folder
     # if it already exists, change the name of the new one by adding a number
@@ -74,14 +81,20 @@ def main(config, pad=None):
         experiment_filemap = experiment_filemap.replace(np.nan, "", regex=True)
 
     # if the ExperimentTime column is not present, create it
-    if "ExperimentTime" not in experiment_filemap.columns:
-        print("Computing experiment time ...")
-        experiment_filemap["ExperimentTime"] = (
-            get_experiment_time_from_filemap_parallel(experiment_filemap)
-        )
-        experiment_filemap.to_csv(
-            os.path.join(report_subdir, "analysis_filemap.csv"), index=False
-        )
+    if ("ExperimentTime" not in experiment_filemap.columns):
+        if extract_experiment_time:
+            print("Computing experiment time ...")
+            experiment_filemap["ExperimentTime"] = (
+                get_experiment_time_from_filemap_parallel(experiment_filemap)
+            )
+            experiment_filemap.to_csv(
+                os.path.join(report_subdir, "analysis_filemap.csv"), index=False
+            )
+        else:
+            experiment_filemap["ExperimentTime"] = np.nan
+            experiment_filemap.to_csv(
+                os.path.join(report_subdir, "analysis_filemap.csv"), index=False
+            )
 
     print("Building the config of the building blocks ...")
 
@@ -98,10 +111,15 @@ def main(config, pad=None):
         )
 
         if building_block.return_type == "subdir":
+            if pad:
+                column_name = f'{config["analysis_dir_name"]}/{os.path.basename(os.path.dirname(os.path.normpath(result)))}'
+            else:
+                column_name = f'{config["analysis_dir_name"]}/{os.path.basename(os.path.normpath(result))}'
+
             experiment_filemap = add_dir_to_experiment_filemap(
                 experiment_filemap,
                 result,
-                f'{config["analysis_dir_name"]}/{os.path.basename(os.path.normpath(result))}',
+                column_name,
             )
             experiment_filemap.to_csv(
                 os.path.join(report_subdir, "analysis_filemap.csv"), index=False
@@ -119,6 +137,7 @@ def main(config, pad=None):
 
 pads = get_experiment_pads(config)
 
+print(f"Running the pipeline for pads: {pads}")
 if not pads:
     main(config)
 else:

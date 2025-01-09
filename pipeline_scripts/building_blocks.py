@@ -22,12 +22,12 @@ OPTIONS_MAP = {
         "segmentation_name_suffix",
         "segmentation_method",
         "segmentation_channels",
-        "augment_contrast",
         "pixelsize",
-        "sigma_canny",
+        "gaussian_filter_sigma",
         "model_path",
+        "predict_on_tiles",
         "tiler_config",
-        "RGB",
+        "enforce_n_channels",
         "activation_layer",
         "batch_size",
         "ilastik_project_path",
@@ -39,10 +39,11 @@ OPTIONS_MAP = {
         "straightening_source",
         "straightening_masks",
     ],
-    "volume_computation": [
-        "rerun_volume_computation",
-        "volume_computation_masks",
+    "morphology_computation": [
+        "rerun_morphology_computation",
+        "morphology_computation_masks",
         "pixelsize",
+        "morphological_features",
     ],
     "classification": [
         "rerun_classification",
@@ -71,9 +72,58 @@ OPTIONS_MAP = {
     ],
 }
 
-POTENTIALLY_MISSING_OPTIONS = {
-    "run_segmentation_on": [None],
+DEFAULT_OPTIONS = {
+    "segmentation":
+        {
+            # default options for segmentation, allows user to make their config file shorter
+            "rerun_segmentation": [False],
+            "segmentation_column": ["raw"],
+            "segmentation_name_suffix": [None],
+            "gaussian_filter_sigma": [1.0],
+            "predict_on_tiles": [False],
+            "tiler_config": [None],
+            "enforce_n_channels": [None],
+            "activation_layer": [None],
+
+            # default options for segmentation that are either almost never used, or allow the user to make their config file shorter
+            # if some of those options are missing, some methods will not work (ie. ilastik if ilastik_project_path is missing)
+            "run_segmentation_on": [None],
+            "ilastik_project_path": [None],
+            "ilastik_result_channel": [None],
+            "model_path": [None],
+            "batch_size": [1],
+        },
+    "straightening":
+        {
+            "rerun_straightening": [False],
+        },
+    "morphology_computation":
+        {
+            "rerun_morphology_computation": [False],
+            "morphological_features": [["volume", "length", "area"]],
+
+        },
+    "classification":
+        {
+            "rerun_classification": [False],
+        },
+    "molt_detection":
+        {
+            "rerun_molt_detection": [False],
+        },
+    "fluorescence_quantification":
+        {
+            "rerun_fluorescence_quantification": [False],
+            "fluorescence_quantification_aggregation": ["median"],
+            "fluorescence_background_aggregation": ["median"],
+        },
+    "custom":
+        {
+            "rerun_custom_script": [False],
+        },
 }
+
+
 
 
 class BuildingBlock(ABC):
@@ -217,7 +267,17 @@ class SegmentationBuildingBlock(BuildingBlock):
     def create_command(
         self, input_pickle_path, output_pickle_path, pickled_block_config, config
     ):
-        command = f"~/.local/bin/micromamba run -n towbintools python3 ./pipeline_scripts/segment.py -i {input_pickle_path} -o {output_pickle_path} -c {pickled_block_config} -j {config['sbatch_cpus']}"
+        NON_LEARNING_METHODS = ["double_threshold", "edge_based"]
+        LEARNING_BASED_METHODS = ["deep_learning", "ilastik"]
+
+        if self.block_config["segmentation_method"] in NON_LEARNING_METHODS:
+            command = f"~/.local/bin/micromamba run -n towbintools python3 ./pipeline_scripts/non_learning_segment.py -i {input_pickle_path} -o {output_pickle_path} -c {pickled_block_config} -j {config['sbatch_cpus']}"
+        elif self.block_config["segmentation_method"] in LEARNING_BASED_METHODS:
+            command = f"~/.local/bin/micromamba run -n towbintools python3 ./pipeline_scripts/learning_based_segment.py -i {input_pickle_path} -o {output_pickle_path} -c {pickled_block_config} -j {config['sbatch_cpus']}"
+        else:
+            raise ValueError(
+                f"Segmentation method {self.block_config['segmentation_method']} not supported."
+            )
         return command
 
     def run_command(self, command, name, config):
@@ -294,27 +354,27 @@ class StraighteningBuildingBlock(BuildingBlock):
         return run_command(command, name, config)
 
 
-class VolumeComputationBuildingBlock(BuildingBlock):
+class MorphologyComputationBuildingBlock(BuildingBlock):
     def __init__(self, block_config):
         super().__init__(
-            "volume_computation", OPTIONS_MAP["volume_computation"], block_config, "csv"
+            "morphology_computation", OPTIONS_MAP["morphology_computation"], block_config, "csv"
         )
 
     def get_output_name(self, config, pad):
         return get_output_name(
             config,
-            self.block_config["volume_computation_masks"],
-            "volume",
+            self.block_config["morphology_computation_masks"],
+            "morphology",
             pad=pad,
             return_subdir=False,
         )
 
     def get_input_and_output_files(self, config, experiment_filemap, subdir):
-        volume_computation_masks = [self.block_config["volume_computation_masks"]]
+        morphology_computation_masks = [self.block_config["morphology_computation_masks"]]
         analysis_subdir = config["analysis_subdir"]
 
         input_files, _ = get_input_and_output_files_parallel(
-            experiment_filemap, volume_computation_masks, analysis_subdir, rerun=True
+            experiment_filemap, morphology_computation_masks, analysis_subdir, rerun=True
         )
 
         input_files = [input_file[0] for input_file in input_files]
@@ -324,7 +384,7 @@ class VolumeComputationBuildingBlock(BuildingBlock):
     def create_command(
         self, input_pickle_path, output_pickle_path, pickled_block_config, config
     ):
-        command = f"~/.local/bin/micromamba run -n towbintools python3 ./pipeline_scripts/compute_volume.py -i {input_pickle_path} -o {output_pickle_path} -c {pickled_block_config} -j {config['sbatch_cpus']}"
+        command = f"~/.local/bin/micromamba run -n towbintools python3 ./pipeline_scripts/compute_morphology.py -i {input_pickle_path} -o {output_pickle_path} -c {pickled_block_config} -j {config['sbatch_cpus']}"
         return command
 
     def run_command(self, command, name, config):
@@ -544,8 +604,9 @@ def parse_building_blocks_config(config):
                     ), f"{config[option]} The number of {option} options ({len(config[option])}) does not match the number of {building_block_name} building blocks ({len(building_block_counts[building_block_name])})"
 
                 except KeyError:
-                    if option in POTENTIALLY_MISSING_OPTIONS:
-                        config_copy[option] = POTENTIALLY_MISSING_OPTIONS[option]
+                    if option in DEFAULT_OPTIONS[building_block_name]:
+                        config_copy[option] = DEFAULT_OPTIONS[building_block_name][option]
+                        print(f'{option} not found in config file, using default value: {config_copy[option]}')
                     else:
                         raise KeyError(
                             f"{option} is not in the config file, but is required for the {building_block_name} building block."
@@ -554,7 +615,7 @@ def parse_building_blocks_config(config):
             # expand single options to match the number of blocks
             for option in options:
                 if len(config_copy[option]) == 1:
-                    config_copy[option] = config[option] * len(
+                    config_copy[option] = config_copy[option] * len(
                         building_block_counts[building_block_name]
                     )
 
@@ -585,8 +646,8 @@ def create_building_blocks(blocks_config):
             building_block = SegmentationBuildingBlock(block_config)
         elif block_config["name"] == "straightening":
             building_block = StraighteningBuildingBlock(block_config)
-        elif block_config["name"] == "volume_computation":
-            building_block = VolumeComputationBuildingBlock(block_config)
+        elif block_config["name"] == "morphology_computation" or block_config["name"] == "volume_computation": # volume_computation is there for backward compatibility
+            building_block = MorphologyComputationBuildingBlock(block_config)
         elif block_config["name"] == "classification":
             building_block = ClassificationBuildingBlock(block_config)
         elif block_config["name"] == "molt_detection":

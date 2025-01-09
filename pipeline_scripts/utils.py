@@ -56,10 +56,11 @@ def backup_file(file_path, destination_dir):
 
 def get_experiment_pads(config):
     experiment_dir = config["experiment_dir"]
+    raw_subdir = os.path.join(experiment_dir, "raw")
     pads = [
         f
-        for f in os.listdir(experiment_dir)
-        if os.path.isdir(os.path.join(experiment_dir, f)) and "pad" in f
+        for f in os.listdir(raw_subdir)
+        if os.path.isdir(os.path.join(raw_subdir, f)) and "pad" in f
     ]
     return pads
 

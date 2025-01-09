@@ -5,11 +5,13 @@ analysis_dir_name: "analysis"
 ################################# IMAGE ANALYSIS PIPELINE CONFIGURATION #################################
 #########################################################################################################
 
-building_blocks: ["segmentation", "straightening", "volume_computation", "classification", "molt_detection", "custom"]
+get_experiment_time: True
+
+building_blocks: ["segmentation", "straightening", "morphology", "classification", "molt_detection", "custom"]
 
 rerun_segmentation: [False]
 rerun_straightening: [False]
-rerun_volume_computation: [False]
+rerun_morphology_computation: [False]
 rerun_classification: [False]
 rerun_molt_detection: [False]
 rerun_fluorescence_quantification: [False]
@@ -18,21 +20,21 @@ rerun_custom_script: [True]
 # segmentation parameters
 segmentation_column: ['raw']
 segmentation_name_suffix: [null]
-segmentation_method: ["edge_based"]
-segmentation_channels: [[1]]
-augment_contrast: [False]
+segmentation_method: ["deep_learning"]
+segmentation_channels: [[0]]
 run_segmentation_on: [null]
 
 # edge-based segmentation parameters
 pixelsize: [0.65]
-sigma_canny: [1]
+gaussian_filter_sigma: [1]
 
 # deep learning segmentation parameters
-model_path: ["/home/spsalmon/towbintools/towbintools/deep_learning/unet_confocal/epoch=105-step=16854.ckpt"]
-tiler_config: [[[512, 512], [256, 256]]]
-RGB: [True]
-activation_layer: [null]
-batch_size: [-1]
+model_path: [/mnt/towbin.data/shared/spsalmon/towbinlab_segmentation_database/models/body/SAMannotations_singleclass_UnetPlusPlus_efficientnet-b4_image-micronet_FocalTversky/epoch=587-step=16464.ckpt]
+# predict_on_tiles: [True]
+# tiler_config: [[[512, 512], [256, 256]]]
+# RGB: [True]
+# activation_layer: [null]
+batch_size: [32]
 
 # ilastik segmentation parameters
 ilastik_project_path: ["/home/igheor/towbintools_pipeline/models/pharynx_str_noCPR.ilp"]
@@ -42,8 +44,9 @@ ilastik_result_channel: [0]
 straightening_source: [['analysis/ch2_seg', null]]
 straightening_masks: ['analysis/ch2_seg']
 
-# volume computation parameters
-volume_computation_masks: ['analysis/ch2_seg_str']
+# morphology computation parameters
+morphology_computation_masks: ['analysis/ch2_seg_str']
+morphological_features: [['length', 'area', 'volume', 'width_mean', 'width_median', 'width_std', 'width_cv', 'width_skew', 'width_kurtosis']]
 
 # classification parameters
 classification_source: ['analysis/ch2_seg_str']
@@ -67,56 +70,7 @@ custom_script_parameters: [["-i testinput"]]
 
 
 # sbatch parameters
-sbatch_memory: 32G
+sbatch_memory: 64G
 sbatch_time: 0-48:00:00
-sbatch_cpus: 8
-sbatch_gpus: 0
-
-##########################################################################################################
-################################## DATA ANALYSIS PIPELINE CONFIGURATION ##################################
-##########################################################################################################
-
-group_by: "point_range"
-conditions:
-  - auxin_concentration_um: 0
-    strain:
-      - wBT186
-      - wBT437
-      - wBT438
-      - wBT439
-    point_range:
-      - [0, 26]
-      - [27, 54]
-      - [55, 86]
-      - [87, 120]
-  - auxin_concentration_um: 10
-    strain:  
-      - wBT186
-      - wBT437
-      - wBT438
-      - wBT439
-    point_range:
-      - [121, 147]
-      - [148, 176]
-      - [177, 204]
-      - [205, 232]
-  - auxin_concentration_um: 50
-    strain:
-      - wBT186
-      - wBT437
-      - wBT438
-      - wBT439
-    point_range:
-      - [233, 250]
-      - [251, 274]
-      - [275, 298]
-      - [299, 330]
-
-# group_by: "pad"
-# conditions:
-#   - strain: wBT397
-#     auxin_concentration_um: 1000
-#     pad: pad1
-#   - strain: wBT405
-#     auxin_concentration_um: 1000
-#     pad: pad2
+sbatch_cpus: 64
+sbatch_gpus: "rtx6000:1"

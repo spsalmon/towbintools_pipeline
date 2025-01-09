@@ -3,6 +3,7 @@ import os
 
 import pytorch_lightning as pl
 import pytorch_lightning.callbacks as callbacks
+import pytorch_lightning.loggers as pl_loggers
 import torch.nn as nn
 import yaml
 from towbintools.deep_learning.deep_learning_tools import (
@@ -77,6 +78,7 @@ accumulate_grad_batches = config.get("accumulate_grad_batches", 8)
 num_workers = config.get("num_workers", 8)
 save_best_k_models = config.get("save_best_k_models", 2)
 train_val_split_ratio = config.get("train_val_split_ratio", 0.25)
+train_test_split_ratio = config.get("train_test_split_ratio", 0.1)
 checkpoint_path = config.get("continue_training_from_checkpoint", None)
 
 model_save_dir = os.path.join(save_dir, model_name)
@@ -98,6 +100,8 @@ if training_filemap is not None:
         validation_transform=get_prediction_augmentation(
             normalization_type, **normalization_parameters
         ),
+        validation_set_ratio=train_val_split_ratio,
+        test_set_ratio=train_test_split_ratio,
     )
 
 else:
@@ -122,6 +126,8 @@ else:
         validation_transform=get_prediction_augmentation(
             normalization_type, **normalization_parameters
         ),
+        validation_set_ratio=train_val_split_ratio,
+        test_set_ratio=train_test_split_ratio,
     )
 
 # initialize model
@@ -154,6 +160,9 @@ checkpoint_callback = callbacks.ModelCheckpoint(
 )
 swa_callback = callbacks.StochasticWeightAveraging(swa_lrs=1e-2)
 
+# configure logger
+logger = pl_loggers.TensorBoardLogger(model_save_dir)
+
 trainer = pl.Trainer(
     max_epochs=max_epochs,
     accelerator="gpu",
@@ -162,6 +171,7 @@ trainer = pl.Trainer(
     accumulate_grad_batches=accumulate_grad_batches,
     gradient_clip_val=0.5,
     detect_anomaly=False,
+    logger=logger,
 )
 trainer.fit(model=model, train_dataloaders=train_loader, val_dataloaders=val_loader)
 print(checkpoint_callback.best_model_path)
