@@ -52,20 +52,20 @@ def run_detect_molts(
         f"{volume_column}_at_{molt}" for molt in ["HatchTime", "M1", "M2", "M3", "M4"]
     ]
     print(f"Point {point} done, ecdysis: {ecdysis}")
+
     return {
         "Point": point,
         "HatchTime": ecdysis["hatch_time"],
-        volume_names[0]: volume_at_ecdysis["volume_at_hatch"],
         "M1": ecdysis["M1"],
-        volume_names[1]: volume_at_ecdysis["volume_at_M1"],
         "M2": ecdysis["M2"],
-        volume_names[2]: volume_at_ecdysis["volume_at_M2"],
         "M3": ecdysis["M3"],
-        volume_names[3]: volume_at_ecdysis["volume_at_M3"],
         "M4": ecdysis["M4"],
+        volume_names[0]: volume_at_ecdysis["volume_at_hatch"],
+        volume_names[1]: volume_at_ecdysis["volume_at_M1"],
+        volume_names[2]: volume_at_ecdysis["volume_at_M2"],
+        volume_names[3]: volume_at_ecdysis["volume_at_M3"],
         volume_names[4]: volume_at_ecdysis["volume_at_M4"],
     }
-
 
 def compute_other_features_at_molt(
     analysis_filemap, molt_dataframe, volume_column, worm_type_column, point
