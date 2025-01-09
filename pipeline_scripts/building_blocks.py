@@ -315,7 +315,7 @@ class StraighteningBuildingBlock(BuildingBlock):
             if column not in experiment_filemap.columns:
                 try:
                     report_subdir = config["report_subdir"]
-                    column_subdir = os.path.join(config["analysis_subdir"], column)
+                    column_subdir = os.path.join(config['experiment_dir'], column)
                     experiment_filemap = add_dir_to_experiment_filemap(
                         experiment_filemap, column_subdir, column
                     )
