@@ -11,12 +11,20 @@ from shinywidgets import output_widget, render_widget
 from towbintools.data_analysis import compute_series_at_time_classified
 from towbintools.foundation import image_handling
 from towbintools.foundation.worm_features import get_features_to_compute_at_molt
+import scipy.io as sio
 
 FEATURES_TO_COMPUTE_AT_MOLT = get_features_to_compute_at_molt()
 
-# filemap_path = "/mnt/towbin.data/shared/spsalmon/pipeline_test_folder/analysis/report/analysis_filemap.csv"
-filemap_path = "/mnt/towbin.data/shared/kstojanovski/20240429_Orca_10x_20h_IAA_1_min_sampling_wBT160-182-186-190-25C_20240429_115434_078/analysis_sacha/report/analysis_filemap.csv"
+KEY_CONVERSION_MAP = {
+    "vol": "volume",
+    "len": "length",
+    "strClass": "worm_type",
+    "ecdys": "ecdysis",
+}
 
+# filemap_path = "/mnt/towbin.data/shared/spsalmon/pipeline_test_folder/analysis/report/analysis_filemap.csv"
+# filemap_path = "/mnt/towbin.data/shared/kstojanovski/20240429_Orca_10x_20h_IAA_1_min_sampling_wBT160-182-186-190-25C_20240429_115434_078/analysis_sacha/report/analysis_filemap.csv"
+filemap_path = "/mnt/towbin.data/shared/kstojanovski/20240212_Orca_10x_yap-1del_col-10-tir_wBT160-186-310-337-380-393_25C_20240212_164059_429/analysis_sacha/report/analysis_filemap.csv"
 filemap = pd.read_csv(filemap_path)
 
 filemap_folder = os.path.dirname(filemap_path)
@@ -151,24 +159,29 @@ if "M4" not in filemap.columns.tolist():
     filemap["M4"] = np.nan
 
 # create columns for features at molts if they do not exist
-columns = filemap.columns.tolist()
-feature_columns = []
-for feature in FEATURES_TO_COMPUTE_AT_MOLT:
-    feature_columns.extend(
-        [col for col in columns if feature in col and "_at_" not in col]
-    )
 
-ecdys_event_list = ['HatchTime', 'M1', 'M2', 'M3', 'M4']
-for feature_column in feature_columns:
-    for ecdys_event in ecdys_event_list:
-        feature_at_ecdysis_column = f"{feature_column}_at_{ecdys_event}"
-        if feature_at_ecdysis_column not in columns:
-            # filemap[feature_at_ecdysis_column] = np.nan
-            for point in points:
-                data_of_point = filemap.loc[filemap["Point"] == point]
-                filemap.loc[filemap["Point"] == point, [feature_at_ecdysis_column]] = compute_series_at_time_classified(
-                    data_of_point[feature_column].values, data_of_point[worm_type_column].values, data_of_point[ecdys_event].values[0]
-                )
+def create_feature_at_molt_columns(filemap, recompute_features=False):
+    columns = filemap.columns.tolist()
+    feature_columns = []
+    for feature in FEATURES_TO_COMPUTE_AT_MOLT:
+        feature_columns.extend(
+            [col for col in columns if feature in col and "_at_" not in col]
+        )
+
+    ecdys_event_list = ['HatchTime', 'M1', 'M2', 'M3', 'M4']
+    for feature_column in feature_columns:
+        for ecdys_event in ecdys_event_list:
+            feature_at_ecdysis_column = f"{feature_column}_at_{ecdys_event}"
+            if (feature_at_ecdysis_column not in columns) or recompute_features:
+                # filemap[feature_at_ecdysis_column] = np.nan
+                for point in points:
+                    data_of_point = filemap.loc[filemap["Point"] == point]
+                    filemap.loc[filemap["Point"] == point, [feature_at_ecdysis_column]] = compute_series_at_time_classified(
+                        data_of_point[feature_column].values, data_of_point[worm_type_column].values, data_of_point[ecdys_event].values[0]
+                    )
+    return filemap, feature_columns
+
+filemap, feature_columns = create_feature_at_molt_columns(filemap)
 
 
 def save_filemap(filemap=filemap):
@@ -243,6 +256,7 @@ molt_annotator = ui.column(
                 value=700,
             ),
             ui.input_checkbox("log_scale", "Log scale", value=True),
+            ui.input_file("import_file", "Import Molts", accept=[".csv", ".mat"], multiple=False),
         ),
         align="center",
     ),
@@ -476,6 +490,96 @@ def server(input, output, session):
     value_at_m2 = reactive.Value("")
     value_at_m3 = reactive.Value("")
     value_at_m4 = reactive.Value("")
+
+
+    @reactive.calc
+    def import_molts():
+        file = input.import_file()
+        if file is None:
+            return None
+        if file[0]["datapath"].endswith(".csv"):
+            print(f"Importing molts from {file[0]['datapath']} ...")
+            molts_df = pd.read_csv(file[0]["datapath"])
+            return molts_df
+        elif file[0]["datapath"].endswith(".mat"):
+            matlab_report = sio.loadmat(file[0]["datapath"], chars_as_strings=False)
+            # Convert keys
+            new_matlab_report = {}
+            for key, value in matlab_report.items():
+                if key.startswith("__"):
+                    continue
+                try:
+                    new_key = KEY_CONVERSION_MAP.get(key)
+                    new_matlab_report[new_key] = value
+                except Exception as e:
+                    continue
+            
+        point = np.arange(0, new_matlab_report["volume"].shape[0])
+        time = np.arange(0, new_matlab_report["volume"].shape[1])
+
+        # combine each point with every time
+        time_point = np.array(np.meshgrid(point, time)).T.reshape(-1, 2)
+
+        time = time_point[:, 1]
+        point = time_point[:, 0]
+
+        # put everything into a nice dataframe
+        data = {
+            "Point": point,
+            "Time": time,
+        }
+        df = pd.DataFrame(data)
+
+        try:
+            ecdysis = new_matlab_report["ecdysis"]
+            hatch, M1, M2, M3, M4 = np.split(ecdysis, 5, axis=1)
+
+            for point, molts in enumerate(ecdysis):
+                HatchTime, M1, M2, M3, M4 = molts
+                # convert to int if not nan
+                if not np.isnan(HatchTime):
+                    HatchTime = int(HatchTime) - 1
+                if not np.isnan(M1):
+                    M1 = int(M1) - 1
+                if not np.isnan(M2):
+                    M2 = int(M2) - 1
+                if not np.isnan(M3):
+                    M3 = int(M3) - 1
+                if not np.isnan(M4):
+                    M4 = int(M4) - 1
+
+                df.loc[df["Point"] == point, "HatchTime"] = HatchTime
+                df.loc[df["Point"] == point, "M1"] = M1
+                df.loc[df["Point"] == point, "M2"] = M2
+                df.loc[df["Point"] == point, "M3"] = M3
+                df.loc[df["Point"] == point, "M4"] = M4
+        except KeyError:
+            print("No molts found in the matlab report")
+
+        return df
+
+    @reactive.Effect
+    @reactive.event(input.import_file)
+    def replace_molts():
+        print("Replacing molts ...")
+        global filemap
+        molts_df = import_molts()
+
+        if molts_df is None:
+            return
+
+        print(molts_df.head())
+        if molts_df is not None:
+            for molt_column in molts_df.columns:
+                try:
+                    new_molt = molts_df[molt_column]
+                    molt = filemap[molt_column]
+                    if new_molt.values.shape == molt.values.shape:
+                        filemap[molt_column] = new_molt
+                except KeyError:
+                    print(f"Column {molt_column} not found in the imported file")
+
+            filemap, _ = create_feature_at_molt_columns(filemap, recompute_features=True)
 
     @reactive.Calc
     def get_images_of_point():
