@@ -25,7 +25,9 @@ from towbintools.foundation.file_handling import get_dir_filemap
 from typing import Dict, List, Tuple, Any
 from towbintools.foundation.image_handling import read_tiff_file
 from tifffile import imwrite
+from towbintools.foundation.worm_features import get_features_to_compute_at_molt
 
+FEATURES_TO_COMPUTE_AT_MOLT = get_features_to_compute_at_molt()
 
 # BUILDING THE PLOTTING STRUCTURE
 
@@ -168,7 +170,7 @@ def separate_column_by_point(filemap, column):
 
 
 def build_plotting_struct(
-    experiment_dir, filemap_path, config_path, organ_channels={"body": 2, "pharynx": 1}
+    experiment_dir, filemap_path, config_path, organ_channels={"body": 2, "pharynx": 1}, recompute_values_at_molt=False,
 ):
 
     experiment_filemap = pd.read_csv(filemap_path)
@@ -241,33 +243,51 @@ def build_plotting_struct(
             organ_columns = [
                 col for col in condition_df.columns if col.startswith(organ_channel)
             ]
+
+            # remove any column with _at_ in it
             organ_columns = [col for col in organ_columns if "_at_" not in col]
-            renamed_organ_columns = [
+
+            # get the columns that contain the interesting features
+            organ_feature_columns = []
+            for feature in FEATURES_TO_COMPUTE_AT_MOLT:
+                organ_feature_columns.extend(
+                    [col for col in organ_columns if feature in col]
+                )
+            
+            renamed_organ_feature_columns = [
                 col.replace(organ_channel, organ) for col in organ_columns
             ]
 
             for organ_column, renamed_organ_column in zip(
-                organ_columns, renamed_organ_columns
+                organ_columns, renamed_organ_feature_columns
             ):
                 condition_dict[renamed_organ_column] = separate_column_by_point(
                     condition_df, organ_column
                 )
 
             # remove any column with worm_type in it
-            renamed_organ_columns = [
-                col for col in renamed_organ_columns if "worm_type" not in col
+            renamed_organ_feature_columns = [
+                col for col in renamed_organ_feature_columns if "worm_type" not in col
             ]
-            for column in renamed_organ_columns:
-                condition_dict[f"{column}_at_ecdysis"] = np.stack(
-                    [
-                        compute_series_at_time_classified(
-                            condition_dict[column][i],
-                            worm_types[i],
-                            ecdysis_time_step[i],
-                        )
-                        for i in range(len(ecdysis_time_step))
-                    ]
-                )
+
+            # compute the features of the organ at each molt
+            for column in renamed_organ_feature_columns:
+                column_at_molt = f"{column}_at_ecdysis"
+                if recompute_values_at_molt or (column_at_molt not in condition_df.columns):
+                    condition_dict[column_at_molt] = np.stack(
+                        [
+                            compute_series_at_time_classified(
+                                condition_dict[column][i],
+                                worm_types[i],
+                                ecdysis_time_step[i],
+                            )
+                            for i in range(len(ecdysis_time_step))
+                        ]
+                    )
+                else:
+                    condition_dict[column_at_molt] = separate_column_by_point(
+                        condition_df, column_at_molt
+                    )
 
         condition_dict["time"] = separate_column_by_point(condition_df, "Time").astype(
             float
@@ -298,7 +318,7 @@ def remove_unwanted_info(conditions_info):
             condition.pop("condition_id")
     return conditions_info
 
-def combine_experiments(filemap_paths, config_paths, experiment_dirs=None, organ_channels=[{"body": 2, "pharynx": 1}]):
+def combine_experiments(filemap_paths, config_paths, experiment_dirs=None, organ_channels=[{"body": 2, "pharynx": 1}], recompute_values_at_molt=False):
     all_conditions_struct = []
     condition_info_merge_list = []
     conditions_info_keys = set()
@@ -320,7 +340,7 @@ def combine_experiments(filemap_paths, config_paths, experiment_dirs=None, organ
             experiment_dirs[i] if experiment_dirs else os.path.dirname(filemap_path)
         )
         conditions_struct, conditions_info = build_plotting_struct(
-            experiment_dir, filemap_path, config_path, organ_channels=organ_channel,
+            experiment_dir, filemap_path, config_path, organ_channels=organ_channel, recompute_values_at_molt=recompute_values_at_molt
         )
 
         # Process conditions for this experiment

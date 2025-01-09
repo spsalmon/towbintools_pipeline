@@ -1,17 +1,10 @@
-import argparse
 import logging
 import os
 import re
-
-import numpy as np
 import pandas as pd
 import utils
-import yaml
 from joblib import Parallel, delayed
-from tifffile import imwrite
 from towbintools.foundation import image_handling, worm_features
-from towbintools.segmentation import segmentation_tools
-
 
 def compute_morphological_features_from_file_path(straightened_mask_path, pixelsize, features):
     """Compute the volume of a straightened mask."""
@@ -47,7 +40,7 @@ def main(input_pickle, output_file, config, n_jobs):
     morphological_features_dataframe = pd.DataFrame(morphological_features)
 
     # rename columns to match the rest of the pipeline
-    output_file_basename = os.path.basename(output_file).split("_volume.csv")[0]
+    output_file_basename = os.path.basename(output_file).split("_morphology.csv")[0]
     for feature in config["morphological_features"]:
         morphological_features_dataframe.rename(
             columns={

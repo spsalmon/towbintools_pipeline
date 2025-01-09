@@ -6,7 +6,9 @@ import utils
 from joblib import Parallel, delayed
 from towbintools.data_analysis import compute_series_at_time_classified, smooth_series_classified
 from towbintools.foundation import detect_molts
+from towbintools.foundation.worm_features import get_features_to_compute_at_molt
 
+FEATURES_TO_COMPUTE_AT_MOLT = get_features_to_compute_at_molt()
 
 def run_detect_molts(
     analysis_filemap,
@@ -71,24 +73,12 @@ def compute_other_features_at_molt(
     data_of_point = analysis_filemap[analysis_filemap["Point"] == point]
     molt_data_of_point = molt_dataframe[molt_dataframe["Point"] == point]
     data_of_point = data_of_point.sort_values(by=["Time"])
-    volumes = data_of_point[volume_column].values
     worm_types = data_of_point[worm_type_column].values
 
-    # get the columns of the features to compute at each molt
-    volumes_to_compute = [
-        column
-        for column in data_of_point.columns
-        if ("volume" in column and "VolumeAt" not in column and column != volume_column and "at_" not in column)
-    ]
-    lengths_to_compute = [
-        column for column in data_of_point.columns if ("length" in column) and ("at_" not in column)
-    ]
-    areas_to_compute = [
-        column for column in data_of_point.columns if ("area" in column) and ("at_" not in column)
-    ]
-
-    columns_to_compute = volumes_to_compute + lengths_to_compute + areas_to_compute
-
+    columns_to_compute = []
+    for feature in FEATURES_TO_COMPUTE_AT_MOLT:
+        columns_to_compute.extend([column for column in data_of_point.columns if (feature in column) and ("at_" not in column)])
+        
     # compute the features at each molt
     features_at_molt = {"Point": point}
 

@@ -27,7 +27,7 @@ OPTIONS_MAP = {
         "model_path",
         "predict_on_tiles",
         "tiler_config",
-        "RGB",
+        "enforce_n_channels",
         "activation_layer",
         "batch_size",
         "ilastik_project_path",
@@ -82,11 +82,11 @@ DEFAULT_OPTIONS = {
             "gaussian_filter_sigma": [1.0],
             "predict_on_tiles": [False],
             "tiler_config": [None],
-            "RGB": [False],
+            "enforce_n_channels": [None],
             "activation_layer": [None],
 
             # default options for segmentation that are either almost never used, or allow the user to make their config file shorter
-            # if some of those options are missing, some methods will not work (ie. ilastik if ilaistk_project_path is missing)
+            # if some of those options are missing, some methods will not work (ie. ilastik if ilastik_project_path is missing)
             "run_segmentation_on": [None],
             "ilastik_project_path": [None],
             "ilastik_result_channel": [None],
