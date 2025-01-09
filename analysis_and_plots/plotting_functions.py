@@ -25,7 +25,9 @@ from towbintools.foundation.file_handling import get_dir_filemap
 from typing import Dict, List, Tuple, Any
 from towbintools.foundation.image_handling import read_tiff_file
 from tifffile import imwrite
+from towbintools.foundation.worm_features import get_features_to_compute_at_molt
 
+FEATURES_TO_COMPUTE_AT_MOLT = get_features_to_compute_at_molt()
 
 # BUILDING THE PLOTTING STRUCTURE
 
@@ -168,7 +170,7 @@ def separate_column_by_point(filemap, column):
 
 
 def build_plotting_struct(
-    experiment_dir, filemap_path, config_path, organ_channels={"body": 2, "pharynx": 1}
+    experiment_dir, filemap_path, config_path, organ_channels={"body": 2, "pharynx": 1}, recompute_values_at_molt=False,
 ):
 
     experiment_filemap = pd.read_csv(filemap_path)
@@ -241,33 +243,51 @@ def build_plotting_struct(
             organ_columns = [
                 col for col in condition_df.columns if col.startswith(organ_channel)
             ]
+
+            # remove any column with _at_ in it
             organ_columns = [col for col in organ_columns if "_at_" not in col]
-            renamed_organ_columns = [
+
+            # get the columns that contain the interesting features
+            organ_feature_columns = []
+            for feature in FEATURES_TO_COMPUTE_AT_MOLT:
+                organ_feature_columns.extend(
+                    [col for col in organ_columns if feature in col]
+                )
+            
+            renamed_organ_feature_columns = [
                 col.replace(organ_channel, organ) for col in organ_columns
             ]
 
             for organ_column, renamed_organ_column in zip(
-                organ_columns, renamed_organ_columns
+                organ_columns, renamed_organ_feature_columns
             ):
                 condition_dict[renamed_organ_column] = separate_column_by_point(
                     condition_df, organ_column
                 )
 
             # remove any column with worm_type in it
-            renamed_organ_columns = [
-                col for col in renamed_organ_columns if "worm_type" not in col
+            renamed_organ_feature_columns = [
+                col for col in renamed_organ_feature_columns if "worm_type" not in col
             ]
-            for column in renamed_organ_columns:
-                condition_dict[f"{column}_at_ecdysis"] = np.stack(
-                    [
-                        compute_series_at_time_classified(
-                            condition_dict[column][i],
-                            worm_types[i],
-                            ecdysis_time_step[i],
-                        )
-                        for i in range(len(ecdysis_time_step))
-                    ]
-                )
+
+            # compute the features of the organ at each molt
+            for column in renamed_organ_feature_columns:
+                column_at_molt = f"{column}_at_ecdysis"
+                if recompute_values_at_molt or (column_at_molt not in condition_df.columns):
+                    condition_dict[column_at_molt] = np.stack(
+                        [
+                            compute_series_at_time_classified(
+                                condition_dict[column][i],
+                                worm_types[i],
+                                ecdysis_time_step[i],
+                            )
+                            for i in range(len(ecdysis_time_step))
+                        ]
+                    )
+                else:
+                    condition_dict[column_at_molt] = separate_column_by_point(
+                        condition_df, column_at_molt
+                    )
 
         condition_dict["time"] = separate_column_by_point(condition_df, "Time").astype(
             float
@@ -298,7 +318,7 @@ def remove_unwanted_info(conditions_info):
             condition.pop("condition_id")
     return conditions_info
 
-def combine_experiments(filemap_paths, config_paths, experiment_dirs=None, organ_channels=[{"body": 2, "pharynx": 1}]):
+def combine_experiments(filemap_paths, config_paths, experiment_dirs=None, organ_channels=[{"body": 2, "pharynx": 1}], recompute_values_at_molt=False):
     all_conditions_struct = []
     condition_info_merge_list = []
     conditions_info_keys = set()
@@ -320,7 +340,7 @@ def combine_experiments(filemap_paths, config_paths, experiment_dirs=None, organ
             experiment_dirs[i] if experiment_dirs else os.path.dirname(filemap_path)
         )
         conditions_struct, conditions_info = build_plotting_struct(
-            experiment_dir, filemap_path, config_path, organ_channels=organ_channel,
+            experiment_dir, filemap_path, config_path, organ_channels=organ_channel, recompute_values_at_molt=recompute_values_at_molt
         )
 
         # Process conditions for this experiment
@@ -638,14 +658,18 @@ def boxplot_at_molt(
     conditions_to_plot,
     log_scale: bool = True,
     figsize: tuple = None,
-    color_palette="colorblind",
+    colors=None,
     plot_significance: bool = False,
     legend=None,
     y_axis_label=None,
     titles=None,
 ):
 
-    color_palette = sns.color_palette(color_palette, len(conditions_to_plot))
+    if colors is None:
+        color_palette = sns.color_palette("colorblind", len(conditions_to_plot))
+    else:
+        color_palette = colors
+
     # Prepare data
     data_list = []
     for condition_id in conditions_to_plot:
@@ -750,6 +774,130 @@ def boxplot_at_molt(
     plt.tight_layout()
     plt.show()
 
+def plot_developmental_success(
+    conditions_struct,
+    conditions_to_plot,
+    colors=None,
+    figsize=None,
+    legend=None,
+):
+    if colors is None:
+        color_palette = sns.color_palette("colorblind", len(conditions_to_plot))
+    else:
+        color_palette = colors
+
+    if figsize is None:
+        figsize = (5*4, 6)
+
+    fig, ax = plt.subplots(1, 4, figsize=figsize)
+
+    for i, condition_id in enumerate(conditions_to_plot):
+        condition_dict = conditions_struct[condition_id]
+
+        ecdysis = condition_dict["ecdysis_time_step"]
+
+        m1_completion = ~np.isnan(ecdysis[:, 1])    
+        m2_completion = np.logical_and(~np.isnan(ecdysis[:, 2]), ~np.isnan(ecdysis[:, 1]))
+        m3_completion = np.logical_and(~np.isnan(ecdysis[:, 3]), ~np.isnan(ecdysis[:, 2]))
+        m4_completion = np.logical_and(~np.isnan(ecdysis[:, 4]), ~np.isnan(ecdysis[:, 3]))
+
+        m1_completion_rate = np.sum(m1_completion) / len(ecdysis)
+        m2_completion_rate = np.sum(m2_completion) / len(ecdysis)
+        m3_completion_rate = np.sum(m3_completion) / len(ecdysis)
+        m4_completion_rate = np.sum(m4_completion) / len(ecdysis)
+
+        label = build_legend(condition_dict, legend)
+        ax[0].bar(i, m1_completion_rate, color=color_palette[i], label=label, edgecolor='black', linewidth=2)
+        ax[1].bar(i, m2_completion_rate, color=color_palette[i], label=label, edgecolor='black', linewidth=2)
+        ax[2].bar(i, m3_completion_rate, color=color_palette[i], label=label, edgecolor='black', linewidth=2)
+        ax[3].bar(i, m4_completion_rate, color=color_palette[i], label=label, edgecolor='black', linewidth=2)
+
+    ax[0].set_title("M1")
+    ax[1].set_title("M2")
+    ax[2].set_title("M3")
+    ax[3].set_title("M4")
+
+    ax[0].set_ylabel("Successful molts (%)")
+
+    # remove ticks
+    for i in range(4):
+        ax[i].tick_params(
+            axis="x", which="both", bottom=False, top=False, labelbottom=False
+        )
+
+    plt.legend()
+    plt.show()
+
+def plot_arrests(
+    conditions_struct,
+    conditions_to_plot,
+    colors=None,
+    figsize=None,
+    legend=None,
+):
+    if colors is None:
+        color_palette = sns.color_palette("colorblind", len(conditions_to_plot))
+    else:
+        color_palette = colors
+
+    if figsize is None:
+        figsize = (5*4, 6)
+
+    fig, ax = plt.subplots(1, 4, figsize=figsize)
+
+    for i, condition_id in enumerate(conditions_to_plot):
+        condition_dict = conditions_struct[condition_id]
+
+        ecdysis = condition_dict["ecdysis_time_step"]
+
+        # m1_arrest = np.isnan(ecdysis[:, 1])
+        # m2_arrest = np.logical_and(np.isnan(ecdysis[:, 2]), ~m1_arrest)
+        # m3_arrest = np.logical_and(np.isnan(ecdysis[:, 3]), ~m2_arrest)
+        # m4_arrest = np.logical_and(np.isnan(ecdysis[:, 4]), ~m3_arrest)
+
+
+        # l1_arrest_rate = np.sum(m1_arrest) / len(ecdysis)
+        # l2_arrest_rate = np.sum(m2_arrest) / np.sum(~m1_arrest)
+        # l3_arrest_rate = np.sum(m3_arrest) / np.sum(~m2_arrest)
+        # l4_arrest_rate = np.sum(m4_arrest) / np.sum(~m3_arrest)
+
+        m1_arrest = np.isnan(ecdysis[:, 1])  # arrested in L1
+        m2_arrest = np.logical_and(np.isnan(ecdysis[:, 2]), ~np.isnan(ecdysis[:, 1]))  # passed L1 but arrested in L2
+        m3_arrest = np.logical_and(np.isnan(ecdysis[:, 3]), ~np.isnan(ecdysis[:, 2]))  # passed L2 but arrested in L3
+        m4_arrest = np.logical_and(np.isnan(ecdysis[:, 4]), ~np.isnan(ecdysis[:, 3]))  # passed L3 but arrested in L4
+
+        # Calculate rates - each rate is: number arrested in stage / number that entered that stage
+        l1_arrest_rate = np.sum(m1_arrest) / len(ecdysis)  # all animals enter L1
+        l2_arrest_rate = np.sum(m2_arrest) / np.sum(~np.isnan(ecdysis[:, 1]))  # only L1 completers enter L2
+        l3_arrest_rate = np.sum(m3_arrest) / np.sum(~np.isnan(ecdysis[:, 2]))  # only L2 completers enter L3
+        l4_arrest_rate = np.sum(m4_arrest) / np.sum(~np.isnan(ecdysis[:, 3]))  # only L3 completers enter L4
+
+        print(np.sum(m1_arrest), np.sum(m2_arrest), np.sum(m3_arrest), np.sum(m4_arrest))
+        print(len(ecdysis), np.sum(~m1_arrest), np.sum(~m2_arrest), np.sum(~m3_arrest))
+
+        label = build_legend(condition_dict, legend)
+
+        ax[0].bar(i, l1_arrest_rate, color=color_palette[i], label=label, edgecolor='black', linewidth=2)
+        ax[1].bar(i, l2_arrest_rate, color=color_palette[i], label=label, edgecolor='black', linewidth=2)
+        ax[2].bar(i, l3_arrest_rate, color=color_palette[i], label=label, edgecolor='black', linewidth=2)
+        ax[3].bar(i, l4_arrest_rate, color=color_palette[i], label=label, edgecolor='black', linewidth=2)
+
+
+    ax[0].set_title("L1")
+    ax[1].set_title("L2")
+    ax[2].set_title("L3")
+    ax[3].set_title("L4")
+
+    ax[0].set_ylabel("Arrest rate (%)")
+
+    # remove ticks
+    for i in range(4):
+        ax[i].tick_params(
+            axis="x", which="both", bottom=False, top=False, labelbottom=False
+        )
+
+    plt.legend()
+    plt.show()
 
 def plot_growth_curves_individuals(
     conditions_struct,

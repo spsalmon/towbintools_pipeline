@@ -10,16 +10,18 @@ from shiny import App, reactive, render, ui
 from shinywidgets import output_widget, render_widget
 from towbintools.data_analysis import compute_series_at_time_classified
 from towbintools.foundation import image_handling
+from towbintools.foundation.worm_features import get_features_to_compute_at_molt
+
+FEATURES_TO_COMPUTE_AT_MOLT = get_features_to_compute_at_molt()
 
 # filemap_path = "/mnt/towbin.data/shared/spsalmon/pipeline_test_folder/analysis/report/analysis_filemap.csv"
-filemap_path = "/mnt/towbin.data/shared/spsalmon/20241014_153459_824_ZIVA_40x_443_training_db/analysis/report/analysis_filemap.csv"
+filemap_path = "/mnt/towbin.data/shared/kstojanovski/20240429_Orca_10x_20h_IAA_1_min_sampling_wBT160-182-186-190-25C_20240429_115434_078/analysis_sacha/report/analysis_filemap.csv"
 
 filemap = pd.read_csv(filemap_path)
 
 filemap_folder = os.path.dirname(filemap_path)
 filemap_name = os.path.basename(filemap_path)
 filemap_name = filemap_name.split(".")[0]
-
 
 def get_backup_path(filemap_folder, filemap_name):
     # check if the filemap is already annotated
@@ -120,16 +122,17 @@ base_volume_column = [
     if "volume" in column and "_at_" not in column
 ][0]
 
-
 segmentation_columns = [
     column
     for column in filemap.columns.tolist()
     if "seg" in column
     and "str" not in column
     and "worm_type" not in column
+    and "length" not in column
     and "volume" not in column
     and "area" not in column
-    and "length" not in column
+    and "width" not in column
+    and "fluo" not in column
 ]
 overlay_segmentation_choices = ["None"] + segmentation_columns
 
@@ -146,6 +149,26 @@ if "M3" not in filemap.columns.tolist():
     filemap["M3"] = np.nan
 if "M4" not in filemap.columns.tolist():
     filemap["M4"] = np.nan
+
+# create columns for features at molts if they do not exist
+columns = filemap.columns.tolist()
+feature_columns = []
+for feature in FEATURES_TO_COMPUTE_AT_MOLT:
+    feature_columns.extend(
+        [col for col in columns if feature in col and "_at_" not in col]
+    )
+
+ecdys_event_list = ['HatchTime', 'M1', 'M2', 'M3', 'M4']
+for feature_column in feature_columns:
+    for ecdys_event in ecdys_event_list:
+        feature_at_ecdysis_column = f"{feature_column}_at_{ecdys_event}"
+        if feature_at_ecdysis_column not in columns:
+            # filemap[feature_at_ecdysis_column] = np.nan
+            for point in points:
+                data_of_point = filemap.loc[filemap["Point"] == point]
+                filemap.loc[filemap["Point"] == point, [feature_at_ecdysis_column]] = compute_series_at_time_classified(
+                    data_of_point[feature_column].values, data_of_point[worm_type_column].values, data_of_point[ecdys_event].values[0]
+                )
 
 
 def save_filemap(filemap=filemap):
@@ -263,7 +286,7 @@ timepoint_selector = ui.column(
             "column_to_plot",
             "Select column to plot",
             selected=base_volume_column,
-            choices=filemap.columns.tolist(),
+            choices=feature_columns,
         )
     ),
     ui.row(ui.input_action_button("save", "Save")),
