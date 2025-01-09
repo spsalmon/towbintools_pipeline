@@ -88,7 +88,13 @@ def main(input_pickle, output_pickle, config, n_jobs):
         # Load the model
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         model = load_segmentation_model_from_checkpoint(config["model_path"]).to(device)
-        preprocessing_fn = get_prediction_augmentation_from_model(model)
+
+        enforce_n_channels = config.get("enforce_n_channels", None)
+        if enforce_n_channels is not None:
+            preprocessing_fn = get_prediction_augmentation_from_model(model, enforce_n_channels=enforce_n_channels)
+        else:
+            preprocessing_fn = get_prediction_augmentation_from_model(model)
+
         batch_size = config["batch_size"]
         dataset = SegmentationPredictionDataset(input_files, config['segmentation_channels'], preprocessing_fn)
         dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=False, num_workers=n_jobs//2, pin_memory=True, collate_fn=dataset.collate_fn)
@@ -102,7 +108,10 @@ def main(input_pickle, output_pickle, config, n_jobs):
         with torch.no_grad():
             for i, batch in enumerate(dataloader):
                 image_paths, images, image_shapes = batch
-                images = torch.from_numpy(images)
+
+                if not isinstance(images, torch.Tensor):
+                    images = torch.from_numpy(images)
+
                 images = images.to(device)
                 predictions = model(images)
 

@@ -7,11 +7,11 @@ analysis_dir_name: "analysis"
 
 get_experiment_time: True
 
-building_blocks: ["segmentation", "straightening", "volume_computation", "classification", "molt_detection", "custom"]
+building_blocks: ["segmentation", "straightening", "morphology", "classification", "molt_detection", "custom"]
 
 rerun_segmentation: [False]
 rerun_straightening: [False]
-rerun_volume_computation: [False]
+rerun_morphology_computation: [False]
 rerun_classification: [False]
 rerun_molt_detection: [False]
 rerun_fluorescence_quantification: [False]
@@ -44,8 +44,9 @@ ilastik_result_channel: [0]
 straightening_source: [['analysis/ch2_seg', null]]
 straightening_masks: ['analysis/ch2_seg']
 
-# volume computation parameters
-volume_computation_masks: ['analysis/ch2_seg_str']
+# morphology computation parameters
+morphology_computation_masks: ['analysis/ch2_seg_str']
+morphological_features: [['length', 'area', 'volume', 'width_mean', 'width_median', 'width_std', 'width_cv', 'width_skew', 'width_kurtosis']]
 
 # classification parameters
 classification_source: ['analysis/ch2_seg_str']
