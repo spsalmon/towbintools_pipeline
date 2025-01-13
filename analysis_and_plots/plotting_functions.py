@@ -124,6 +124,7 @@ def get_ecdysis_and_durations(filemap):
     for point in filemap["Point"].unique():
         point_df = filemap[filemap["Point"] == point]
         point_ecdysis = point_df[["HatchTime", "M1", "M2", "M3", "M4"]].iloc[0]
+
         larval_stage_durations = list(
             compute_larval_stage_duration(point_ecdysis).values()
         )
@@ -137,6 +138,11 @@ def get_ecdysis_and_durations(filemap):
             if np.isnan(ecdys):
                 ecdysis_experiment_time.append(np.nan)
             else:
+                # if ecdys is not in the time column, get the closest time
+                if ecdys not in point_df["Time"].values:
+                    ecdys = point_df["Time"].iloc[
+                        np.abs(point_df["Time"] - ecdys).idxmin()
+                    ]
                 ecdys_experiment_time = point_df[point_df["Time"] == ecdys][
                     "ExperimentTime"
                 ].iloc[0]
@@ -651,7 +657,6 @@ def plot_correlation_at_ecdysis(
     plt.legend()
     plt.show()
 
-
 def boxplot_at_molt(
     conditions_struct,
     column,
@@ -664,12 +669,10 @@ def boxplot_at_molt(
     y_axis_label=None,
     titles=None,
 ):
-
     if colors is None:
         color_palette = sns.color_palette("colorblind", len(conditions_to_plot))
     else:
         color_palette = colors
-
     # Prepare data
     data_list = []
     for condition_id in conditions_to_plot:
@@ -684,19 +687,24 @@ def boxplot_at_molt(
                         column: np.log(value) if log_scale else value,
                     }
                 )
-
     df = pd.DataFrame(data_list)
-
+    
     # Determine figure size
     if figsize is None:
         figsize = (5 * df["Molt"].nunique(), 6)
-
     if titles is not None and len(titles) != df["Molt"].nunique():
         print("Number of titles does not match the number of ecdysis events.")
         titles = None
-
-    # Create plot
-    fig, ax = plt.subplots(1, df["Molt"].nunique(), figsize=figsize)
+    
+    # Create figure with extra space on the right for legend
+    fig, ax = plt.subplots(1, df["Molt"].nunique(), figsize=(figsize[0] + 3, figsize[1]))
+    
+    # Create a dummy plot to get proper legend handles
+    dummy_ax = fig.add_axes([0, 0, 0, 0])
+    for i, condition in enumerate(conditions_to_plot):
+        dummy_ax.plot([], [], color=color_palette[i], label=build_legend(conditions_struct[condition], legend))
+    dummy_ax.set_visible(False)
+    
     for i in range(df["Molt"].nunique()):
         sns.boxplot(
             data=df[df["Molt"] == i],
@@ -707,15 +715,9 @@ def boxplot_at_molt(
             showfliers=False,
             ax=ax[i],
             dodge=False,
+            linewidth=2,
+            legend=False
         )
-
-        handles, labels = ax[i].get_legend_handles_labels()
-        new_label_list = [
-            build_legend(conditions_struct[condition_id], legend)
-            for condition_id in conditions_to_plot
-        ]
-        ax[i].legend(handles, new_label_list)
-
         ylims = ax[i].get_ylim()
         sns.stripplot(
             data=df[df["Molt"] == i],
@@ -727,20 +729,19 @@ def boxplot_at_molt(
             dodge=True,
         )
         ax[i].set_ylim(ylims)
-
         ax[i].set_xlabel("")
         ax[i].set_ylabel("")
+        
         if titles is not None:
             ax[i].set_title(titles[i])
+        
         # remove ticks
         ax[i].tick_params(
             axis="x", which="both", bottom=False, top=False, labelbottom=False
         )
-
+        
         if plot_significance:
             pairs = list(combinations(df["Condition"].unique(), 2))
-            p_values = []
-
             bars = []
             for pair in pairs:
                 data1 = df[(df["Condition"] == pair[0]) & (df["Molt"] == i)][
@@ -752,26 +753,35 @@ def boxplot_at_molt(
                 if len(data1) == 0 or len(data2) == 0:
                     continue
                 p_value = mannwhitneyu(data1, data2).pvalue
-
-                # convert condition id to condition index
                 bar = [
                     conditions_to_plot.index(pair[0]),
                     conditions_to_plot.index(pair[1]),
                     p_value,
                 ]
                 bars.append(bar)
-
             starbars.draw_annotation(bars, ax=ax[i])
+    
     # Set y label for the first plot
     if y_axis_label is not None:
         ax[0].set_ylabel(y_axis_label)
     else:
         ax[0].set_ylabel(column)
-
-    # remove x label
-
-    # Adjust layout and show plot
-    plt.tight_layout()
+    
+    # Add legend to the right of the subplots
+    legend_labels = [build_legend(conditions_struct[condition_id], legend)
+                    for condition_id in conditions_to_plot]
+    legend_handles = dummy_ax.get_legend_handles_labels()[0]
+    
+    # Place legend to the right of the subplots
+    fig.legend(legend_handles, legend_labels,
+              bbox_to_anchor=(0.9, 0.5),
+              loc='center left',
+              title=None,
+              frameon=True)
+    
+    # Adjust layout while leaving space for legend
+    # plt.subplots_adjust(right=0.85)
+    
     plt.show()
 
 def plot_developmental_success(
@@ -1612,7 +1622,7 @@ def get_most_average_deviations_at_ecdysis(
     column_two: str,
     img_dir_list: List[str],
     control_condition_id: str,
-    conditions_to_plot: List[str],
+    conditions_to_plot: List[int],
     remove_hatch: bool = True,
     exclude_arrests: bool = False,
     dpi: int = 200,
@@ -1672,7 +1682,7 @@ def get_most_average_proportions_at_ecdysis(
     column_one: str,
     column_two: str,
     img_dir_list: List[str],
-    conditions_to_plot: List[str],
+    conditions_to_plot: List[int],
     remove_hatch: bool = True,
     exclude_arrests: bool = False,
     dpi: int = 200,
@@ -1736,7 +1746,7 @@ def get_most_average_size_at_ecdysis(
     conditions_struct: Dict,
     column : str,
     img_dir_list: List[str],
-    conditions_to_plot: List[str],
+    conditions_to_plot: List[int],
     remove_hatch: bool = True,
     exclude_arrests: bool = False,
     dpi: int = 200,
@@ -1788,3 +1798,46 @@ def get_most_average_size_at_ecdysis(
                     overlay=overlay,
                     cmap=cmap,
                 )
+
+def plot_heterogeneity_at_ecdysis(
+    conditions_struct: Dict,
+    column: str,
+    conditions_to_plot: List[int], 
+    remove_hatch = True, 
+    legend = None, 
+    x_axis_label = None, 
+    y_axis_label = None, 
+    exclude_arrests: bool = False,):
+    for condition in conditions_to_plot:
+        condition_dict = conditions_struct[condition]
+
+        values = condition_dict[column]
+
+        if remove_hatch:
+            values = values[:, 1:]
+
+        if exclude_arrests:
+            values = exclude_arrests_from_series(values)
+
+        cvs = []
+        for i in range(values.shape[1]):
+            values_at_ecdysis = values[:, i]
+            cv = np.nanstd(values_at_ecdysis) / np.nanmean(values_at_ecdysis)
+            cvs.append(cv)
+
+        label = build_legend(condition_dict, legend)
+
+        plt.plot(cvs, label = label, marker = 'o')
+
+    # replace the ticks by [L1, L2, L3, L4]
+    if remove_hatch:
+        plt.xticks(range(4), ['M1', 'M2', 'M3', 'M4'])
+    else:
+        plt.xticks(range(5), ['Hatch', 'M1', 'M2', 'M3', 'M4'])
+
+    plt.xlabel(x_axis_label)
+    plt.ylabel(y_axis_label)
+
+    plt.legend()
+
+    plt.show()

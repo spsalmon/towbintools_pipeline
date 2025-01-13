@@ -22,9 +22,8 @@ KEY_CONVERSION_MAP = {
     "ecdys": "ecdysis",
 }
 
-# filemap_path = "/mnt/towbin.data/shared/spsalmon/pipeline_test_folder/analysis/report/analysis_filemap.csv"
-filemap_path = "/mnt/towbin.data/shared/kstojanovski/20240429_Orca_10x_20h_IAA_1_min_sampling_wBT160-182-186-190-25C_20240429_115434_078/analysis_sacha/report/analysis_filemap.csv"
-# filemap_path = "/mnt/towbin.data/shared/kstojanovski/20240212_Orca_10x_yap-1del_col-10-tir_wBT160-186-310-337-380-393_25C_20240212_164059_429/analysis_sacha/report/analysis_filemap.csv"
+filemap_path = "/mnt/towbin.data/shared/kstojanovski/20240212_Orca_10x_yap-1del_col-10-tir_wBT160-186-310-337-380-393_25C_20240212_164059_429/analysis_sacha/report/analysis_filemap.csv"
+
 filemap = pd.read_csv(filemap_path)
 
 filemap_folder = os.path.dirname(filemap_path)
