@@ -499,7 +499,11 @@ def server(input, output, session):
         if file[0]["datapath"].endswith(".csv"):
             print(f"Importing molts from {file[0]['datapath']} ...")
             molts_df = pd.read_csv(file[0]["datapath"])
+            
+            # keep only the relevant columns
+            molts_df = molts_df[["Point", "Time", "HatchTime", "M1", "M2", "M3", "M4"]]
             return molts_df
+            
         elif file[0]["datapath"].endswith(".mat"):
             matlab_report = sio.loadmat(file[0]["datapath"], chars_as_strings=False)
             # Convert keys
@@ -513,49 +517,49 @@ def server(input, output, session):
                 except Exception as e:
                     continue
             
-        point = np.arange(0, new_matlab_report["volume"].shape[0])
-        time = np.arange(0, new_matlab_report["volume"].shape[1])
+            point = np.arange(0, new_matlab_report["volume"].shape[0])
+            time = np.arange(0, new_matlab_report["volume"].shape[1])
 
-        # combine each point with every time
-        time_point = np.array(np.meshgrid(point, time)).T.reshape(-1, 2)
+            # combine each point with every time
+            time_point = np.array(np.meshgrid(point, time)).T.reshape(-1, 2)
 
-        time = time_point[:, 1]
-        point = time_point[:, 0]
+            time = time_point[:, 1]
+            point = time_point[:, 0]
 
-        # put everything into a nice dataframe
-        data = {
-            "Point": point,
-            "Time": time,
-        }
-        df = pd.DataFrame(data)
+            # put everything into a nice dataframe
+            data = {
+                "Point": point,
+                "Time": time,
+            }
+            df = pd.DataFrame(data)
 
-        try:
-            ecdysis = new_matlab_report["ecdysis"]
-            hatch, M1, M2, M3, M4 = np.split(ecdysis, 5, axis=1)
+            try:
+                ecdysis = new_matlab_report["ecdysis"]
+                hatch, M1, M2, M3, M4 = np.split(ecdysis, 5, axis=1)
 
-            for point, molts in enumerate(ecdysis):
-                HatchTime, M1, M2, M3, M4 = molts
-                # convert to int if not nan
-                if not np.isnan(HatchTime):
-                    HatchTime = int(HatchTime) - 1
-                if not np.isnan(M1):
-                    M1 = int(M1) - 1
-                if not np.isnan(M2):
-                    M2 = int(M2) - 1
-                if not np.isnan(M3):
-                    M3 = int(M3) - 1
-                if not np.isnan(M4):
-                    M4 = int(M4) - 1
+                for point, molts in enumerate(ecdysis):
+                    HatchTime, M1, M2, M3, M4 = molts
+                    # convert to int if not nan
+                    if not np.isnan(HatchTime):
+                        HatchTime = int(HatchTime) - 1
+                    if not np.isnan(M1):
+                        M1 = int(M1) - 1
+                    if not np.isnan(M2):
+                        M2 = int(M2) - 1
+                    if not np.isnan(M3):
+                        M3 = int(M3) - 1
+                    if not np.isnan(M4):
+                        M4 = int(M4) - 1
 
-                df.loc[df["Point"] == point, "HatchTime"] = HatchTime
-                df.loc[df["Point"] == point, "M1"] = M1
-                df.loc[df["Point"] == point, "M2"] = M2
-                df.loc[df["Point"] == point, "M3"] = M3
-                df.loc[df["Point"] == point, "M4"] = M4
-        except KeyError:
-            print("No molts found in the matlab report")
+                    df.loc[df["Point"] == point, "HatchTime"] = HatchTime
+                    df.loc[df["Point"] == point, "M1"] = M1
+                    df.loc[df["Point"] == point, "M2"] = M2
+                    df.loc[df["Point"] == point, "M3"] = M3
+                    df.loc[df["Point"] == point, "M4"] = M4
+            except KeyError:
+                print("No molts found in the matlab report")
 
-        return df
+            return df
 
     @reactive.Effect
     @reactive.event(input.import_file)
