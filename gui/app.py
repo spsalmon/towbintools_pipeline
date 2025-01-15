@@ -22,7 +22,7 @@ KEY_CONVERSION_MAP = {
     "ecdys": "ecdysis",
 }
 
-filemap_path = "/mnt/towbin.data/shared/kstojanovski/20240212_Orca_10x_yap-1del_col-10-tir_wBT160-186-310-337-380-393_25C_20240212_164059_429/analysis_sacha/report/analysis_filemap.csv"
+filemap_path = "/mnt/towbin.data/shared/plenart/20240212_squid_wbt318_Nacl/analysis_Peter/report/analysis_filemap.csv"
 
 filemap = pd.read_csv(filemap_path)
 
@@ -503,7 +503,7 @@ def server(input, output, session):
             # keep only the relevant columns
             molts_df = molts_df[["Point", "Time", "HatchTime", "M1", "M2", "M3", "M4"]]
             return molts_df
-            
+
         elif file[0]["datapath"].endswith(".mat"):
             matlab_report = sio.loadmat(file[0]["datapath"], chars_as_strings=False)
             # Convert keys
