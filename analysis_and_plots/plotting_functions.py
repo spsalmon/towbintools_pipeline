@@ -954,18 +954,14 @@ def plot_growth_curves_individuals(
 
 
 def get_proportion_model(
-    series_one, series_two, worm_type, x_axis_label=None, y_axis_label=None
+    rescaled_series_one, rescaled_series_two, x_axis_label=None, y_axis_label=None
 ):
-    assert len(series_one) == len(
-        series_two
+    assert len(rescaled_series_one) == len(
+        rescaled_series_two
     ), "The two series must have the same length."
 
-    series_one = np.array(series_one).flatten()
-    series_two = np.array(series_two).flatten()
-    worm_type = np.array(worm_type).flatten()
-
-    series_one = filter_series_with_classification(series_one, worm_type)
-    series_two = filter_series_with_classification(series_two, worm_type)
+    series_one = np.array(rescaled_series_one).flatten()
+    series_two = np.array(rescaled_series_two).flatten()
 
     # remove elements that are nan in one of the two arrays
     correct_indices = ~np.isnan(series_one) & ~np.isnan(series_two)
@@ -997,71 +993,49 @@ def get_proportion_model(
     else:
         plt.ylabel("column two")
 
+
     # lowess will return our "smoothed" data with a y value for at every x-value
-    lowess = sm.nonparametric.lowess(series_two, series_one, frac=1.0 / 3)
+    lowess = sm.nonparametric.lowess(series_two, series_one, frac=0.1)
 
     # unpack the lowess smoothed points to their values
     lowess_x = list(zip(*lowess))[0]
     lowess_y = list(zip(*lowess))[1]
 
-    # plt.scatter(lowess_x, lowess_y, color='red')
-    # plt.show()
-
     # interpolate the loess curve
-    model = make_interp_spline(lowess_x, lowess_y, k=3)
+    model = make_interp_spline(lowess_x, lowess_y, k=1)
 
-    x = np.linspace(min(series_one), max(series_one), 100)
+    x = np.linspace(min(series_one), max(series_one), 500)
     y = model(x)
 
-    plt.plot(x, y, color="red")
+    plt.plot(x, y, color="red", linewidth=2)
     plt.show()
 
     return model
 
 
 def get_deviation_from_model(
-    series_one, series_two, time, ecdysis, model, worm_type, n_points=100
+    rescaled_series_one, rescaled_series_two, model
 ):
-
-    _, rescaled_series_one = rescale_series(
-        series_one, time, ecdysis, worm_type, n_points=n_points
-    )
-    _, rescaled_series_two = rescale_series(
-        series_two, time, ecdysis, worm_type, n_points=n_points
-    )
-
     # log transform the data
-    rescaled_series_one = np.log(rescaled_series_one)
-    rescaled_series_two = np.log(rescaled_series_two)
 
-    expected_series_two = model(rescaled_series_one)
+    expected_series_two = np.exp(model(np.log(rescaled_series_one)))
 
-    log_residuals = rescaled_series_two - expected_series_two
-    residuals = np.exp(log_residuals)
+    # log_residuals = rescaled_series_two - expected_series_two
+    # residuals = np.exp(log_residuals)
+    percentage_deviation = (
+        (rescaled_series_two - expected_series_two) / expected_series_two * 100
+    )
 
-    aggregated_series_one = np.full((4, n_points), np.nan)
-    aggregated_residuals = np.full((4, n_points), np.nan)
-    std_residuals = np.full((4, n_points), np.nan)
-    ste_residuals = np.full((4, n_points), np.nan)
+    mean_series_one = np.nanmean(rescaled_series_one, axis=0)
+    # mean_residuals = np.nanmean(residuals, axis=0)
+    # std_residuals = np.nanstd(residuals, axis=0)
+    # ste_residuals = std_residuals / np.sqrt(np.sum(np.isfinite(residuals), axis=0))
 
-    for i in range(4):
-        aggregated_residuals[i, :] = np.nanmean(residuals[:, i, :], axis=0)
-        std_residuals[i, :] = np.nanstd(residuals[:, i, :], axis=0)
-        ste_residuals[i, :] = std_residuals[i, :] / np.sqrt(
-            np.sum(np.isfinite(residuals[:, i, :]), axis=0)
-        )
+    mean_residuals = np.nanmean(percentage_deviation, axis=0)
+    std_residuals = np.nanstd(percentage_deviation, axis=0)
+    ste_residuals = std_residuals / np.sqrt(np.sum(np.isfinite(percentage_deviation), axis=0))
 
-        aggregated_series_one[i, :] = np.nanmean(
-            np.exp(rescaled_series_one[:, i, :]), axis=0
-        )
-
-    aggregated_series_one = aggregated_series_one.flatten()
-
-    aggregated_residuals = aggregated_residuals.flatten()
-    std_residuals = std_residuals.flatten()
-    ste_residuals = ste_residuals.flatten()
-
-    return aggregated_series_one, aggregated_residuals, std_residuals, ste_residuals
+    return mean_series_one, mean_residuals, std_residuals, ste_residuals
 
 
 def plot_deviation_from_model(
@@ -1070,12 +1044,17 @@ def plot_deviation_from_model(
     column_two,
     control_condition_id,
     conditions_to_plot,
+    colors = None,
     log_scale=(True, False),
     legend=None,
     x_axis_label=None,
     y_axis_label=None,
 ):
-    color_palette = sns.color_palette("husl", len(conditions_to_plot))
+
+    if colors is None:
+        color_palette = sns.color_palette("colorblind", len(conditions_to_plot))
+    else:
+        color_palette = colors
 
     xlbl = column_one
     ylbl = column_two
@@ -1089,37 +1068,34 @@ def plot_deviation_from_model(
 
     control_condition = conditions_struct[control_condition_id]
 
-    # TEMPORARY, ONLY WORKS WITH SINGLE CLASSIFICATION, FIND A WAY TO GENERALIZE
-    worm_type_key = [key for key in control_condition.keys() if "worm_type" in key][0]
 
     control_model = get_proportion_model(
         control_condition[column_one],
         control_condition[column_two],
-        control_condition[worm_type_key],
         x_axis_label=xlbl,
         y_axis_label=ylbl,
     )
 
     for i, condition_id in enumerate(conditions_to_plot):
         condition = conditions_struct[condition_id]
-        ecdysis = condition["ecdysis_time_step"]
-        time = condition["time"]
         body_data, pharynx_data = condition[column_one], condition[column_two]
         x, residuals, std_residuals, ste_residuals = get_deviation_from_model(
             body_data,
             pharynx_data,
-            time,
-            ecdysis,
             control_model,
-            condition[worm_type_key],
         )
+
+        sorted_indices = np.argsort(x)
+        x = x[sorted_indices]
+        residuals = residuals[sorted_indices]
+        ste_residuals = ste_residuals[sorted_indices]
 
         label = build_legend(condition, legend)
         plt.plot(x, residuals, label=label, color=color_palette[i])
         plt.fill_between(
             x,
-            residuals - 1.96 * std_residuals,
-            residuals + 1.96 * std_residuals,
+            residuals - 1.96 * ste_residuals,
+            residuals + 1.96 * ste_residuals,
             color=color_palette[i],
             alpha=0.2,
         )
@@ -1131,7 +1107,6 @@ def plot_deviation_from_model(
 
     plt.legend()
     plt.show()
-
 
 def exclude_arrests_from_series(series_at_ecdysis):
     filtered_series = np.full(series_at_ecdysis.shape, np.nan)
