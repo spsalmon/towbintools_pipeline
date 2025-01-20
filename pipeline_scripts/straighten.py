@@ -35,6 +35,18 @@ def mask_preprocessing(mask):
     mask = np.array([cv2.medianBlur(m, 7) for m in mask])
     return mask
 
+def image_preprocessing(image, keep_biggest_object = False):
+    if image.ndim == 2:
+        if (np.unique(image).size == 2) and keep_biggest_object:
+            image = binary_image.get_biggest_object(image)
+            image = binary_fill_holes(image)
+        return image
+
+    if (np.unique(image).size == 2) and keep_biggest_object:
+        image = np.array([binary_image.get_biggest_object(i) for i in image])
+        image = np.array([binary_fill_holes(i) for i in image])
+    return image
+
 
 def straighten_and_save(
     source_image_path,
@@ -43,6 +55,7 @@ def straighten_and_save(
     output_path,
     is_zstack=False,
     channel_to_allign=[2],
+    keep_biggest_object = False,
 ):
     """Straighten image and save to output_path."""
     mask = image_handling.read_tiff_file(mask_path)
@@ -51,6 +64,8 @@ def straighten_and_save(
         image = get_image(
             source_image_path, mask, is_zstack, channel_to_allign, source_image_channels
         )
+
+        image = image_preprocessing(image, keep_biggest_object)
 
         if is_zstack:
             straightened_image = straighten_zstack_image(image, mask)
@@ -64,7 +79,6 @@ def straighten_and_save(
             straightened_image = straightened_image[:, np.newaxis, ...]
 
     if straightened_image.ndim == 2:
-        print(straightened_image.shape)
         imwrite(
             output_path,
             straightened_image,
@@ -74,7 +88,6 @@ def straighten_and_save(
         )
 
     elif straightened_image.ndim == 3:
-        print(straightened_image.shape)
         imwrite(
             output_path,
             straightened_image,
@@ -83,7 +96,6 @@ def straighten_and_save(
             metadata={"axes": "ZYX"},
         )
     else:
-        print(straightened_image.shape)
         imwrite(
             output_path,
             straightened_image,
@@ -183,6 +195,9 @@ def main(input_pickle, output_pickle, config, n_jobs):
 
     is_zstack = image_handling.check_if_zstack(source_files[0])
 
+    keep_biggest_object = config.get("keep_biggest_object", False)
+    channel_to_allign = config.get("channel_to_allign", [2])
+
     Parallel(n_jobs=n_jobs)(
         delayed(straighten_and_save)(
             source_file,
@@ -190,6 +205,8 @@ def main(input_pickle, output_pickle, config, n_jobs):
             mask_file,
             output_path,
             is_zstack=is_zstack,
+            channel_to_allign=channel_to_allign,
+            keep_biggest_object = keep_biggest_object,
         )
         for source_file, mask_file, output_path in zip(
             source_files, mask_files, output_files

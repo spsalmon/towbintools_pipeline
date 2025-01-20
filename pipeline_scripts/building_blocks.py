@@ -38,6 +38,7 @@ OPTIONS_MAP = {
         "rerun_straightening",
         "straightening_source",
         "straightening_masks",
+        "keep_biggest_object",
     ],
     "morphology_computation": [
         "rerun_morphology_computation",
@@ -96,6 +97,7 @@ DEFAULT_OPTIONS = {
     "straightening":
         {
             "rerun_straightening": [False],
+            "keep_biggest_object": [False],
         },
     "morphology_computation":
         {
