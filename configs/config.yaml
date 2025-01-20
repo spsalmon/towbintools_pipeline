@@ -30,10 +30,6 @@ gaussian_filter_sigma: [1]
 
 # deep learning segmentation parameters
 model_path: [/mnt/towbin.data/shared/spsalmon/towbinlab_segmentation_database/models/body/SAMannotations_singleclass_UnetPlusPlus_efficientnet-b4_image-micronet_FocalTversky/epoch=587-step=16464.ckpt]
-# predict_on_tiles: [True]
-# tiler_config: [[[512, 512], [256, 256]]]
-# RGB: [True]
-# activation_layer: [null]
 batch_size: [32]
 
 # ilastik segmentation parameters
@@ -43,6 +39,7 @@ ilastik_result_channel: [0]
 # straightening parameters
 straightening_source: [['analysis/ch2_seg', null]]
 straightening_masks: ['analysis/ch2_seg']
+keep_biggest_object: [False]
 
 # morphology computation parameters
 morphology_computation_masks: ['analysis/ch2_seg_str']
