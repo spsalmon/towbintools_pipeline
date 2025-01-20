@@ -10,6 +10,7 @@ import starbars
 import statsmodels.api as sm
 import yaml
 from scipy.interpolate import make_interp_spline
+from scipy.signal import medfilt
 from scipy.stats import mannwhitneyu
 from towbintools.data_analysis import (
     compute_larval_stage_duration,
@@ -26,6 +27,7 @@ from typing import Dict, List, Tuple, Any
 from towbintools.foundation.image_handling import read_tiff_file
 from tifffile import imwrite
 from towbintools.foundation.worm_features import get_features_to_compute_at_molt
+from towbintools.data_analysis.growth_rate import compute_instantaneous_growth_rate_classified
 
 FEATURES_TO_COMPUTE_AT_MOLT = get_features_to_compute_at_molt()
 
@@ -954,18 +956,14 @@ def plot_growth_curves_individuals(
 
 
 def get_proportion_model(
-    series_one, series_two, worm_type, x_axis_label=None, y_axis_label=None
+    rescaled_series_one, rescaled_series_two, x_axis_label=None, y_axis_label=None
 ):
-    assert len(series_one) == len(
-        series_two
+    assert len(rescaled_series_one) == len(
+        rescaled_series_two
     ), "The two series must have the same length."
 
-    series_one = np.array(series_one).flatten()
-    series_two = np.array(series_two).flatten()
-    worm_type = np.array(worm_type).flatten()
-
-    series_one = filter_series_with_classification(series_one, worm_type)
-    series_two = filter_series_with_classification(series_two, worm_type)
+    series_one = np.array(rescaled_series_one).flatten()
+    series_two = np.array(rescaled_series_two).flatten()
 
     # remove elements that are nan in one of the two arrays
     correct_indices = ~np.isnan(series_one) & ~np.isnan(series_two)
@@ -997,71 +995,49 @@ def get_proportion_model(
     else:
         plt.ylabel("column two")
 
+
     # lowess will return our "smoothed" data with a y value for at every x-value
-    lowess = sm.nonparametric.lowess(series_two, series_one, frac=1.0 / 3)
+    lowess = sm.nonparametric.lowess(series_two, series_one, frac=0.1)
 
     # unpack the lowess smoothed points to their values
     lowess_x = list(zip(*lowess))[0]
     lowess_y = list(zip(*lowess))[1]
 
-    # plt.scatter(lowess_x, lowess_y, color='red')
-    # plt.show()
-
     # interpolate the loess curve
-    model = make_interp_spline(lowess_x, lowess_y, k=3)
+    model = make_interp_spline(lowess_x, lowess_y, k=1)
 
-    x = np.linspace(min(series_one), max(series_one), 100)
+    x = np.linspace(min(series_one), max(series_one), 500)
     y = model(x)
 
-    plt.plot(x, y, color="red")
+    plt.plot(x, y, color="red", linewidth=2)
     plt.show()
 
     return model
 
 
 def get_deviation_from_model(
-    series_one, series_two, time, ecdysis, model, worm_type, n_points=100
+    rescaled_series_one, rescaled_series_two, model
 ):
-
-    _, rescaled_series_one = rescale_series(
-        series_one, time, ecdysis, worm_type, n_points=n_points
-    )
-    _, rescaled_series_two = rescale_series(
-        series_two, time, ecdysis, worm_type, n_points=n_points
-    )
-
     # log transform the data
-    rescaled_series_one = np.log(rescaled_series_one)
-    rescaled_series_two = np.log(rescaled_series_two)
 
-    expected_series_two = model(rescaled_series_one)
+    expected_series_two = np.exp(model(np.log(rescaled_series_one)))
 
-    log_residuals = rescaled_series_two - expected_series_two
-    residuals = np.exp(log_residuals)
+    # log_residuals = rescaled_series_two - expected_series_two
+    # residuals = np.exp(log_residuals)
+    percentage_deviation = (
+        (rescaled_series_two - expected_series_two) / expected_series_two * 100
+    )
 
-    aggregated_series_one = np.full((4, n_points), np.nan)
-    aggregated_residuals = np.full((4, n_points), np.nan)
-    std_residuals = np.full((4, n_points), np.nan)
-    ste_residuals = np.full((4, n_points), np.nan)
+    mean_series_one = np.nanmean(rescaled_series_one, axis=0)
+    # mean_residuals = np.nanmean(residuals, axis=0)
+    # std_residuals = np.nanstd(residuals, axis=0)
+    # ste_residuals = std_residuals / np.sqrt(np.sum(np.isfinite(residuals), axis=0))
 
-    for i in range(4):
-        aggregated_residuals[i, :] = np.nanmean(residuals[:, i, :], axis=0)
-        std_residuals[i, :] = np.nanstd(residuals[:, i, :], axis=0)
-        ste_residuals[i, :] = std_residuals[i, :] / np.sqrt(
-            np.sum(np.isfinite(residuals[:, i, :]), axis=0)
-        )
+    mean_residuals = np.nanmean(percentage_deviation, axis=0)
+    std_residuals = np.nanstd(percentage_deviation, axis=0)
+    ste_residuals = std_residuals / np.sqrt(np.sum(np.isfinite(percentage_deviation), axis=0))
 
-        aggregated_series_one[i, :] = np.nanmean(
-            np.exp(rescaled_series_one[:, i, :]), axis=0
-        )
-
-    aggregated_series_one = aggregated_series_one.flatten()
-
-    aggregated_residuals = aggregated_residuals.flatten()
-    std_residuals = std_residuals.flatten()
-    ste_residuals = ste_residuals.flatten()
-
-    return aggregated_series_one, aggregated_residuals, std_residuals, ste_residuals
+    return mean_series_one, mean_residuals, std_residuals, ste_residuals
 
 
 def plot_deviation_from_model(
@@ -1070,12 +1046,17 @@ def plot_deviation_from_model(
     column_two,
     control_condition_id,
     conditions_to_plot,
+    colors = None,
     log_scale=(True, False),
     legend=None,
     x_axis_label=None,
     y_axis_label=None,
 ):
-    color_palette = sns.color_palette("husl", len(conditions_to_plot))
+
+    if colors is None:
+        color_palette = sns.color_palette("colorblind", len(conditions_to_plot))
+    else:
+        color_palette = colors
 
     xlbl = column_one
     ylbl = column_two
@@ -1089,37 +1070,34 @@ def plot_deviation_from_model(
 
     control_condition = conditions_struct[control_condition_id]
 
-    # TEMPORARY, ONLY WORKS WITH SINGLE CLASSIFICATION, FIND A WAY TO GENERALIZE
-    worm_type_key = [key for key in control_condition.keys() if "worm_type" in key][0]
 
     control_model = get_proportion_model(
         control_condition[column_one],
         control_condition[column_two],
-        control_condition[worm_type_key],
         x_axis_label=xlbl,
         y_axis_label=ylbl,
     )
 
     for i, condition_id in enumerate(conditions_to_plot):
         condition = conditions_struct[condition_id]
-        ecdysis = condition["ecdysis_time_step"]
-        time = condition["time"]
         body_data, pharynx_data = condition[column_one], condition[column_two]
         x, residuals, std_residuals, ste_residuals = get_deviation_from_model(
             body_data,
             pharynx_data,
-            time,
-            ecdysis,
             control_model,
-            condition[worm_type_key],
         )
+
+        sorted_indices = np.argsort(x)
+        x = x[sorted_indices]
+        residuals = residuals[sorted_indices]
+        ste_residuals = ste_residuals[sorted_indices]
 
         label = build_legend(condition, legend)
         plt.plot(x, residuals, label=label, color=color_palette[i])
         plt.fill_between(
             x,
-            residuals - 1.96 * std_residuals,
-            residuals + 1.96 * std_residuals,
+            residuals - 1.96 * ste_residuals,
+            residuals + 1.96 * ste_residuals,
             color=color_palette[i],
             alpha=0.2,
         )
@@ -1131,7 +1109,6 @@ def plot_deviation_from_model(
 
     plt.legend()
     plt.show()
-
 
 def exclude_arrests_from_series(series_at_ecdysis):
     filtered_series = np.full(series_at_ecdysis.shape, np.nan)
@@ -1841,3 +1818,112 @@ def plot_heterogeneity_at_ecdysis(
     plt.legend()
 
     plt.show()
+
+def plot_heterogeneity_rescaled_data(
+    conditions_struct: Dict,
+    column: str,
+    conditions_to_plot: List[int], 
+    smooth: bool = False,
+    remove_hatch = True, 
+    legend = None, 
+    x_axis_label = None, 
+    y_axis_label = None, 
+    exclude_arrests: bool = False,):
+    for condition in conditions_to_plot:
+        condition_dict = conditions_struct[condition]
+
+        values = condition_dict[column]
+        cvs = np.nanstd(values, axis=0) / np.nanmean(values, axis=0)
+        label = build_legend(condition_dict, legend)
+
+        if smooth:
+            cvs = medfilt(cvs, 7)
+            # cvs = savgol_filter(cvs, 15, 3)
+
+        plt.plot(cvs, label = label)
+
+    plt.xlabel(x_axis_label)
+    plt.ylabel(y_axis_label)
+
+    plt.legend()
+
+    plt.show()
+
+def combine_series(conditions_struct, series_one, series_two, operation, new_series_name):
+    for condition in conditions_struct:
+        series_one_values = condition[series_one]
+        series_two_values = condition[series_two]
+
+        if operation == 'add':
+            new_series_values = np.add(series_one_values, series_two_values)
+        elif operation == 'subtract':
+            new_series_values = series_one_values - series_two_values
+        elif operation == 'multiply':
+            new_series_values = series_one_values * series_two_values
+        elif operation == 'divide':
+            new_series_values = np.divide(series_one_values, series_two_values)
+        condition[new_series_name] = new_series_values
+    return conditions_struct
+
+def transform_series(conditions_struct, series, operation, new_series_name):
+    for conditions in conditions_struct:
+        series_values = conditions[series]
+
+        if operation == 'log':
+            new_series_values = np.log(series_values)
+        elif operation == 'exp':
+            new_series_values = np.exp(series_values)
+        elif operation == 'sqrt':
+            new_series_values = np.sqrt(series_values)
+        conditions[new_series_name] = new_series_values
+
+    return conditions_struct
+
+def compute_growth_rate(conditions_struct, series_name, gr_series_name, experiment_time=True):
+    for condition in conditions_struct:
+        series_values = condition[series_name]
+        # TEMPORARY, ONLY WORKS WITH SINGLE CLASSIFICATION, FIND A WAY TO GENERALIZE
+        worm_type_key = [key for key in condition.keys() if "worm_type" in key][0]
+        worm_type = condition[worm_type_key]
+
+        if experiment_time:
+            time = condition['experiment_time']
+        else:
+            time = condition['time']
+
+
+        growth_rate = []
+        for i in range(series_values.shape[0]):
+            # gr = compute_instantaneous_growth_rate_classified(series_values[i], time[i], worm_type[i], smoothing_method = 'savgol', savgol_filter_window = 7)
+            gr = compute_instantaneous_growth_rate_classified(series_values[i], time[i], worm_type[i], smoothing_method = 'savgol', savgol_filter_window = 5)
+            growth_rate.append(gr)
+
+        growth_rate = np.array(growth_rate)
+
+        condition[gr_series_name] = growth_rate
+
+    return conditions_struct
+
+def rescale(conditions_struct, series_name, rescaled_series_name, experiment_time=True, n_points=100):
+    for condition in conditions_struct:
+        series_values = condition[series_name]
+        # TEMPORARY, ONLY WORKS WITH SINGLE CLASSIFICATION, FIND A WAY TO GENERALIZE
+        worm_type_key = [key for key in condition.keys() if "worm_type" in key][0]
+        worm_type = condition[worm_type_key]
+        ecdysis = condition["ecdysis_time_step"]
+
+        if experiment_time:
+            time = condition['experiment_time']
+        else:
+            time = condition['time']
+
+        _, rescaled_series = rescale_series(
+        series_values, time, ecdysis, worm_type, n_points=n_points) # shape (n_worms, 4, n_points)
+
+        # reshape into (n_worms, 4*n_points)
+
+        rescaled_series = rescaled_series.reshape(rescaled_series.shape[0], -1)
+
+        condition[rescaled_series_name] = rescaled_series
+
+    return conditions_struct
