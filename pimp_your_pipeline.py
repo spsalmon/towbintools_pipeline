@@ -58,7 +58,7 @@ def main(config, pad=None):
     config["report_subdir"] = report_subdir
     config["sbatch_backup_dir"] = sbatch_backup_dir
 
-    extract_experiment_time = config.get("extract_experiment_time", True)
+    extract_experiment_time = config.get("get_experiment_time", True)
 
     # copy the config file to the report folder
     # if it already exists, change the name of the new one by adding a number

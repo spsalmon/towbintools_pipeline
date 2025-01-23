@@ -237,6 +237,7 @@ def build_plotting_struct(
             larval_stage_durations_experiment_time
         )
         condition_dict["experiment"] = np.array([experiment_dir]*condition_df['Point'].nunique())[:, np.newaxis]
+        condition_dict["filemap_path"] = np.array([filemap_path]*condition_df['Point'].nunique())[:, np.newaxis]
         condition_dict["point"] = np.unique(condition_df["Point"].values)[:, np.newaxis]
 
         # TEMPORARY, ONLY WORKS WITH SINGLE CLASSIFICATION, FIND A WAY TO GENERALIZE
@@ -1110,7 +1111,7 @@ def plot_deviation_from_model(
     plt.legend()
     plt.show()
 
-def exclude_arrests_from_series(series_at_ecdysis):
+def exclude_arrests_from_series_at_ecdysis(series_at_ecdysis):
     filtered_series = np.full(series_at_ecdysis.shape, np.nan)
     # keep only a value at one ecdys event if the next one is not nan
     if series_at_ecdysis.shape[0] == 1 or len(series_at_ecdysis.shape) == 1:
@@ -1147,8 +1148,8 @@ def get_proportion_model_ecdysis(
         series_two_at_ecdysis = series_two_at_ecdysis[:, 1:]
 
     if exclude_arrests:
-        series_one_at_ecdysis = exclude_arrests_from_series(series_one_at_ecdysis)
-        series_two_at_ecdysis = exclude_arrests_from_series(series_two_at_ecdysis)
+        series_one_at_ecdysis = exclude_arrests_from_series_at_ecdysis(series_one_at_ecdysis)
+        series_two_at_ecdysis = exclude_arrests_from_series_at_ecdysis(series_two_at_ecdysis)
 
     series_one_at_ecdysis = np.array(series_one_at_ecdysis).flatten()
     series_two_at_ecdysis = np.array(series_two_at_ecdysis).flatten()
@@ -1200,8 +1201,8 @@ def get_deviation_from_model_at_ecdysis(
         series_two_at_ecdysis = series_two_at_ecdysis[:, 1:]
 
     if exclude_arrests:
-        series_one_at_ecdysis = exclude_arrests_from_series(series_one_at_ecdysis)
-        series_two_at_ecdysis = exclude_arrests_from_series(series_two_at_ecdysis)
+        series_one_at_ecdysis = exclude_arrests_from_series_at_ecdysis(series_one_at_ecdysis)
+        series_two_at_ecdysis = exclude_arrests_from_series_at_ecdysis(series_two_at_ecdysis)
 
     # remove elements that are nan in one of the two arrays
     for i in range(series_one_at_ecdysis.shape[1]):
@@ -1237,8 +1238,8 @@ def get_deviation_percentage_from_model_at_ecdysis(
         series_two_at_ecdysis = series_two_at_ecdysis[:, 1:]
 
     if exclude_arrests:
-        series_one_at_ecdysis = exclude_arrests_from_series(series_one_at_ecdysis)
-        series_two_at_ecdysis = exclude_arrests_from_series(series_two_at_ecdysis)
+        series_one_at_ecdysis = exclude_arrests_from_series_at_ecdysis(series_one_at_ecdysis)
+        series_two_at_ecdysis = exclude_arrests_from_series_at_ecdysis(series_two_at_ecdysis)
 
     # remove elements that are nan in one of the two arrays
     for i in range(series_one_at_ecdysis.shape[1]):
@@ -1405,8 +1406,8 @@ def process_series_data(
         series_two = series_two[:, 1:]
         ecdysis = ecdysis[:, 1:]
     if exclude_arrests:
-        series_one = exclude_arrests_from_series(series_one)
-        series_two = exclude_arrests_from_series(series_two)
+        series_one = exclude_arrests_from_series_at_ecdysis(series_one)
+        series_two = exclude_arrests_from_series_at_ecdysis(series_two)
 
     # Stack point horizontally to match series shape
     point = np.hstack([point for _ in range(series_one.shape[1])]).astype(float)
@@ -1434,7 +1435,7 @@ def process_single_series_data(
         series = series[:, 1:]
         ecdysis = ecdysis[:, 1:]
     if exclude_arrests:
-        series = exclude_arrests_from_series(series)
+        series = exclude_arrests_from_series_at_ecdysis(series)
 
     # Stack point horizontally to match series shape
     point = np.hstack([point for _ in range(series.shape[1])]).astype(float)
@@ -1465,132 +1466,185 @@ def filter_non_worm_data(
                 filtered_data[i][j] = np.nan
     return filtered_data
 
-def setup_image_filemaps(
-    experiment: np.ndarray,
-    img_dir_list: List[str]
+def get_condition_filemaps(
+    condition_dict: Dict,
 ) -> Dict[str, Any]:
     """
     Set up file mappings for image directories.
     """
-    unique_experiment = np.unique(experiment)
+    filemap_paths = condition_dict['filemap_path']
+    unique_filemap_paths = np.unique(filemap_paths)
     filemaps = {}
     
-    for exp in unique_experiment:
-        exp = exp.split('analysis')[0]
-        for img_dir in img_dir_list:
-            img_dir = os.path.join(exp, img_dir)
-            filemap = get_dir_filemap(img_dir)
-            filemaps[img_dir] = filemap
-            
+    for filemap_path in unique_filemap_paths:
+        filemap = pd.read_csv(filemap_path)
+        filemaps[filemap_path] = filemap
     return filemaps
 
-def display_image(
-    img_path: str,
-    dpi: int = 200,
-    cmap: str = 'viridis',
-    backup_dir: str = None,
-    backup_file_name: str = None,
-) -> None:
-    """
-    Display an image with the specified parameters.
-    """
-    img = read_tiff_file(img_path)
-
-    if backup_dir is not None:
-        if backup_file_name is not None:
-            shutil.copy(img_path, os.path.join(backup_dir, backup_file_name))
-        else:
-            shutil.copy(img_path, backup_dir)
-    height, width = img.shape[-2:]
-    
-    fig = plt.figure(figsize=(width/dpi, height/dpi), dpi=dpi)
-    plt.imshow(img, interpolation='none', aspect='equal', cmap=cmap)
-    plt.subplots_adjust(left=0, right=1, top=1, bottom=0)
-    plt.axis('off')
-    plt.show()
-
-def display_image_overlay(
-    img_paths: List[str],
-    dpi: int = 200,
-    cmap: List[str] = ['viridis'],
-    backup_dir: str = None,
-    backup_file_name: str = None
-):
-    """
-    Display an overlay of multiple images.
-    """
-    img_list = [read_tiff_file(img_path) for img_path in img_paths]
-
-    if len(cmap) == 1:
-        cmap = cmap * len(img_list)
-
-    stacked_img = np.stack(img_list, axis=0)
-
-    if backup_dir is not None:
-        if backup_file_name is not None:
-            imwrite(os.path.join(backup_dir, backup_file_name), stacked_img)
-        else:
-            img_path = img_paths[0]
-            imwrite(os.path.join(backup_dir, os.path.basename(img_path)), stacked_img)
-
-    # add an empty channel to the image
-    print(stacked_img.shape)
-
-    height, width = stacked_img.shape[-2:]
-    fig, ax = plt.subplots(figsize=(width/dpi, height/dpi), dpi=dpi)
-    microim = microshow(images = stacked_img, fig_scaling = 5, cmaps = cmap, ax = ax, proj_type='max', dpi = dpi,)
-
-def display_sample_images(
-    experiment: str,
-    point: int,
-    ecdysis: int,
+def get_most_average_size_at_ecdysis(
+    conditions_struct: Dict,
+    column : str,
     img_dir_list: List[str],
-    filemaps: Dict[str, Any],
-    dpi: int,
+    conditions_to_plot: List[int],
+    remove_hatch: bool = True,
+    exclude_arrests: bool = False,
+    dpi: int = 200,
+    nb_per_condition: int = 1,
     overlay: bool = True,
     cmap: List[str] = ['viridis'],
-    backup_dir: str = None
+    backup_dir: str = None,
+    backup_name = None,
 ) -> None:
     """
-    Display sample images for a given experiment, point, and ecdysis time.
+    Calculate and display the most average sizes at ecdysis.
     """
-    # Remove analysis suffix from experiment name if present
-    experiment_base = experiment.split('analysis')[0]
-    
-    if isinstance(cmap, str):
-        cmap = [cmap] * len(img_dir_list)
+    for condition_id in conditions_to_plot:
+        condition = conditions_struct[condition_id]
+        # TEMPORARY, ONLY WORKS WITH SINGLE CLASSIFICATION, FIND A WAY TO GENERALIZE
+        worm_type_key = [key for key in condition.keys() if "worm_type" in key][0]
 
-    if overlay:
-        img_paths = []
-        for img_dir in img_dir_list:
-            img_dir_path = os.path.join(experiment_base, img_dir)
-            filemap = filemaps[img_dir_path]
-            
-            # Find matching image path
-            matching_rows = filemap[
-                (filemap['Point'] == point) & 
-                (filemap['Time'] == ecdysis)
-            ]
-            
-            if len(matching_rows) > 0:
-                img_path = matching_rows['ImagePath'].values[0]
-                img_paths.append(img_path)
+        series, point, experiment, ecdysis, worm_type = [
+            condition[key] for key in [column, 'point', 'experiment', 'ecdysis_time_step', worm_type_key]
+        ]
+
+        filemaps = setup_image_filemaps(experiment, img_dir_list)
         
-        display_image_overlay(img_paths, dpi, cmap, backup_dir)
-    else:
-        for img_dir in img_dir_list:
-            img_dir_path = os.path.join(experiment_base, img_dir)
-            filemap = filemaps[img_dir_path]
+        series, point, ecdysis = process_single_series_data(
+            series, point, ecdysis, remove_hatch, exclude_arrests
+        )
+
+        series = filter_non_worm_data(series, worm_type, ecdysis)
+
+        series_mean = np.nanmean(series, axis=0)
+
+        for i in range(series.shape[1]):
+            series_molt = series[:, i]
+            series_mean_molt = series_mean[i]
+
+            distance_score = np.abs(series_molt - series_mean_molt)
+    
+            sorted_idx = np.argsort(distance_score)
+            valid_idx = sorted_idx[:nb_per_condition]
             
-            # Find matching image path
-            matching_rows = filemap[
-                (filemap['Point'] == point) & 
-                (filemap['Time'] == ecdysis)
-            ]
+            for idx in valid_idx:
+                display_sample_images(
+                    experiment[idx][0],
+                    int(point[idx][i]),
+                    int(ecdysis[idx][i]),
+                    img_dir_list,
+                    filemaps,
+                    dpi,
+                    overlay=overlay,
+                    cmap=cmap,
+                )
+
+# def display_image(
+#     img_path: str,
+#     dpi: int = 200,
+#     cmap: str = 'viridis',
+#     backup_dir: str = None,
+#     backup_file_name: str = None,
+# ) -> None:
+#     """
+#     Display an image with the specified parameters.
+#     """
+#     img = read_tiff_file(img_path)
+
+#     if backup_dir is not None:
+#         if backup_file_name is not None:
+#             shutil.copy(img_path, os.path.join(backup_dir, backup_file_name))
+#         else:
+#             shutil.copy(img_path, backup_dir)
+#     height, width = img.shape[-2:]
+    
+#     fig = plt.figure(figsize=(width/dpi, height/dpi), dpi=dpi)
+#     plt.imshow(img, interpolation='none', aspect='equal', cmap=cmap)
+#     plt.subplots_adjust(left=0, right=1, top=1, bottom=0)
+#     plt.axis('off')
+#     plt.show()
+
+# def display_image_overlay(
+#     img_paths: List[str],
+#     dpi: int = 200,
+#     cmap: List[str] = ['viridis'],
+#     backup_dir: str = None,
+#     backup_file_name: str = None
+# ):
+#     """
+#     Display an overlay of multiple images.
+#     """
+#     img_list = [read_tiff_file(img_path) for img_path in img_paths]
+
+#     if len(cmap) == 1:
+#         cmap = cmap * len(img_list)
+
+#     stacked_img = np.stack(img_list, axis=0)
+
+#     if backup_dir is not None:
+#         if backup_file_name is not None:
+#             imwrite(os.path.join(backup_dir, backup_file_name), stacked_img)
+#         else:
+#             img_path = img_paths[0]
+#             imwrite(os.path.join(backup_dir, os.path.basename(img_path)), stacked_img)
+
+#     # add an empty channel to the image
+#     print(stacked_img.shape)
+
+#     height, width = stacked_img.shape[-2:]
+#     fig, ax = plt.subplots(figsize=(width/dpi, height/dpi), dpi=dpi)
+#     microim = microshow(images = stacked_img, fig_scaling = 5, cmaps = cmap, ax = ax, proj_type='max', dpi = dpi,)
+
+# def display_sample_images(
+#     experiment: str,
+#     point: int,
+#     ecdysis: int,
+#     img_dir_list: List[str],
+#     filemaps: Dict[str, Any],
+#     dpi: int,
+#     overlay: bool = True,
+#     cmap: List[str] = ['viridis'],
+#     backup_dir: str = None
+# ) -> None:
+#     """
+#     Display sample images for a given experiment, point, and ecdysis time.
+#     """
+#     # Remove analysis suffix from experiment name if present
+#     experiment_base = experiment.split('analysis')[0]
+    
+#     if isinstance(cmap, str):
+#         cmap = [cmap] * len(img_dir_list)
+
+#     if overlay:
+#         img_paths = []
+#         for img_dir in img_dir_list:
+#             img_dir_path = os.path.join(experiment_base, img_dir)
+#             filemap = filemaps[img_dir_path]
             
-            if len(matching_rows) > 0:
-                img_path = matching_rows['ImagePath'].values[0]
-                display_image(img_path, dpi, cmap=cmap[0], backup_dir=backup_dir)
+#             # Find matching image path
+#             matching_rows = filemap[
+#                 (filemap['Point'] == point) & 
+#                 (filemap['Time'] == ecdysis)
+#             ]
+            
+#             if len(matching_rows) > 0:
+#                 img_path = matching_rows['ImagePath'].values[0]
+#                 img_paths.append(img_path)
+        
+#         display_image_overlay(img_paths, dpi, cmap, backup_dir)
+#     else:
+#         for img_dir in img_dir_list:
+#             img_dir_path = os.path.join(experiment_base, img_dir)
+#             filemap = filemaps[img_dir_path]
+            
+#             # Find matching image path
+#             matching_rows = filemap[
+#                 (filemap['Point'] == point) & 
+#                 (filemap['Time'] == ecdysis)
+#             ]
+            
+#             if len(matching_rows) > 0:
+#                 img_path = matching_rows['ImagePath'].values[0]
+#                 display_image(img_path, dpi, cmap=cmap[0], backup_dir=backup_dir)
         
 
 def get_most_average_deviations_at_ecdysis(
@@ -1794,7 +1848,7 @@ def plot_heterogeneity_at_ecdysis(
             values = values[:, 1:]
 
         if exclude_arrests:
-            values = exclude_arrests_from_series(values)
+            values = exclude_arrests_from_series_at_ecdysis(values)
 
         cvs = []
         for i in range(values.shape[1]):
