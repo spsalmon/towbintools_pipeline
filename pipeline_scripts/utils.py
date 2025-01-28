@@ -390,7 +390,7 @@ def run_command(command, script_name, config, requires_gpu=False):
     return sbatch_output_file, sbatch_error_file
 
 
-def create_sbatch_file(job_name, cores, time_limit, memory, command, gpus=0):
+def create_sbatch_file(job_name, cores, time_limit, memory, command, gpus=0, nodelist="izbdodoma"):
     content = f"""#!/bin/bash
 #SBATCH -J {job_name}
 #SBATCH -o ./temp_files/sbatch_output/{job_name}.out
@@ -399,6 +399,7 @@ def create_sbatch_file(job_name, cores, time_limit, memory, command, gpus=0):
 #SBATCH --gres=gpu:{gpus}
 #SBATCH -t {time_limit}
 #SBATCH --mem={memory}
+#SBATCH --nodelist={nodelist}
 #SBATCH --wait
 
 {command}

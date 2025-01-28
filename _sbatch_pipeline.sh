@@ -6,6 +6,7 @@
 #SBATCH -c 8
 #SBATCH -t 48:00:00
 #SBATCH --mem=8GB
+#SBATCH --nodelist=izbdodoma
 
 # Default configuration file
 DEFAULT_CONFIG_FILE="./configs/config.yaml"
