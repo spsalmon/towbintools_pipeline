@@ -29,6 +29,13 @@ from tifffile import imwrite
 from towbintools.foundation.worm_features import get_features_to_compute_at_molt
 from towbintools.data_analysis.growth_rate import compute_instantaneous_growth_rate_classified
 
+from towbintools.foundation.image_handling import pad_images_to_same_dim, pad_to_dim_equally, pad_to_dim
+
+from tifffile import imwrite
+import cv2
+from skimage import measure
+
+
 FEATURES_TO_COMPUTE_AT_MOLT = get_features_to_compute_at_molt()
 
 # BUILDING THE PLOTTING STRUCTURE
@@ -237,6 +244,7 @@ def build_plotting_struct(
             larval_stage_durations_experiment_time
         )
         condition_dict["experiment"] = np.array([experiment_dir]*condition_df['Point'].nunique())[:, np.newaxis]
+        condition_dict["filemap_path"] = np.array([filemap_path]*condition_df['Point'].nunique())[:, np.newaxis]
         condition_dict["point"] = np.unique(condition_df["Point"].values)[:, np.newaxis]
 
         # TEMPORARY, ONLY WORKS WITH SINGLE CLASSIFICATION, FIND A WAY TO GENERALIZE
@@ -1110,7 +1118,7 @@ def plot_deviation_from_model(
     plt.legend()
     plt.show()
 
-def exclude_arrests_from_series(series_at_ecdysis):
+def exclude_arrests_from_series_at_ecdysis(series_at_ecdysis):
     filtered_series = np.full(series_at_ecdysis.shape, np.nan)
     # keep only a value at one ecdys event if the next one is not nan
     if series_at_ecdysis.shape[0] == 1 or len(series_at_ecdysis.shape) == 1:
@@ -1147,8 +1155,8 @@ def get_proportion_model_ecdysis(
         series_two_at_ecdysis = series_two_at_ecdysis[:, 1:]
 
     if exclude_arrests:
-        series_one_at_ecdysis = exclude_arrests_from_series(series_one_at_ecdysis)
-        series_two_at_ecdysis = exclude_arrests_from_series(series_two_at_ecdysis)
+        series_one_at_ecdysis = exclude_arrests_from_series_at_ecdysis(series_one_at_ecdysis)
+        series_two_at_ecdysis = exclude_arrests_from_series_at_ecdysis(series_two_at_ecdysis)
 
     series_one_at_ecdysis = np.array(series_one_at_ecdysis).flatten()
     series_two_at_ecdysis = np.array(series_two_at_ecdysis).flatten()
@@ -1200,8 +1208,8 @@ def get_deviation_from_model_at_ecdysis(
         series_two_at_ecdysis = series_two_at_ecdysis[:, 1:]
 
     if exclude_arrests:
-        series_one_at_ecdysis = exclude_arrests_from_series(series_one_at_ecdysis)
-        series_two_at_ecdysis = exclude_arrests_from_series(series_two_at_ecdysis)
+        series_one_at_ecdysis = exclude_arrests_from_series_at_ecdysis(series_one_at_ecdysis)
+        series_two_at_ecdysis = exclude_arrests_from_series_at_ecdysis(series_two_at_ecdysis)
 
     # remove elements that are nan in one of the two arrays
     for i in range(series_one_at_ecdysis.shape[1]):
@@ -1237,8 +1245,8 @@ def get_deviation_percentage_from_model_at_ecdysis(
         series_two_at_ecdysis = series_two_at_ecdysis[:, 1:]
 
     if exclude_arrests:
-        series_one_at_ecdysis = exclude_arrests_from_series(series_one_at_ecdysis)
-        series_two_at_ecdysis = exclude_arrests_from_series(series_two_at_ecdysis)
+        series_one_at_ecdysis = exclude_arrests_from_series_at_ecdysis(series_one_at_ecdysis)
+        series_two_at_ecdysis = exclude_arrests_from_series_at_ecdysis(series_two_at_ecdysis)
 
     # remove elements that are nan in one of the two arrays
     for i in range(series_one_at_ecdysis.shape[1]):
@@ -1389,40 +1397,8 @@ def plot_normalized_proportions(
     plt.show()
 
 
-def process_series_data(
-    series_one: np.ndarray,
-    series_two: np.ndarray,
-    point: np.ndarray,
-    ecdysis: np.ndarray,
-    remove_hatch: bool = True,
-    exclude_arrests: bool = False
-) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
-    """
-    Process and clean the input series data.
-    """
-    if remove_hatch:
-        series_one = series_one[:, 1:]
-        series_two = series_two[:, 1:]
-        ecdysis = ecdysis[:, 1:]
-    if exclude_arrests:
-        series_one = exclude_arrests_from_series(series_one)
-        series_two = exclude_arrests_from_series(series_two)
-
-    # Stack point horizontally to match series shape
-    point = np.hstack([point for _ in range(series_one.shape[1])]).astype(float)
-
-    # Remove nan elements
-    for i in range(series_one.shape[1]):
-        nan_mask = np.isnan(series_one[:, i]) | np.isnan(series_two[:, i])
-        series_one[:, i][nan_mask] = np.nan
-        series_two[:, i][nan_mask] = np.nan
-        point[:, i][nan_mask] = np.nan
-
-    return series_one, series_two, point, ecdysis
-
-def process_single_series_data(
+def process_series_at_ecdysis(
     series: np.ndarray,
-    point: np.ndarray,
     ecdysis: np.ndarray,
     remove_hatch: bool = True,
     exclude_arrests: bool = False
@@ -1434,18 +1410,14 @@ def process_single_series_data(
         series = series[:, 1:]
         ecdysis = ecdysis[:, 1:]
     if exclude_arrests:
-        series = exclude_arrests_from_series(series)
-
-    # Stack point horizontally to match series shape
-    point = np.hstack([point for _ in range(series.shape[1])]).astype(float)
+        series = exclude_arrests_from_series_at_ecdysis(series)
 
     # Remove nan elements
     for i in range(series.shape[1]):
         nan_mask = np.isnan(series[:, i])
         series[:, i][nan_mask] = np.nan
-        point[:, i][nan_mask] = np.nan
 
-    return series, point, ecdysis
+    return series, ecdysis
 
 def filter_non_worm_data(
     data: np.ndarray,
@@ -1465,28 +1437,48 @@ def filter_non_worm_data(
                 filtered_data[i][j] = np.nan
     return filtered_data
 
-def setup_image_filemaps(
-    experiment: np.ndarray,
-    img_dir_list: List[str]
+def get_condition_filemaps(
+    condition_dict: Dict,
 ) -> Dict[str, Any]:
     """
     Set up file mappings for image directories.
     """
-    unique_experiment = np.unique(experiment)
+    filemap_paths = condition_dict['filemap_path']
+    unique_filemap_paths = np.unique(filemap_paths)
     filemaps = {}
     
-    for exp in unique_experiment:
-        exp = exp.split('analysis')[0]
-        for img_dir in img_dir_list:
-            img_dir = os.path.join(exp, img_dir)
-            filemap = get_dir_filemap(img_dir)
-            filemaps[img_dir] = filemap
-            
+    for filemap_path in unique_filemap_paths:
+        filemap = pd.read_csv(filemap_path)
+        filemaps[filemap_path] = filemap
     return filemaps
 
+def keep_selected_columns(filemap_dict: Dict[str, Any], columns_to_keep) -> Dict[str, Any]:
+
+    columns = columns_to_keep.copy()
+    if 'Point' not in columns:
+        columns.append('Point')
+    if 'Time' not in columns:
+        columns.append('Time')
+
+    for key, filemap in filemap_dict.items():
+        filemap = filemap[columns]
+        filemap_dict[key] = filemap
+    
+    return filemap_dict
+
+def get_image_paths_of_time_point(point, time, filemap_path_of_point, filemaps, image_columns):
+    filemap_of_point = filemaps[filemap_path_of_point]
+    filemap_of_point = filemap_of_point[filemap_of_point['Point'] == point]
+    filemap_of_point = filemap_of_point[filemap_of_point['Time'] == time]
+
+    image_paths = filemap_of_point[image_columns].values.flatten().tolist()
+
+    return image_paths
+
 def display_image(
-    img_path: str,
-    dpi: int = 200,
+    img_path,
+    dpi: int = 300,
+    scale: float = 1.0,
     cmap: str = 'viridis',
     backup_dir: str = None,
     backup_file_name: str = None,
@@ -1494,105 +1486,129 @@ def display_image(
     """
     Display an image with the specified parameters.
     """
-    img = read_tiff_file(img_path)
+    if isinstance(img_path, str):
+        img = read_tiff_file(img_path)
 
     if backup_dir is not None:
-        if backup_file_name is not None:
+        if backup_file_name is not None :
             shutil.copy(img_path, os.path.join(backup_dir, backup_file_name))
         else:
-            shutil.copy(img_path, backup_dir)
+            if isinstance(img_path, str):
+                shutil.copy(img_path, backup_dir)
+            else:
+                imwrite(os.path.join(backup_dir, 'backup_image.tif'), img)
     height, width = img.shape[-2:]
     
-    fig = plt.figure(figsize=(width/dpi, height/dpi), dpi=dpi)
+    fig = plt.figure(figsize=((width/dpi) * scale, (height/dpi)* scale), dpi=dpi, facecolor='black')
+    plt.gca().set_facecolor('black')
     plt.imshow(img, interpolation='none', aspect='equal', cmap=cmap)
     plt.subplots_adjust(left=0, right=1, top=1, bottom=0)
     plt.axis('off')
     plt.show()
 
-def display_image_overlay(
-    img_paths: List[str],
-    dpi: int = 200,
-    cmap: List[str] = ['viridis'],
-    backup_dir: str = None,
-    backup_file_name: str = None
-):
-    """
-    Display an overlay of multiple images.
-    """
-    img_list = [read_tiff_file(img_path) for img_path in img_paths]
-
-    if len(cmap) == 1:
-        cmap = cmap * len(img_list)
-
-    stacked_img = np.stack(img_list, axis=0)
-
-    if backup_dir is not None:
-        if backup_file_name is not None:
-            imwrite(os.path.join(backup_dir, backup_file_name), stacked_img)
-        else:
-            img_path = img_paths[0]
-            imwrite(os.path.join(backup_dir, os.path.basename(img_path)), stacked_img)
-
-    # add an empty channel to the image
-    print(stacked_img.shape)
-
-    height, width = stacked_img.shape[-2:]
-    fig, ax = plt.subplots(figsize=(width/dpi, height/dpi), dpi=dpi)
-    microim = microshow(images = stacked_img, fig_scaling = 5, cmaps = cmap, ax = ax, proj_type='max', dpi = dpi,)
-
-def display_sample_images(
-    experiment: str,
-    point: int,
-    ecdysis: int,
+def get_most_average_proportions_at_ecdysis(
+    conditions_struct: Dict,
+    column_one: str,
+    column_two: str,
     img_dir_list: List[str],
-    filemaps: Dict[str, Any],
-    dpi: int,
-    overlay: bool = True,
-    cmap: List[str] = ['viridis'],
-    backup_dir: str = None
+    conditions_to_plot: List[int],
+    remove_hatch: bool = True,
+    exclude_arrests: bool = False,
+    nb_per_condition: int = 1,
 ) -> None:
     """
-    Display sample images for a given experiment, point, and ecdysis time.
+    Calculate and display the most average proportions at ecdysis.
     """
-    # Remove analysis suffix from experiment name if present
-    experiment_base = experiment.split('analysis')[0]
+    paths_dict = {}
+    for condition_id in conditions_to_plot:
+        condition = conditions_struct[condition_id]
+        # TEMPORARY, ONLY WORKS WITH SINGLE CLASSIFICATION, FIND A WAY TO GENERALIZE
+        worm_type_key = [key for key in condition.keys() if "worm_type" in key][0]
+
+        series_one, series_two, point, experiment, ecdysis, worm_type = [
+            condition[key] for key in [column_one, column_two, 'point', 'experiment', 'ecdysis_time_step', worm_type_key]
+        ]
+
+        filemaps = get_condition_filemaps(condition)
+        filemaps = keep_selected_columns(filemaps, img_dir_list)
+        
+        series_one, ecdysis = process_series_at_ecdysis(
+            series_one, ecdysis, remove_hatch, exclude_arrests
+        )
+        series_two, _ = process_series_at_ecdysis(
+            series_two, ecdysis, remove_hatch, exclude_arrests
+        )
+
+        series_one = filter_non_worm_data(series_one, worm_type, ecdysis)
+        series_two = filter_non_worm_data(series_two, worm_type, ecdysis)
+
+        ratio = series_one / series_two
+        ratio_mean = np.nanmean(ratio, axis=0)
+
+        image_paths = []
+
+        for i in range(ratio_mean.shape[0]):
+            ratio_molt = ratio[:, i]
+            ratio_mean_molt = ratio_mean[i]
+
+            distance_score = np.abs(ratio_molt - ratio_mean_molt)
     
-    if isinstance(cmap, str):
-        cmap = [cmap] * len(img_dir_list)
+            sorted_idx = np.argsort(distance_score)
+            selected_idx = sorted_idx[:nb_per_condition]
 
-    if overlay:
-        img_paths = []
-        for img_dir in img_dir_list:
-            img_dir_path = os.path.join(experiment_base, img_dir)
-            filemap = filemaps[img_dir_path]
-            
-            # Find matching image path
-            matching_rows = filemap[
-                (filemap['Point'] == point) & 
-                (filemap['Time'] == ecdysis)
-            ]
-            
-            if len(matching_rows) > 0:
-                img_path = matching_rows['ImagePath'].values[0]
-                img_paths.append(img_path)
-        
-        display_image_overlay(img_paths, dpi, cmap, backup_dir)
-    else:
-        for img_dir in img_dir_list:
-            img_dir_path = os.path.join(experiment_base, img_dir)
-            filemap = filemaps[img_dir_path]
-            
-            # Find matching image path
-            matching_rows = filemap[
-                (filemap['Point'] == point) & 
-                (filemap['Time'] == ecdysis)
-            ]
-            
-            if len(matching_rows) > 0:
-                img_path = matching_rows['ImagePath'].values[0]
-                display_image(img_path, dpi, cmap=cmap[0], backup_dir=backup_dir)
-        
+            point_of_indices = point[selected_idx].squeeze().astype(int)
+            ecdysis_of_indices = ecdysis[selected_idx, i].squeeze().astype(int)
 
+            # check if 0D array
+            if point_of_indices.shape == ():
+                point_of_indices = [point_of_indices]
+                ecdysis_of_indices = [ecdysis_of_indices]
+
+            filemap_paths_of_indices = condition['filemap_path'][selected_idx].squeeze()
+
+            if filemap_paths_of_indices.shape == ():
+                filemap_paths_of_indices = [filemap_paths_of_indices]
+
+            image_paths_ecdysis = []
+            for j, (p, t, filemap_path) in enumerate(zip(point_of_indices, ecdysis_of_indices, filemap_paths_of_indices)):
+                paths = get_image_paths_of_time_point(p, t, str(filemap_path), filemaps, img_dir_list)
+                image_paths_ecdysis.append(paths)
+
+            image_paths.append(image_paths_ecdysis)
+        paths_dict[condition_id] = image_paths
+    return paths_dict
+
+# def display_image_overlay(
+#     img_paths: List[str],
+#     dpi: int = 200,
+#     cmap: List[str] = ['viridis'],
+#     backup_dir: str = None,
+#     backup_file_name: str = None
+# ):
+#     """
+#     Display an overlay of multiple images.
+#     """
+#     img_list = [read_tiff_file(img_path) for img_path in img_paths]
+
+#     if len(cmap) == 1:
+#         cmap = cmap * len(img_list)
+
+#     stacked_img = np.stack(img_list, axis=0)
+
+#     if backup_dir is not None:
+#         if backup_file_name is not None:
+#             imwrite(os.path.join(backup_dir, backup_file_name), stacked_img)
+#         else:
+#             img_path = img_paths[0]
+#             imwrite(os.path.join(backup_dir, os.path.basename(img_path)), stacked_img)
+
+#     # add an empty channel to the image
+#     print(stacked_img.shape)
+
+#     height, width = stacked_img.shape[-2:]
+#     fig, ax = plt.subplots(figsize=(width/dpi, height/dpi), dpi=dpi)
+#     microim = microshow(images = stacked_img, fig_scaling = 5, cmaps = cmap, ax = ax, proj_type='max', dpi = dpi,)
+        
 def get_most_average_deviations_at_ecdysis(
     conditions_struct: Dict,
     column_one: str,
@@ -1654,70 +1670,7 @@ def get_most_average_deviations_at_ecdysis(
                 display_sample_images(experiment[idx][0], int(point[idx][i]), 
                                    int(ecdysis[idx][i]), img_dir_list, filemaps, dpi, overlay=overlay, cmap=cmap, backup_dir=backup_dir)
 
-def get_most_average_proportions_at_ecdysis(
-    conditions_struct: Dict,
-    column_one: str,
-    column_two: str,
-    img_dir_list: List[str],
-    conditions_to_plot: List[int],
-    remove_hatch: bool = True,
-    exclude_arrests: bool = False,
-    dpi: int = 200,
-    nb_per_condition: int = 1,
-    overlay: bool = True,
-    cmap: List[str] = ['viridis'],
-    backup_dir: str = None,
-    backup_name = None,
-) -> None:
-    """
-    Calculate and display the most average proportions at ecdysis.
-    """
-    for condition_id in conditions_to_plot:
-        condition = conditions_struct[condition_id]
-        # TEMPORARY, ONLY WORKS WITH SINGLE CLASSIFICATION, FIND A WAY TO GENERALIZE
-        worm_type_key = [key for key in condition.keys() if "worm_type" in key][0]
-        series_one, series_two, point, experiment, ecdysis, worm_type = [
-            condition[key] for key in [column_one, column_two, 'point', 'experiment', 'ecdysis_time_step', worm_type_key]
-        ]
 
-        filemaps = setup_image_filemaps(experiment, img_dir_list)
-        
-        series_one, series_two, point, ecdysis = process_series_data(
-            series_one, series_two, point, ecdysis, remove_hatch, exclude_arrests
-        )
-
-        series_one = filter_non_worm_data(series_one, worm_type, ecdysis)
-        series_two = filter_non_worm_data(series_two, worm_type, ecdysis)
-
-        series_one_mean = np.nanmean(series_one, axis=0)
-        series_two_mean = np.nanmean(series_two, axis=0)
-
-        for i in range(series_one.shape[1]):
-            series_one_molt = series_one[:, i]
-            series_two_molt = series_two[:, i]
-
-            series_one_mean_molt = series_one_mean[i]
-            series_two_mean_molt = series_two_mean[i]
-
-            distance_series_one = np.abs(series_one_molt - series_one_mean_molt)/series_one_mean_molt
-            distance_series_two = np.abs(series_two_molt - series_two_mean_molt)/series_two_mean_molt
-
-            distance_score = distance_series_one + distance_series_two
-    
-            sorted_idx = np.argsort(distance_score)
-            valid_idx = sorted_idx[:nb_per_condition]
-            
-            for idx in valid_idx:
-                display_sample_images(
-                    experiment[idx][0],
-                    int(point[idx][i]),
-                    int(ecdysis[idx][i]),
-                    img_dir_list,
-                    filemaps,
-                    dpi,
-                    overlay=overlay,
-                    cmap=cmap,
-                )
 
 def get_most_average_size_at_ecdysis(
     conditions_struct: Dict,
@@ -1736,6 +1689,7 @@ def get_most_average_size_at_ecdysis(
     """
     Calculate and display the most average sizes at ecdysis.
     """
+    paths_dict = {}
     for condition_id in conditions_to_plot:
         condition = conditions_struct[condition_id]
         # TEMPORARY, ONLY WORKS WITH SINGLE CLASSIFICATION, FIND A WAY TO GENERALIZE
@@ -1745,36 +1699,110 @@ def get_most_average_size_at_ecdysis(
             condition[key] for key in [column, 'point', 'experiment', 'ecdysis_time_step', worm_type_key]
         ]
 
-        filemaps = setup_image_filemaps(experiment, img_dir_list)
-        
-        series, point, ecdysis = process_single_series_data(
-            series, point, ecdysis, remove_hatch, exclude_arrests
+        filemaps = get_condition_filemaps(condition)
+        filemaps = keep_selected_columns(filemaps, img_dir_list)
+
+        series, ecdysis = process_series_at_ecdysis(
+            series, ecdysis, remove_hatch, exclude_arrests
         )
 
         series = filter_non_worm_data(series, worm_type, ecdysis)
 
-        series_mean = np.nanmean(series, axis=0)
+        size_mean = np.nanmean(series, axis=0)
 
-        for i in range(series.shape[1]):
-            series_molt = series[:, i]
-            series_mean_molt = series_mean[i]
+        image_paths = []
 
-            distance_score = np.abs(series_molt - series_mean_molt)
+        for i in range(size_mean.shape[0]):
+            size_molt = series[:, i]
+            size_mean_molt = size_mean[i]
+
+            distance_score = np.abs(size_molt - size_mean_molt)
     
             sorted_idx = np.argsort(distance_score)
-            valid_idx = sorted_idx[:nb_per_condition]
-            
-            for idx in valid_idx:
-                display_sample_images(
-                    experiment[idx][0],
-                    int(point[idx][i]),
-                    int(ecdysis[idx][i]),
-                    img_dir_list,
-                    filemaps,
-                    dpi,
-                    overlay=overlay,
-                    cmap=cmap,
-                )
+            selected_idx = sorted_idx[:nb_per_condition]
+
+            point_of_indices = point[selected_idx].squeeze().astype(int)
+            ecdysis_of_indices = ecdysis[selected_idx, i].squeeze().astype(int)
+
+            # check if 0D array
+            if point_of_indices.shape == ():
+                point_of_indices = [point_of_indices]
+                ecdysis_of_indices = [ecdysis_of_indices]
+
+            filemap_paths_of_indices = condition['filemap_path'][selected_idx].squeeze()
+
+            if filemap_paths_of_indices.shape == ():
+                filemap_paths_of_indices = [filemap_paths_of_indices]
+
+            image_paths_ecdysis = []
+            for j, (p, t, filemap_path) in enumerate(zip(point_of_indices, ecdysis_of_indices, filemap_paths_of_indices)):
+                paths = get_image_paths_of_time_point(p, t, str(filemap_path), filemaps, img_dir_list)
+                image_paths_ecdysis.append(paths)
+
+            image_paths.append(image_paths_ecdysis)
+        paths_dict[condition_id] = image_paths
+    return paths_dict
+
+def overlay_contours(mask_one_path, mask_two_path, dpi: int = 300, scale: float = 1.0, center=False, allign = 'left', thickness = 2) -> None:
+    """
+    Overlay two masks on top of each other.
+    """
+    mask_one = read_tiff_file(mask_one_path).astype(np.uint8)
+    mask_two = read_tiff_file(mask_two_path).astype(np.uint8)
+
+    max_height = max(mask_one.shape[0], mask_two.shape[0])
+    max_width = max(mask_one.shape[1], mask_two.shape[1])
+
+
+    m1, m2 = pad_images_to_same_dim(mask_one, mask_two)
+    diff = np.linalg.norm(m1 - m2)
+    flipped_m2 = np.flip(m2, axis=1)
+    diff_flipped = np.linalg.norm(m1 - flipped_m2)
+    if diff_flipped < diff:
+        mask_two = np.flip(mask_two, axis=1)
+
+    if allign == 'left':
+        mask_one = pad_to_dim_equally(mask_one, max_height, mask_one.shape[1])
+        mask_two = pad_to_dim_equally(mask_two, max_height, mask_two.shape[1])
+
+        mask_one = pad_to_dim(mask_one, mask_one.shape[0], max_width)
+        mask_two = pad_to_dim(mask_two, mask_two.shape[0], max_width)
+
+    elif allign == 'right':
+        mask_one = pad_to_dim_equally(mask_one, max_height, mask_one.shape[1])
+        mask_two = pad_to_dim_equally(mask_two, max_height, mask_two.shape[1])
+
+        mask_one = np.pad(mask_one, ((0, 0), (max_width - mask_one.shape[1], 0)), mode='constant', constant_values=0)
+        mask_two = np.pad(mask_two, ((0, 0), (max_width - mask_two.shape[1], 0)), mode='constant', constant_values=0)
+
+    elif allign == 'center':
+        mask_one, mask_two = pad_images_to_same_dim(mask_one, mask_two)
+
+    # pad 5 pixels on each side
+    mask_one = cv2.copyMakeBorder(mask_one, 5, 5, 5, 5, cv2.BORDER_CONSTANT, value=0)
+    mask_two = cv2.copyMakeBorder(mask_two, 5, 5, 5, 5, cv2.BORDER_CONSTANT, value=0)
+
+    mask_one = cv2.medianBlur(mask_one, 5)
+    mask_two = cv2.medianBlur(mask_two, 5)
+
+    contours_one, _ = cv2.findContours(mask_one, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
+
+    contour_img_one = np.zeros_like(mask_one)
+    cv2.drawContours(contour_img_one, contours_one, -1, 255, thickness)
+
+    contours_two, _ = cv2.findContours(mask_two, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
+    contour_img_two = np.zeros_like(mask_two)
+    cv2.drawContours(contour_img_two, contours_two, -1, 255, thickness)
+
+    masked_contour_img_one = np.ma.masked_where(contour_img_one == 0, contour_img_one)
+    masked_contour_img_two = np.ma.masked_where(contour_img_two == 0, contour_img_two)
+    plt.figure(figsize=((max_width/dpi) * scale, (max_height/dpi) * scale), dpi=dpi, facecolor='black')
+    plt.gca().set_facecolor('black')
+    plt.imshow(masked_contour_img_one, cmap=plt.cm.colors.LinearSegmentedColormap.from_list('', ['black', 'yellow']), alpha=0.7, vmin=0, vmax=255)
+    plt.imshow(masked_contour_img_two, cmap=plt.cm.colors.LinearSegmentedColormap.from_list('', ['black', 'red']), alpha=0.7, vmin=0, vmax=255)
+    plt.axis('off')
+    plt.tight_layout()
+    plt.show()
 
 def plot_heterogeneity_at_ecdysis(
     conditions_struct: Dict,
@@ -1782,10 +1810,17 @@ def plot_heterogeneity_at_ecdysis(
     conditions_to_plot: List[int], 
     remove_hatch = True, 
     legend = None, 
+    colors = None,
     x_axis_label = None, 
     y_axis_label = None, 
     exclude_arrests: bool = False,):
-    for condition in conditions_to_plot:
+
+    if colors is None:
+        color_palette = sns.color_palette("colorblind", len(conditions_to_plot))
+    else:
+        color_palette = colors
+
+    for i, condition in enumerate(conditions_to_plot):
         condition_dict = conditions_struct[condition]
 
         values = condition_dict[column]
@@ -1794,17 +1829,17 @@ def plot_heterogeneity_at_ecdysis(
             values = values[:, 1:]
 
         if exclude_arrests:
-            values = exclude_arrests_from_series(values)
+            values = exclude_arrests_from_series_at_ecdysis(values)
 
         cvs = []
-        for i in range(values.shape[1]):
-            values_at_ecdysis = values[:, i]
+        for j in range(values.shape[1]):
+            values_at_ecdysis = values[:, j]
             cv = np.nanstd(values_at_ecdysis) / np.nanmean(values_at_ecdysis)
             cvs.append(cv)
 
         label = build_legend(condition_dict, legend)
 
-        plt.plot(cvs, label = label, marker = 'o')
+        plt.plot(cvs, label = label, marker = 'o', color = color_palette[i])
 
     # replace the ticks by [L1, L2, L3, L4]
     if remove_hatch:
@@ -1826,10 +1861,17 @@ def plot_heterogeneity_rescaled_data(
     smooth: bool = False,
     remove_hatch = True, 
     legend = None, 
+    colors = None,
     x_axis_label = None, 
     y_axis_label = None, 
     exclude_arrests: bool = False,):
-    for condition in conditions_to_plot:
+
+    if colors is None:
+        color_palette = sns.color_palette("husl", len(conditions_to_plot))
+    else:
+        color_palette = colors
+
+    for i, condition in enumerate(conditions_to_plot):
         condition_dict = conditions_struct[condition]
 
         values = condition_dict[column]
@@ -1840,7 +1882,7 @@ def plot_heterogeneity_rescaled_data(
             cvs = medfilt(cvs, 7)
             # cvs = savgol_filter(cvs, 15, 3)
 
-        plt.plot(cvs, label = label)
+        plt.plot(cvs, label = label, color = color_palette[i])
 
     plt.xlabel(x_axis_label)
     plt.ylabel(y_axis_label)
