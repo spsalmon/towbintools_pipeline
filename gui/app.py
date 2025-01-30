@@ -22,7 +22,7 @@ KEY_CONVERSION_MAP = {
     "ecdys": "ecdysis",
 }
 
-filemap_path = "/mnt/towbin.data/shared/kstojanovski/20240610_Orca_10x_yap-1aid-raga-1aid_wBT186-437-438-439_25C_20240610_151353_919/analysis_sacha/report/analysis_filemap.csv"
+filemap_path = "/mnt/towbin.data/shared/plenart/20252501_squid_10x_wBT446_NaCl/analysis_Peter/report/analysis_filemap.csv"
 
 filemap = pd.read_csv(filemap_path)
 
@@ -309,7 +309,7 @@ app_ui = ui.page_fluid(ui.row(molt_annotator, timepoint_selector))
 
 
 def set_marker_shape(
-    selected_time, worm_types, hatch_time, m1, m2, m3, m4, custom_annotations: list = []
+    selected_time_index, worm_types, hatch_time, m1, m2, m3, m4, custom_annotations: list = []
 ):
     symbols = []
     for worm_type in worm_types:
@@ -357,7 +357,7 @@ def set_marker_shape(
         colors[int(m4)] = "blue"
 
     widths = [1] * len(worm_types)
-    widths[int(selected_time)] = 4
+    widths[int(selected_time_index)] = 4
     markers = dict(symbol=symbols, size=sizes, color=colors, line=dict(width=widths))
     return markers
 
@@ -673,28 +673,36 @@ def server(input, output, session):
     @reactive.event(input.previous_time)
     def previous_time():
         print("previous_time")
-        new_time = max(int(input.time()) - 1, np.min(times))
+        # new_time = max(int(input.time()) - 1, np.min(times))
+        new_time_index = max(np.where(np.array(times) == int(input.time()))[0][0] - 1, 0)
+        new_time = times[new_time_index]
         ui.update_selectize("time", selected=str(int(new_time)))
 
     @reactive.Effect
     @reactive.event(input.next_time)
     def next_time():
         print("next_time")
-        new_time = min(int(input.time()) + 1, np.max(times))
+        # new_time = min(int(input.time()) + 1, np.max(times))
+        new_time_index = min(np.where(np.array(times) == int(input.time()))[0][0] + 1, len(times) - 1)
+        new_time = times[new_time_index]
         ui.update_selectize("time", selected=str(int(new_time)))
 
     @reactive.Effect
     @reactive.event(input.previous_point)
     def previous_point():
         print("previous_point")
-        new_point = max(int(input.point()) - 1, np.min(points))
+        # new_point = max(int(input.point()) - 1, np.min(points))
+        new_point_index = max(np.where(np.array(points) == int(input.point()))[0][0] - 1, 0)
+        new_point = points[new_point_index]
         ui.update_selectize("point", selected=str(int(new_point)))
 
     @reactive.Effect
     @reactive.event(input.next_point)
     def next_point():
         print("next_point")
-        new_point = min(int(input.point()) + 1, np.max(points))
+        # new_point = min(int(input.point()) + 1, np.max(points))
+        new_point_index = min(np.where(np.array(points) == int(input.point()))[0][0] + 1, len(points) - 1)
+        new_point = points[new_point_index]
         ui.update_selectize("point", selected=str(int(new_point)))
 
     @output
@@ -715,7 +723,7 @@ def server(input, output, session):
         ]
         
         markers = set_marker_shape(
-            input.time(),
+            np.where(np.array(times) == int(input.time()))[0][0],
             data_of_point[worm_type_column],
             hatch(),
             m1(),
@@ -767,7 +775,7 @@ def server(input, output, session):
 
         def update_selected_time(trace, points, selector):
             print("update_selected_time")
-            for point in points.point_inds:
+            for point in points.xs:
                 ui.update_selectize("time", selected=str(point))
 
         fig.data[0].on_click(update_selected_time)
@@ -1044,7 +1052,7 @@ def server(input, output, session):
         images_of_point = get_images_of_point()
         segmentation_of_point = get_segmentation_of_point()
 
-        img = images_of_point[int(input.time())]
+        img = images_of_point[np.where(np.array(times) == int(input.time()))[0][0]]
         img = image_handling.read_tiff_file(img)
 
         if img.ndim == 3:
