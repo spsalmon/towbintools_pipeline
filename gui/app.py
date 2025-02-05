@@ -22,7 +22,7 @@ KEY_CONVERSION_MAP = {
     "ecdys": "ecdysis",
 }
 
-filemap_path = "/mnt/towbin.data/shared/plenart/20252501_squid_10x_wBT446_NaCl/analysis_Peter/report/analysis_filemap.csv"
+filemap_path = "/mnt/towbin.data/shared/spsalmon/20250127_ORCA_10x_chambers_for_lucien/analysis_sacha/report/analysis_filemap.csv"
 
 filemap = pd.read_csv(filemap_path)
 
