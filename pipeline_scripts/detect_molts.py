@@ -93,7 +93,7 @@ def compute_features_at_molt(
                     )
                 else:
                     features_at_molt[f"{column}_at_{molt}"] = np.nan
-            except ValueError as e:
+            except Exception as e:
                 print(f"Error in point {point}, column {column}, molt {molt}: {e}")
                 features_at_molt[f"{column}_at_{molt}"] = np.nan
 
