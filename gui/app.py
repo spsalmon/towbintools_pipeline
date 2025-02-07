@@ -484,12 +484,15 @@ def correct_ecdysis_columns(ecdys_event, time, point, selected_column):
             f'New value {value_at_ecdys_column}: {filemap.loc[(filemap["Point"] == point), value_at_ecdys_column].values[0]}')
 
 def set_ignore_start(point):
-    data_of_point = filemap.loc[filemap["Point"] == point]
-    # set ignore_start to the first time point that is ignored
-    ignore_start = data_of_point[data_of_point["Ignore"]]["Time"].min()
+    try:
+        data_of_point = filemap.loc[filemap["Point"] == point]
+        # set ignore_start to the first time point that is ignored
+        ignore_start = data_of_point[data_of_point["Ignore"]]["Time"].min()
 
-    print(f"Ignore start: {ignore_start}")
-    return ignore_start
+        print(f"Ignore start: {ignore_start}")
+        return ignore_start
+    except KeyError:
+        return ""
 
 def server(input, output, session):
     print("Initializing the server ...")
@@ -506,6 +509,8 @@ def server(input, output, session):
     value_at_m4 = reactive.Value("")
 
     ignore_start = reactive.Value("")
+    death = reactive.Value("")
+    arrest = reactive.Value("")
     
     @reactive.calc
     def import_molts():
@@ -690,6 +695,22 @@ def server(input, output, session):
         ignore_start.set(set_ignore_start(int(input.point())))
 
     @reactive.Effect
+    def get_death():
+        try:
+            death.set(filemap.loc[filemap["Point"] == int(input.point()), "Death"].values[0])
+        except KeyError:
+            death.set("")
+
+        print(f'Death: {death()}')
+
+    @reactive.Effect
+    def get_arrest():
+        try:
+            arrest.set(filemap.loc[filemap["Point"] == int(input.point()), "Arrest"].values[0])
+        except KeyError:
+            arrest.set(False)
+
+    @reactive.Effect
     @reactive.event(input.previous_time)
     def previous_time():
         print("previous_time")
@@ -770,6 +791,47 @@ def server(input, output, session):
             filemap.loc[mask_after, 'Ignore'] = True
 
         ignore_start.set(set_ignore_start(current_point))
+
+    @reactive.Effect
+    @reactive.event(input.set_death)
+    def set_death():
+        global filemap
+        print("set death")
+        current_point = int(input.point())
+        current_time = int(input.time())
+        
+        mask = filemap["Point"] == current_point
+
+        try:
+            if filemap.loc[mask, "Death"].values[0] == current_time:
+                filemap.loc[mask, "Death"] = np.nan
+            else:
+                filemap.loc[mask, "Death"] = current_time
+        except KeyError:
+            filemap["Death"] = np.nan
+            filemap.loc[mask, "Death"] = current_time
+
+        death.set(filemap.loc[mask, "Death"].values[0])
+
+    @reactive.Effect
+    @reactive.event(input.set_arrest)
+    def set_arrest():
+        global filemap
+        print("set arrest")
+        current_point = int(input.point())
+        
+        mask = filemap["Point"] == current_point
+
+        try:
+            if np.all(filemap.loc[mask, "Arrest"]):
+                filemap.loc[mask, "Arrest"] = False
+            else:
+                filemap.loc[mask, "Arrest"] = True
+        except KeyError:
+            filemap["Arrest"] = False
+            filemap.loc[mask, "Arrest"] = True
+
+        arrest.set(filemap.loc[mask, "Arrest"].values[0])
 
     @output
     @render_widget
@@ -864,6 +926,38 @@ def server(input, output, session):
                             line_width=0
                         )
                     ])
+
+        if death() != "":
+            if not np.isnan(float(death())):
+                fig.add_shape(
+                    dict(
+                        type="line",
+                        xref="x",
+                        yref="paper",
+                        x0=float(death()),
+                        y0=0,
+                        x1=float(death()),
+                        y1=1,
+                        line=dict(color="black", width=2),
+                    )
+                )
+
+        if arrest() != "" and arrest():
+            fig.add_shape(
+                dict(
+                    type="rect",
+                    xref="paper",
+                    yref="paper",
+                    x0=0,
+                    x1=1,  
+                    y0=0,
+                    y1=1,
+                    fillcolor="red",
+                    opacity=0.5,
+                    layer="above",
+                    line_width=0
+                )
+            )
 
         return fig
 
