@@ -1,9 +1,9 @@
-image_directories: ["/mnt/towbin.data/shared/spsalmon/towbinlab_segmentation_database/germline/good_images"]
-mask_directories: ["/mnt/towbin.data/shared/spsalmon/towbinlab_segmentation_database/germline/binarized_and_cleaned_masks/"]
+image_directories: ["/mnt/towbin.data/shared/spsalmon/towbinlab_segmentation_database/pharynx/good_images"]
+mask_directories: ["/mnt/towbin.data/shared/spsalmon/towbinlab_segmentation_database/pharynx/binarized_and_cleaned_masks/"]
 
 # training_filemap: '/mnt/external.data/TowbinLab/plenart/20221020_Ti2_10x_green_bacteria_wbt150_small_chambers_good/analysis/report/training_filemap.csv'
 
-save_dir: '/mnt/towbin.data/shared/spsalmon/towbinlab_segmentation_database/models/germline/'
+save_dir: '/mnt/towbin.data/shared/spsalmon/towbinlab_segmentation_database/models/pharynx/'
 model_name: 'SAMannotations_singleclass_UnetPlusPlus_efficientnet-b4_image-micronet_FocalTversky'
 
 pretrained: True
