@@ -218,6 +218,10 @@ def build_plotting_struct(
         ~experiment_filemap["condition_id"].isnull()
     ]
 
+    # remove rows where Ignore is True
+    if "Ignore" in experiment_filemap.columns:
+        experiment_filemap = experiment_filemap[~experiment_filemap["Ignore"]]
+
     conditions_struct = []
 
     for condition_id in experiment_filemap["condition_id"].unique():
@@ -942,7 +946,7 @@ def plot_growth_curves_individuals(
         worm_type_key = [key for key in condition_dict.keys() if "worm_type" in key][0]
 
         for j in range(len(condition_dict[column])):
-            time = condition_dict["time"][j]
+            time = condition_dict["experiment_time"][j]/3600
             data = condition_dict[column][j]
             worm_type = condition_dict[worm_type_key][j]
 
@@ -950,15 +954,25 @@ def plot_growth_curves_individuals(
 
             label = build_legend(condition_dict, legend)
 
-            ax[i].title.set_text(label)
-            ax[i].plot(time, filtered_data)
-
-        set_scale(ax[i], log_scale)
+            try:
+                ax[i].title.set_text(label)
+                ax[i].plot(time, filtered_data)
+                set_scale(ax[i], log_scale)
+            except TypeError:
+                ax.title.set_text(label)
+                ax.plot(time, filtered_data)
+                set_scale(ax, log_scale)
 
     if y_axis_label is not None:
-        ax[0].set_ylabel(y_axis_label)
+        try:
+            ax[0].set_ylabel(y_axis_label)
+        except TypeError:
+            ax.set_ylabel(y_axis_label)
     else:
-        ax[0].set_ylabel(column)
+        try:
+            ax[0].set_ylabel(column)
+        except TypeError:
+            ax.set_ylabel(column)
 
     plt.show()
 

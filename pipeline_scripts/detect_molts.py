@@ -40,17 +40,17 @@ def run_detect_molts(
             "M3": np.nan,
             "M4": np.nan,
         }
-        volume_at_ecdysis = {
-            "volume_at_hatch": np.nan,
-            "volume_at_M1": np.nan,
-            "volume_at_M2": np.nan,
-            "volume_at_M3": np.nan,
-            "volume_at_M4": np.nan,
-        }
+        # volume_at_ecdysis = {
+        #     "volume_at_hatch": np.nan,
+        #     "volume_at_M1": np.nan,
+        #     "volume_at_M2": np.nan,
+        #     "volume_at_M3": np.nan,
+        #     "volume_at_M4": np.nan,
+        # }
 
-    volume_names = [
-        f"{volume_column}_at_{molt}" for molt in ["HatchTime", "M1", "M2", "M3", "M4"]
-    ]
+    # volume_names = [
+    #     f"{volume_column}_at_{molt}" for molt in ["HatchTime", "M1", "M2", "M3", "M4"]
+    # ]
     print(f"Point {point} done, ecdysis: {ecdysis}")
 
     return {
@@ -60,14 +60,9 @@ def run_detect_molts(
         "M2": ecdysis["M2"],
         "M3": ecdysis["M3"],
         "M4": ecdysis["M4"],
-        volume_names[0]: volume_at_ecdysis["volume_at_hatch"],
-        volume_names[1]: volume_at_ecdysis["volume_at_M1"],
-        volume_names[2]: volume_at_ecdysis["volume_at_M2"],
-        volume_names[3]: volume_at_ecdysis["volume_at_M3"],
-        volume_names[4]: volume_at_ecdysis["volume_at_M4"],
     }
 
-def compute_other_features_at_molt(
+def compute_features_at_molt(
     analysis_filemap, molt_dataframe, volume_column, worm_type_column, point
 ):
     data_of_point = analysis_filemap[analysis_filemap["Point"] == point]
@@ -98,7 +93,7 @@ def compute_other_features_at_molt(
                     )
                 else:
                     features_at_molt[f"{column}_at_{molt}"] = np.nan
-            except ValueError as e:
+            except Exception as e:
                 print(f"Error in point {point}, column {column}, molt {molt}: {e}")
                 features_at_molt[f"{column}_at_{molt}"] = np.nan
 
@@ -126,7 +121,7 @@ def main(input_dataframe_path, output_file, config, n_jobs):
 
     # compute other features at each molt
     other_features_at_molt = Parallel(n_jobs=n_jobs)(
-        delayed(compute_other_features_at_molt)(
+        delayed(compute_features_at_molt)(
             analysis_filemap,
             molts_dataframe,
             config["molt_detection_volume"],
