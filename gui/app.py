@@ -22,7 +22,7 @@ KEY_CONVERSION_MAP = {
     "ecdys": "ecdysis",
 }
 
-filemap_path = "/mnt/towbin.data/shared/plenart/20252501_squid_10x_wBT446_NaCl/analysis_Peter/report/analysis_filemap.csv"
+filemap_path = "/mnt/towbin.data/shared/spsalmon/20250127_ORCA_10x_chambers_for_lucien/analysis_sacha/report/analysis_filemap.csv"
 
 filemap = pd.read_csv(filemap_path)
 
@@ -228,6 +228,13 @@ molt_annotator = ui.column(
             ui.row(ui.input_action_button("set_m4", "M4")),
             ui.row(ui.input_action_button("reset_m4", "Reset M4")),
             ui.row(ui.input_action_button("set_value_at_m4", "Set value at M4")),
+        ),
+        ui.column(
+            2,
+            ui.row(ui.input_action_button("set_arrest", "Arrest")),
+            ui.row(ui.input_action_button("set_death", "Dead")),
+            ui.row(ui.input_action_button("set_ignore_after", "Ignore After")),
+            ui.row(ui.input_action_button("set_ignore_point", "Ignore Point")),
         ),
         ui.row(
             ui.column(
@@ -476,6 +483,17 @@ def correct_ecdysis_columns(ecdys_event, time, point, selected_column):
         print(
             f'New value {value_at_ecdys_column}: {filemap.loc[(filemap["Point"] == point), value_at_ecdys_column].values[0]}')
 
+def set_ignore_start(point):
+    try:
+        data_of_point = filemap.loc[filemap["Point"] == point]
+        # set ignore_start to the first time point that is ignored
+        ignore_start = data_of_point[data_of_point["Ignore"]]["Time"].min()
+
+        print(f"Ignore start: {ignore_start}")
+        return ignore_start
+    except KeyError:
+        return ""
+
 def server(input, output, session):
     print("Initializing the server ...")
     hatch = reactive.Value("")
@@ -490,7 +508,10 @@ def server(input, output, session):
     value_at_m3 = reactive.Value("")
     value_at_m4 = reactive.Value("")
 
-
+    ignore_start = reactive.Value("")
+    death = reactive.Value("")
+    arrest = reactive.Value("")
+    
     @reactive.calc
     def import_molts():
         file = input.import_file()
@@ -584,17 +605,17 @@ def server(input, output, session):
 
             filemap, _ = create_feature_at_molt_columns(filemap, recompute_features=True)
 
-    @reactive.Calc
+    @reactive.calc
     def get_images_of_point():
         images_of_point_paths = filemap[filemap["Point"] == int(input.point())][
             "raw"
         ].values.tolist()
 
         images_of_point = images_of_point_paths
-        # images_of_point = Parallel(n_jobs=-1)(delayed(image_handling.read_tiff_file)(path) for path in images_of_point_paths['raw'].values.tolist())
+
         return images_of_point
 
-    @reactive.Calc
+    @reactive.calc
     def get_segmentation_of_point():
         if input.segmentation_overlay() == "None":
             return []
@@ -670,6 +691,26 @@ def server(input, output, session):
             value_at_m4.set(np.nan)
 
     @reactive.Effect
+    def get_ignore_start():
+        ignore_start.set(set_ignore_start(int(input.point())))
+
+    @reactive.Effect
+    def get_death():
+        try:
+            death.set(filemap.loc[filemap["Point"] == int(input.point()), "Death"].values[0])
+        except KeyError:
+            death.set("")
+
+        print(f'Death: {death()}')
+
+    @reactive.Effect
+    def get_arrest():
+        try:
+            arrest.set(filemap.loc[filemap["Point"] == int(input.point()), "Arrest"].values[0])
+        except KeyError:
+            arrest.set(False)
+
+    @reactive.Effect
     @reactive.event(input.previous_time)
     def previous_time():
         print("previous_time")
@@ -704,6 +745,93 @@ def server(input, output, session):
         new_point_index = min(np.where(np.array(points) == int(input.point()))[0][0] + 1, len(points) - 1)
         new_point = points[new_point_index]
         ui.update_selectize("point", selected=str(int(new_point)))
+
+    @reactive.Effect
+    @reactive.event(input.set_ignore_point)
+    def set_ignore_point():
+        global filemap
+        print("set ignore point")
+        current_point = int(input.point())
+        
+        mask = filemap["Point"] == current_point
+
+        try:
+            if np.all(filemap.loc[mask, 'Ignore']):
+                filemap.loc[mask, 'Ignore'] = False
+            else:
+                filemap.loc[mask, 'Ignore'] = True
+        except KeyError:
+            filemap['Ignore'] = False
+            filemap.loc[mask, 'Ignore'] = True
+
+        ignore_start.set(set_ignore_start(current_point))
+
+    @reactive.Effect
+    @reactive.event(input.set_ignore_after)
+    def set_ignore_after():
+        global filemap
+        print("set ignore after")
+        current_point = int(input.point())
+        current_time = int(input.time())
+        
+        mask_point = filemap["Point"] == current_point
+        mask_after = (filemap["Point"] == current_point) & (filemap["Time"] >= current_time)
+
+        try:
+            if np.all(filemap.loc[mask_point, 'Ignore']):
+                filemap.loc[mask_point, 'Ignore'] = False
+                filemap.loc[mask_after, 'Ignore'] = True
+            elif np.all(filemap.loc[mask_after, 'Ignore']):
+                filemap.loc[mask_point, 'Ignore'] = False
+            else:
+                filemap.loc[mask_point, 'Ignore'] = False
+                filemap.loc[mask_after, 'Ignore'] = True
+        except KeyError:
+            filemap['Ignore'] = False
+            filemap.loc[mask_after, 'Ignore'] = True
+
+        ignore_start.set(set_ignore_start(current_point))
+
+    @reactive.Effect
+    @reactive.event(input.set_death)
+    def set_death():
+        global filemap
+        print("set death")
+        current_point = int(input.point())
+        current_time = int(input.time())
+        
+        mask = filemap["Point"] == current_point
+
+        try:
+            if filemap.loc[mask, "Death"].values[0] == current_time:
+                filemap.loc[mask, "Death"] = np.nan
+            else:
+                filemap.loc[mask, "Death"] = current_time
+        except KeyError:
+            filemap["Death"] = np.nan
+            filemap.loc[mask, "Death"] = current_time
+
+        death.set(filemap.loc[mask, "Death"].values[0])
+
+    @reactive.Effect
+    @reactive.event(input.set_arrest)
+    def set_arrest():
+        global filemap
+        print("set arrest")
+        current_point = int(input.point())
+        
+        mask = filemap["Point"] == current_point
+
+        try:
+            if np.all(filemap.loc[mask, "Arrest"]):
+                filemap.loc[mask, "Arrest"] = False
+            else:
+                filemap.loc[mask, "Arrest"] = True
+        except KeyError:
+            filemap["Arrest"] = False
+            filemap.loc[mask, "Arrest"] = True
+
+        arrest.set(filemap.loc[mask, "Arrest"].values[0])
 
     @output
     @render_widget
@@ -779,6 +907,57 @@ def server(input, output, session):
                 ui.update_selectize("time", selected=str(point))
 
         fig.data[0].on_click(update_selected_time)
+
+        if ignore_start() != "":
+            if not np.isnan(float(ignore_start())):
+                fig.update_layout(
+                    shapes=[
+                        dict(
+                            type="rect",
+                            xref="x",
+                            yref="paper",
+                            x0=float(ignore_start()),
+                            x1=max(data_of_point["Time"])+1,  
+                            y0=0,
+                            y1=1,
+                            fillcolor="gray",
+                            opacity=0.5,
+                            layer="above",
+                            line_width=0
+                        )
+                    ])
+
+        if death() != "":
+            if not np.isnan(float(death())):
+                fig.add_shape(
+                    dict(
+                        type="line",
+                        xref="x",
+                        yref="paper",
+                        x0=float(death()),
+                        y0=0,
+                        x1=float(death()),
+                        y1=1,
+                        line=dict(color="black", width=2),
+                    )
+                )
+
+        if arrest() != "" and arrest():
+            fig.add_shape(
+                dict(
+                    type="rect",
+                    xref="paper",
+                    yref="paper",
+                    x0=0,
+                    x1=1,  
+                    y0=0,
+                    y1=1,
+                    fillcolor="red",
+                    opacity=0.5,
+                    layer="above",
+                    line_width=0
+                )
+            )
 
         return fig
 
@@ -969,7 +1148,7 @@ def server(input, output, session):
         value_at_m4.set(filemap.loc[
                 (filemap["Point"] == int(input.point())),
                 f"{input.column_to_plot()}_at_M4",
-            ].values[0])
+            ].values[0]) 
 
     @reactive.Effect
     @reactive.event(input.custom_annotation)
