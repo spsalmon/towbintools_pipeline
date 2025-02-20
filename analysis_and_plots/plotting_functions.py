@@ -16,6 +16,7 @@ from towbintools.data_analysis import (
     compute_larval_stage_duration,
     compute_series_at_time_classified,
     filter_series_with_classification,
+    correct_series_with_classification,
     rescale_and_aggregate,
     rescale_series,
 )
@@ -177,11 +178,31 @@ def get_ecdysis_and_durations(filemap):
 
 
 def separate_column_by_point(filemap, column):
-    separated_column = []
-    for point in filemap["Point"].unique():
+    max_number_of_values = np.max([len(filemap[filemap["Point"] == point][column].values) for point in filemap["Point"].unique()])
+
+    all_values = []
+    for i, point in enumerate(filemap["Point"].unique()):
         point_df = filemap[filemap["Point"] == point]
-        separated_column.append(point_df[column].values)
-    return np.array(separated_column)
+        values_of_point = point_df[column].values
+
+        if isinstance(values_of_point[0], str):
+            dtype = str
+            pad_value = "error"
+        else:
+            dtype = float
+            pad_value = np.nan
+
+        values_of_point = np.array(values_of_point, dtype=dtype)
+        values_of_point = np.pad(
+            values_of_point,
+            (0, max_number_of_values - len(values_of_point)),
+            mode="constant",
+            constant_values=pad_value,
+        )
+
+        all_values.append(values_of_point)
+
+    return np.array(all_values)
 
 
 def build_plotting_struct(
@@ -932,47 +953,65 @@ def plot_growth_curves_individuals(
     figsize=None,
     legend=None,
     y_axis_label=None,
+    smoothing_window=21,
 ):
-    color_palette = sns.color_palette(color_palette, len(conditions_to_plot))
 
+    color_palette = sns.color_palette(color_palette, len(conditions_to_plot))
     if figsize is None:
         figsize = (len(conditions_to_plot) * 8, 10)
-
+    
     fig, ax = plt.subplots(1, len(conditions_to_plot), figsize=figsize)
-
+    
     for i, condition_id in enumerate(conditions_to_plot):
         condition_dict = conditions_struct[condition_id]
         # TEMPORARY, ONLY WORKS WITH SINGLE CLASSIFICATION, FIND A WAY TO GENERALIZE
         worm_type_key = [key for key in condition_dict.keys() if "worm_type" in key][0]
-
+        
         for j in range(len(condition_dict[column])):
             time = condition_dict["experiment_time"][j]/3600
             data = condition_dict[column][j]
             worm_type = condition_dict[worm_type_key][j]
+            hatch = condition_dict['ecdysis_time_step'][j][0]
+            hatch_experiment_time = condition_dict['ecdysis_experiment_time'][j][0]/3600
+            
+            if not np.isnan(hatch):
+                hatch = int(hatch)
+                time = time[hatch:]
+                time = time - hatch_experiment_time
+                data = data[hatch:]
+                worm_type = worm_type[hatch:]
+                filtered_data = correct_series_with_classification(data, worm_type)
+                # smooth the data
+                filtered_data = medfilt(filtered_data, smoothing_window)
+                label = build_legend(condition_dict, legend)
+                
+                try:
+                    ax[i].plot(time, filtered_data)
+                    set_scale(ax[i], log_scale)
+                except TypeError:
+                    ax.plot(time, filtered_data)
+                    set_scale(ax, log_scale)
 
-            filtered_data = filter_series_with_classification(data, worm_type)
-
-            label = build_legend(condition_dict, legend)
-
-            try:
-                ax[i].title.set_text(label)
-                ax[i].plot(time, filtered_data)
-                set_scale(ax[i], log_scale)
-            except TypeError:
-                ax.title.set_text(label)
-                ax.plot(time, filtered_data)
-                set_scale(ax, log_scale)
-
+        try:
+            ax[i].title.set_text(label)
+        except TypeError:
+            ax.title.set_text(label)
+    
+    # Set labels
     if y_axis_label is not None:
         try:
             ax[0].set_ylabel(y_axis_label)
+            ax[0].set_xlabel("Time (h)")
         except TypeError:
             ax.set_ylabel(y_axis_label)
+            ax.set_xlabel("Time (h)")
     else:
         try:
             ax[0].set_ylabel(column)
+            ax[0].set_xlabel("Time (h)")
         except TypeError:
             ax.set_ylabel(column)
+            ax.set_xlabel("Time (h)")
 
     plt.show()
 

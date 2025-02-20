@@ -22,7 +22,7 @@ KEY_CONVERSION_MAP = {
     "ecdys": "ecdysis",
 }
 
-filemap_path = "/mnt/towbin.data/shared/spsalmon/20250127_ORCA_10x_chambers_for_lucien/analysis_sacha/report/analysis_filemap.csv"
+filemap_path = "/mnt/towbin.data/shared/spsalmon/20241018_SQUID_dpy_11_yap1_del/analysis/report/analysis_filemap.csv"
 
 filemap = pd.read_csv(filemap_path)
 
@@ -73,8 +73,8 @@ times = filemap["Time"].unique().tolist()
 points = filemap["Point"].unique().tolist()
 
 # channels = image_handling.read_tiff_file(filemap["raw"].iloc[0]).shape[0]
-channels = int(aicsimageio.AICSImage(filemap["raw"].iloc[1]).dims["C"][0])
-# channels = 3
+# channels = int(aicsimageio.AICSImage(filemap["raw"].iloc[1]).dims["C"][0])
+channels = 2
 list_channels = [f"Channel {i+1}" for i in range(channels)]
 list_channels = ["None"] + list_channels
 
