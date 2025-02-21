@@ -148,14 +148,13 @@ def get_ecdysis_and_durations(filemap):
             if np.isnan(ecdys):
                 ecdysis_experiment_time.append(np.nan)
             else:
-                # if ecdys is not in the time column, get the closest time
+                # if ecdys is not in the time column, set it to nan
                 if ecdys not in point_df["Time"].values:
-                    ecdys = point_df["Time"].iloc[
-                        np.abs(point_df["Time"] - ecdys).idxmin()
-                    ]
-                ecdys_experiment_time = point_df[point_df["Time"] == ecdys][
-                    "ExperimentTime"
-                ].iloc[0]
+                    ecdys_experiment_time = np.nan
+                else:
+                    ecdys_experiment_time = point_df[point_df["Time"] == ecdys][
+                        "ExperimentTime"
+                    ].iloc[0]
                 ecdysis_experiment_time.append(ecdys_experiment_time)
 
         all_ecdysis_experiment_time.append(ecdysis_experiment_time)
@@ -204,6 +203,33 @@ def separate_column_by_point(filemap, column):
 
     return np.array(all_values)
 
+def remove_ignored_molts(filemap):
+    df = filemap.copy()
+    
+    molt_columns = ['HatchTime', 'M1', 'M2', 'M3', 'M4']
+    
+    for point in df['Point'].unique():
+        point_mask = df['Point'] == point
+        point_df = df[point_mask]
+        
+        if point_df.empty:
+            continue
+            
+        # Get molt times for this point
+        molt_times = point_df[molt_columns].iloc[0]
+        
+        # Check each molt time
+        for col, molt_time in molt_times.items():
+            if pd.isna(molt_time):
+                continue
+                
+            # Find if this molt should be ignored
+            if point_df[point_df['Time'] == molt_time]['Ignore'].iloc[0]:
+                # Use .loc to avoid chained indexing warning
+                df.loc[point_mask, col] = np.nan
+    
+    return df
+
 
 def build_plotting_struct(
     experiment_dir, filemap_path, config_path, organ_channels={"body": 2, "pharynx": 1}, recompute_values_at_molt=False,
@@ -239,6 +265,9 @@ def build_plotting_struct(
         ~experiment_filemap["condition_id"].isnull()
     ]
 
+    # set molts that should be ignored to NaN
+    experiment_filemap = remove_ignored_molts(experiment_filemap)
+    
     # remove rows where Ignore is True
     if "Ignore" in experiment_filemap.columns:
         experiment_filemap = experiment_filemap[~experiment_filemap["Ignore"]]
