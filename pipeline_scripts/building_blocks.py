@@ -255,13 +255,8 @@ class SegmentationBuildingBlock(BuildingBlock):
             rerun=self.block_config["rerun_segmentation"],
         )
 
-        print(len(input_files))
         input_files = filter_files_of_group(input_files, config, self.block_config["run_segmentation_on"])
-        print(len(input_files))
-
-        print(len(output_files))
         output_files = filter_files_of_group(output_files, config, self.block_config["run_segmentation_on"])
-        print(len(output_files))
         
         return input_files, output_files
 
