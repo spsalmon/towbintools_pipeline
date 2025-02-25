@@ -127,7 +127,6 @@ def filter_files_with_filter_rule(file_groups, filter_rule):
 def filter_files_of_group(files, config, run_on_option):
     groups = get_groups(config)
     filter_rule = get_filter_rule(groups, run_on_option)
-    print(f"Filtering files with rule: {filter_rule}")
     return filter_files_with_filter_rule(files, filter_rule)
 
 def get_output_name(
