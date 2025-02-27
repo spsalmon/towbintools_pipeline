@@ -117,11 +117,8 @@ def process_directory(dir_path, output_dir, time, overwrite=False):
     point_groups = group_files_by_point(dir_path)
     point_lists = list(point_groups.values())
 
-    # for _, point_list in point_groups.items():
-    #     process_point(point_list, time, dir_path, fluorescence_pattern, brightfield_pattern)
-
     # Parallel processing
-    Parallel(n_jobs=-1, prefer='threads')(delayed(process_point)(point_list, time, dir_path, fluorescence_pattern, brightfield_pattern, overwrite) for point_list in point_lists[0:5])
+    Parallel(n_jobs=-1, prefer='threads')(delayed(process_point)(point_list, time, dir_path, fluorescence_pattern, brightfield_pattern, overwrite) for point_list in point_lists)
 
 
 def merge_and_rename_images(source_dir, output_dir, overwrite=False):
