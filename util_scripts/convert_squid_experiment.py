@@ -21,6 +21,10 @@ def group_files_by_point(dir_path):
 
 def process_point(point_list, time, dir_path, fluorescence_pattern, brightfield_pattern, overwrite=False):
 
+    channels_data = []
+    channels_metadata = []
+    channels_names = []
+
     for image_path in point_list:
         # check if the image is a fluorescence image
         match = fluorescence_pattern.match(image_path)
@@ -40,10 +44,6 @@ def process_point(point_list, time, dir_path, fluorescence_pattern, brightfield_
         output_path = os.path.join(output_dir, new_filename)
         if os.path.exists(output_path) and not overwrite:
             return
-        
-        channels_data = []
-        channels_metadata = []
-        channels_names = []
 
         # load the images
         image = tifffile.imread(os.path.join(dir_path, image_path))
