@@ -88,7 +88,7 @@ def compute_features_at_molt(
                 if not np.isnan(molt_time):
                     features_at_molt[f"{column}_at_{molt}"] = (
                         compute_series_at_time_classified(
-                            column_data, worm_types, molt_time
+                            column_data, worm_types, molt_time, series_time=data_of_point["Time"].values
                         )
                     )
                 else:
