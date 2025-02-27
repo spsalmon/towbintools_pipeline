@@ -310,7 +310,7 @@ def calculate_experiment_time(point, experiment_filemap, first_time):
     point_indices = experiment_filemap["Point"] == point
     point_data = experiment_filemap.loc[point_indices]
     try:
-        return (point_data["date"] - first_time[point]).dt.total_seconds()
+        return round((point_data["date"] - first_time[point]).dt.total_seconds())
     except KeyError:
         print(f"### Error calculating experiment time for point {point} ###")
         return pd.Series([np.nan] * len(point_data))
