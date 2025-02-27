@@ -22,7 +22,7 @@ KEY_CONVERSION_MAP = {
     "ecdys": "ecdysis",
 }
 
-filemap_path = "/mnt/towbin.data/shared/kstojanovski/20240212_Orca_10x_yap-1del_col-10-tir_wBT160-186-310-337-380-393_25C_20240212_164059_429/analysis_sacha/report/analysis_filemap.csv"
+filemap_path = "/mnt/towbin.data/shared/plenart/20252501_squid_10x_wBT446_NaCl/analysis_Peter/report/analysis_filemap.csv"
 
 filemap = pd.read_csv(filemap_path)
 
@@ -176,7 +176,7 @@ def create_feature_at_molt_columns(filemap, recompute_features=False):
                 for point in points:
                     data_of_point = filemap.loc[filemap["Point"] == point]
                     filemap.loc[filemap["Point"] == point, [feature_at_ecdysis_column]] = compute_series_at_time_classified(
-                        data_of_point[feature_column].values, data_of_point[worm_type_column].values, data_of_point[ecdys_event].values[0]
+                        data_of_point[feature_column].values, data_of_point[worm_type_column].values, data_of_point[ecdys_event].values[0], series_time=data_of_point["Time"].values
                     )
     return filemap, feature_columns
 
@@ -316,21 +316,30 @@ app_ui = ui.page_fluid(ui.row(molt_annotator, timepoint_selector))
 
 
 def set_marker_shape(
-    selected_time_index, worm_types, hatch_time, m1, m2, m3, m4, custom_annotations: list = []
+    times_of_point, selected_time_index, worm_types, hatch_time, m1, m2, m3, m4, custom_annotations: list = []
 ):
+    # fill the gaps in the times_of_point list
+    times_of_point_filled = np.arange(np.min(times_of_point), np.max(times_of_point) + 1)
+
+    worm_types_filled = [""] * len(times_of_point_filled)
+    for time, worm_type in zip(times_of_point, worm_types):
+        worm_types_filled[time] = worm_type
+
     symbols = []
-    for worm_type in worm_types:
+    for worm_type in worm_types_filled:
         if worm_type == "egg":
             symbol = "square-open"
         elif worm_type == "worm":
             symbol = "circle-open"
-        else:
+        elif worm_type != "":
             symbol = "triangle-up-open"
+        else:
+            symbol = ""
         symbols.append(symbol)
 
     # create a list full of "blue"
-    sizes = [4] * len(worm_types)
-    colors = ["black"] * len(worm_types)
+    sizes = [4] * len(symbols)
+    colors = ["black"] * len(symbols)
 
     for custom_annotation in custom_annotations:
         if np.isfinite(custom_annotation):
@@ -363,8 +372,18 @@ def set_marker_shape(
         sizes[int(m4)] = 8
         colors[int(m4)] = "blue"
 
-    widths = [1] * len(worm_types)
+    widths = [1] * len(symbols)
     widths[int(selected_time_index)] = 4
+
+    # find the index of all empty symbols
+    symbols, sizes, colors, widths = zip(
+        *[
+            (symbol, size, color, width)
+            for symbol, size, color, width in zip(symbols, sizes, colors, widths)
+            if symbol != ""
+        ]
+    )
+
     markers = dict(symbol=symbols, size=sizes, color=colors, line=dict(width=widths))
     return markers
 
@@ -431,6 +450,7 @@ def update_molt_and_ecdysis_columns(ecdys_event, time, point, selected_column):
                 data_of_point[value_column].values,
                 data_of_point[worm_type_column].values,
                 time,
+                series_time=data_of_point["Time"].values,
             )
 
         print(
@@ -849,10 +869,13 @@ def server(input, output, session):
                 "M4",
             ],
         ]
+
+        times_of_point = data_of_point["Time"].values
         
         markers = set_marker_shape(
-            np.where(np.array(times) == int(input.time()))[0][0],
-            data_of_point[worm_type_column],
+            times_of_point,
+            int(input.time()),
+            data_of_point[worm_type_column].values,
             hatch(),
             m1(),
             m2(),
