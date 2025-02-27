@@ -307,6 +307,13 @@ def build_plotting_struct(
         ]
         worm_types = separate_column_by_point(condition_df, worm_type_column)
 
+        condition_dict["time"] = separate_column_by_point(condition_df, "Time").astype(
+            float
+        )
+        condition_dict["experiment_time"] = separate_column_by_point(
+            condition_df, "ExperimentTime"
+        ).astype(float)
+
         for organ in organ_channels.keys():
             organ_channel = organ_channels[organ]
             organ_channel = f"ch{organ_channel}"
@@ -350,6 +357,7 @@ def build_plotting_struct(
                                 condition_dict[column][i],
                                 worm_types[i],
                                 ecdysis_time_step[i],
+                                series_time = condition_dict["time"][i],
                             )
                             for i in range(len(ecdysis_time_step))
                         ]
@@ -358,13 +366,6 @@ def build_plotting_struct(
                     condition_dict[column_at_molt] = separate_column_by_point(
                         condition_df, column_at_molt
                     )
-
-        condition_dict["time"] = separate_column_by_point(condition_df, "Time").astype(
-            float
-        )
-        condition_dict["experiment_time"] = separate_column_by_point(
-            condition_df, "ExperimentTime"
-        ).astype(float)
 
         conditions_struct.append(condition_dict)
 
