@@ -266,7 +266,8 @@ def build_plotting_struct(
     ]
 
     # set molts that should be ignored to NaN
-    experiment_filemap = remove_ignored_molts(experiment_filemap)
+    if "Ignore" in experiment_filemap.columns:
+        experiment_filemap = remove_ignored_molts(experiment_filemap)
     
     # remove rows where Ignore is True
     if "Ignore" in experiment_filemap.columns:
@@ -476,8 +477,39 @@ def combine_experiments(filemap_paths, config_paths, experiment_dirs=None, organ
 
     return merged_conditions_struct
 
-
 # PLOTTING FUNCTIONS
+
+def save_figure(fig, name, directory, format='svg', dpi=300, transparent=False):
+    """
+    Save the current matplotlib figure to the specified directory with the given name.
+    
+    Parameters:
+    fig (matplotlib.figure.Figure) : Figure to save
+    name (str) : Name of the file (without extension)
+    directory (str) : Directory to save the file in
+    format (str) : File format to save the figure in
+    dpi (int) : Resolution of the saved figure
+    transparent (bool) : Whether to save the figure with a transparent background
+    
+    Returns:
+    str : Full path to the saved file
+    """
+    
+    # Create directory if it doesn't exist
+    os.makedirs(directory, exist_ok=True)
+
+    # Construct full file path
+    filename = f"{name}.{format}"
+    filepath = os.path.join(directory, filename)
+    
+    # Save the figure
+    fig.savefig(
+        filepath,
+        format=format,
+        dpi=dpi,
+        bbox_inches='tight',
+        transparent=transparent
+    )
 
 
 def build_legend(single_condition_dict, legend):
@@ -586,8 +618,10 @@ def plot_aggregated_series(
     else:
         plt.ylabel(series_column)
 
+    fig = plt.gcf()
     plt.show()
 
+    return fig
 
 def plot_correlation(
     conditions_struct,
@@ -655,7 +689,11 @@ def plot_correlation(
     set_scale(plt.gca(), log_scale)
 
     plt.legend()
+
+    fig = plt.gcf()
     plt.show()
+
+    return fig
 
 
 def plot_correlation_at_ecdysis(
@@ -720,7 +758,11 @@ def plot_correlation_at_ecdysis(
     set_scale(plt.gca(), log_scale)
 
     plt.legend()
+
+    fig = plt.gcf()
     plt.show()
+
+    return fig
 
 def boxplot_at_molt(
     conditions_struct,
@@ -733,6 +775,7 @@ def boxplot_at_molt(
     legend=None,
     y_axis_label=None,
     titles=None,
+    share_y_axis: bool = True,
 ):
     if colors is None:
         color_palette = sns.color_palette("colorblind", len(conditions_to_plot))
@@ -756,19 +799,30 @@ def boxplot_at_molt(
     
     # Determine figure size
     if figsize is None:
-        figsize = (5 * df["Molt"].nunique(), 6)
+        figsize = (6 * df["Molt"].nunique(), 10)
     if titles is not None and len(titles) != df["Molt"].nunique():
         print("Number of titles does not match the number of ecdysis events.")
         titles = None
     
     # Create figure with extra space on the right for legend
-    fig, ax = plt.subplots(1, df["Molt"].nunique(), figsize=(figsize[0] + 3, figsize[1]))
+    fig, ax = plt.subplots(1, df["Molt"].nunique(), figsize=(figsize[0] + 3, figsize[1]), sharey=share_y_axis)
     
     # Create a dummy plot to get proper legend handles
     dummy_ax = fig.add_axes([0, 0, 0, 0])
     for i, condition in enumerate(conditions_to_plot):
-        dummy_ax.plot([], [], color=color_palette[i], label=build_legend(conditions_struct[condition], legend))
+        dummy_ax.boxplot([], [], patch_artist = True, label=build_legend(conditions_struct[condition], legend))
+        for j, patch in enumerate(dummy_ax.patches):
+            patch.set_facecolor(color_palette[j])
     dummy_ax.set_visible(False)
+    
+    # Find global min and max values for y-axis
+    min_val = df[column].min()
+    max_val = df[column].max()
+    
+    # Add some padding to the min and max values
+    range_padding = (max_val - min_val) * 0.1  # 10% padding
+    global_min = min_val - range_padding
+    global_max = max_val + range_padding
     
     for i in range(df["Molt"].nunique()):
         sns.boxplot(
@@ -783,7 +837,7 @@ def boxplot_at_molt(
             linewidth=2,
             legend=False
         )
-        ylims = ax[i].get_ylim()
+        
         sns.stripplot(
             data=df[df["Molt"] == i],
             x="Condition",
@@ -793,9 +847,17 @@ def boxplot_at_molt(
             color="black",
             dodge=True,
         )
-        ax[i].set_ylim(ylims)
+        
         ax[i].set_xlabel("")
-        ax[i].set_ylabel("")
+        # Hide y-axis labels and ticks for all subplots except the first one
+        if i > 0:
+            ax[i].set_ylabel("")
+        
+        if share_y_axis:
+            # Set all plots to use the same y-axis limits
+            ax[i].set_ylim(global_min, global_max)         
+            if i > 0:
+                ax[i].tick_params(axis='y', which='both', left=False, labelleft=False)
         
         if titles is not None:
             ax[i].set_title(titles[i])
@@ -844,10 +906,27 @@ def boxplot_at_molt(
               title=None,
               frameon=True)
     
-    # Adjust layout while leaving space for legend
-    # plt.subplots_adjust(right=0.85)
+    # Ensure all subplots share the same scale
+    # This is needed in addition to sharey=True to handle edge cases
+    fig.canvas.draw()  # This ensures that the plots are drawn before we adjust them
     
+    if share_y_axis:
+        # Get the global y-axis limits
+        all_ylims = [ax[i].get_ylim() for i in range(len(ax))]
+        y_min = min([lim[0] for lim in all_ylims])
+        y_max = max([lim[1] for lim in all_ylims])
+        
+        # Apply the global limits to all axes
+        for i in range(len(ax)):
+            ax[i].set_ylim(y_min, y_max)
+
+    # Make subplots closer together while leaving space for legend
+    plt.tight_layout(rect=[0, 0, 0.9, 1])
+    
+    fig = plt.gcf()
     plt.show()
+
+    return fig
 
 def plot_developmental_success(
     conditions_struct,
@@ -901,7 +980,11 @@ def plot_developmental_success(
         )
 
     plt.legend()
+
+    fig = plt.gcf()
     plt.show()
+
+    return fig
 
 def plot_arrests(
     conditions_struct,
@@ -972,7 +1055,11 @@ def plot_arrests(
         )
 
     plt.legend()
+
+    fig = plt.gcf()
     plt.show()
+
+    return fig
 
 def plot_growth_curves_individuals(
     conditions_struct,
@@ -1043,7 +1130,10 @@ def plot_growth_curves_individuals(
             ax.set_ylabel(column)
             ax.set_xlabel("Time (h)")
 
+    fig = plt.gcf()
     plt.show()
+
+    return fig
 
 
 def get_proportion_model(
@@ -1199,7 +1289,11 @@ def plot_deviation_from_model(
     set_scale(plt.gca(), log_scale)
 
     plt.legend()
+
+    fig = plt.gcf()
     plt.show()
+
+    return fig
 
 def exclude_arrests_from_series_at_ecdysis(series_at_ecdysis):
     filtered_series = np.full(series_at_ecdysis.shape, np.nan)
@@ -1418,7 +1512,11 @@ def plot_deviation_from_model_at_ecdysis(
     set_scale(plt.gca(), log_scale)
 
     plt.legend()
+
+    fig = plt.gcf()
     plt.show()    
+
+    return fig
 
 def plot_normalized_proportions(
     conditions_struct,
@@ -1477,7 +1575,11 @@ def plot_normalized_proportions(
     set_scale(plt.gca(), log_scale)
 
     plt.legend()
+
+    fig = plt.gcf()
     plt.show()
+
+    return fig
 
 
 def process_series_at_ecdysis(
@@ -1660,37 +1762,6 @@ def get_most_average_proportions_at_ecdysis(
             image_paths.append(image_paths_ecdysis)
         paths_dict[condition_id] = image_paths
     return paths_dict
-
-# def display_image_overlay(
-#     img_paths: List[str],
-#     dpi: int = 200,
-#     cmap: List[str] = ['viridis'],
-#     backup_dir: str = None,
-#     backup_file_name: str = None
-# ):
-#     """
-#     Display an overlay of multiple images.
-#     """
-#     img_list = [read_tiff_file(img_path) for img_path in img_paths]
-
-#     if len(cmap) == 1:
-#         cmap = cmap * len(img_list)
-
-#     stacked_img = np.stack(img_list, axis=0)
-
-#     if backup_dir is not None:
-#         if backup_file_name is not None:
-#             imwrite(os.path.join(backup_dir, backup_file_name), stacked_img)
-#         else:
-#             img_path = img_paths[0]
-#             imwrite(os.path.join(backup_dir, os.path.basename(img_path)), stacked_img)
-
-#     # add an empty channel to the image
-#     print(stacked_img.shape)
-
-#     height, width = stacked_img.shape[-2:]
-#     fig, ax = plt.subplots(figsize=(width/dpi, height/dpi), dpi=dpi)
-#     microim = microshow(images = stacked_img, fig_scaling = 5, cmaps = cmap, ax = ax, proj_type='max', dpi = dpi,)
         
 def get_most_average_deviations_at_ecdysis(
     conditions_struct: Dict,
@@ -1935,7 +2006,10 @@ def plot_heterogeneity_at_ecdysis(
 
     plt.legend()
 
+    fig = plt.gcf()
     plt.show()
+
+    return fig
 
 def plot_heterogeneity_rescaled_data(
     conditions_struct: Dict,
@@ -1972,7 +2046,10 @@ def plot_heterogeneity_rescaled_data(
 
     plt.legend()
 
+    fig = plt.gcf()
     plt.show()
+
+    return fig
 
 def combine_series(conditions_struct, series_one, series_two, operation, new_series_name):
     for condition in conditions_struct:
