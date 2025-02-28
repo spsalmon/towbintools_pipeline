@@ -1763,66 +1763,66 @@ def get_most_average_proportions_at_ecdysis(
         paths_dict[condition_id] = image_paths
     return paths_dict
         
-def get_most_average_deviations_at_ecdysis(
-    conditions_struct: Dict,
-    column_one: str,
-    column_two: str,
-    img_dir_list: List[str],
-    control_condition_id: str,
-    conditions_to_plot: List[int],
-    remove_hatch: bool = True,
-    exclude_arrests: bool = False,
-    dpi: int = 200,
-    nb_per_condition: int = 1,
-    overlay: bool = True,
-    cmap: List[str] = ['viridis'],
-    backup_dir: str = None,
-    backup_name = None,
-) -> None:
-    """
-    Calculate and display the most average deviations at ecdysis.
-    """
-    control_condition = conditions_struct[control_condition_id]
-    control_model = get_proportion_model_ecdysis(
-        control_condition[column_one],
-        control_condition[column_two],
-        remove_hatch,
-        x_axis_label=column_one,
-        y_axis_label=column_two,
-        exclude_arrests=exclude_arrests,
-    )
+# def get_most_average_deviations_at_ecdysis(
+#     conditions_struct: Dict,
+#     column_one: str,
+#     column_two: str,
+#     img_dir_list: List[str],
+#     control_condition_id: str,
+#     conditions_to_plot: List[int],
+#     remove_hatch: bool = True,
+#     exclude_arrests: bool = False,
+#     dpi: int = 200,
+#     nb_per_condition: int = 1,
+#     overlay: bool = True,
+#     cmap: List[str] = ['viridis'],
+#     backup_dir: str = None,
+#     backup_name = None,
+# ) -> None:
+#     """
+#     Calculate and display the most average deviations at ecdysis.
+#     """
+#     control_condition = conditions_struct[control_condition_id]
+#     control_model = get_proportion_model_ecdysis(
+#         control_condition[column_one],
+#         control_condition[column_two],
+#         remove_hatch,
+#         x_axis_label=column_one,
+#         y_axis_label=column_two,
+#         exclude_arrests=exclude_arrests,
+#     )
 
-    for condition_id in conditions_to_plot:
-        condition = conditions_struct[condition_id]
+#     for condition_id in conditions_to_plot:
+#         condition = conditions_struct[condition_id]
 
-        # TEMPORARY, ONLY WORKS WITH SINGLE CLASSIFICATION, FIND A WAY TO GENERALIZE
-        worm_type_key = [key for key in condition.keys() if "worm_type" in key][0]
-        series_one, series_two, point, experiment, ecdysis, worm_type = [
-            condition[key] for key in [column_one, column_two, 'point', 'experiment', 'ecdysis_time_step', worm_type_key]
-        ]
+#         # TEMPORARY, ONLY WORKS WITH SINGLE CLASSIFICATION, FIND A WAY TO GENERALIZE
+#         worm_type_key = [key for key in condition.keys() if "worm_type" in key][0]
+#         series_one, series_two, point, experiment, ecdysis, worm_type = [
+#             condition[key] for key in [column_one, column_two, 'point', 'experiment', 'ecdysis_time_step', worm_type_key]
+#         ]
 
-        filemaps = setup_image_filemaps(experiment, img_dir_list)
+#         filemaps = setup_image_filemaps(experiment, img_dir_list)
         
-        series_one, series_two, point, ecdysis = process_series_data(
-            series_one, series_two, point, ecdysis, remove_hatch, exclude_arrests
-        )
+#         series_one, series_two, point, ecdysis = process_series_data(
+#             series_one, series_two, point, ecdysis, remove_hatch, exclude_arrests
+#         )
 
-        # Calculate expected values and deviations
-        expected_series_two = np.exp(control_model(np.log(series_one)))
-        percentage_deviation = ((series_two - expected_series_two) / expected_series_two * 100)
-        percentage_deviation = filter_non_worm_data(percentage_deviation, worm_type, ecdysis)
+#         # Calculate expected values and deviations
+#         expected_series_two = np.exp(control_model(np.log(series_one)))
+#         percentage_deviation = ((series_two - expected_series_two) / expected_series_two * 100)
+#         percentage_deviation = filter_non_worm_data(percentage_deviation, worm_type, ecdysis)
         
-        y = np.nanmean(percentage_deviation, axis=0)
+#         y = np.nanmean(percentage_deviation, axis=0)
 
-        for i in range(percentage_deviation.shape[1]):
-            deviation_molt = percentage_deviation[:, i]
-            mean_deviation = y[i]
-            sorted_idx = np.argsort(np.abs(deviation_molt - mean_deviation))
-            valid_idx = sorted_idx[~np.isnan(deviation_molt[sorted_idx])][:nb_per_condition]
+#         for i in range(percentage_deviation.shape[1]):
+#             deviation_molt = percentage_deviation[:, i]
+#             mean_deviation = y[i]
+#             sorted_idx = np.argsort(np.abs(deviation_molt - mean_deviation))
+#             valid_idx = sorted_idx[~np.isnan(deviation_molt[sorted_idx])][:nb_per_condition]
             
-            for idx in valid_idx:
-                display_sample_images(experiment[idx][0], int(point[idx][i]), 
-                                   int(ecdysis[idx][i]), img_dir_list, filemaps, dpi, overlay=overlay, cmap=cmap, backup_dir=backup_dir)
+#             for idx in valid_idx:
+#                 display_sample_images(experiment[idx][0], int(point[idx][i]), 
+#                                    int(ecdysis[idx][i]), img_dir_list, filemaps, dpi, overlay=overlay, cmap=cmap, backup_dir=backup_dir)
 
 
 
