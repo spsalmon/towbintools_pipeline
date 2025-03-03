@@ -6,7 +6,7 @@ import subprocess
 
 import numpy as np
 import pandas as pd
-from joblib import Parallel, delayed
+from joblib import Parallel, delayed, parallel_config
 from towbintools.foundation import file_handling as file_handling
 from towbintools.foundation.image_handling import get_acquisition_date
 
@@ -196,10 +196,11 @@ def process_row_input_output_files(row, columns, output_dir, rerun):
 def get_input_and_output_files_parallel(
     experiment_filemap, columns: list, output_dir: str, rerun=True, n_jobs=-1
 ):
-    results = Parallel(n_jobs=n_jobs)(
-        delayed(process_row_input_output_files)(row, columns, output_dir, rerun)
-        for _, row in experiment_filemap.iterrows()
-    )
+    with parallel_config(backend="loky", n_jobs=n_jobs):
+        results = Parallel()(
+            delayed(process_row_input_output_files)(row, columns, output_dir, rerun)
+            for _, row in experiment_filemap.iterrows()
+        )
 
     # Filter out None results
     results = [result for result in results if result[0] is not None]
@@ -276,9 +277,11 @@ def get_experiment_time_from_filemap_parallel(experiment_filemap):
     print("### Calculating ExperimentTime ###")
     # copy the filemap to avoid modifying the original
     experiment_filemap = experiment_filemap.copy()
-    date_result = Parallel(n_jobs=-1)(
-        delayed(get_acquisition_date)(raw) for raw in experiment_filemap["raw"]
-    )
+
+    with parallel_config(backend="threading", n_jobs=-1):
+        date_result = Parallel()(
+            delayed(get_acquisition_date)(raw) for raw in experiment_filemap["raw"]
+        )
     experiment_filemap["date"] = date_result
     # in case all acquisition dates are None, return a None filled ExperimentTime column
     if experiment_filemap["date"].isnull().all():
@@ -296,10 +299,11 @@ def get_experiment_time_from_filemap_parallel(experiment_filemap):
             lambda x: x[x["Time"] == x["Time"].min()].iloc[0]["date"]
         )
     # iterate over each point and calculate the time difference
-    experiment_time = Parallel(n_jobs=-1)(
-        delayed(calculate_experiment_time)(point, experiment_filemap, first_time)
-        for point in experiment_filemap["Point"].unique()
-    )
+    with parallel_config(backend="loky", n_jobs=-1):
+        experiment_time = Parallel()(
+            delayed(calculate_experiment_time)(point, experiment_filemap, first_time)
+            for point in experiment_filemap["Point"].unique()
+        )
     experiment_time = pd.concat(experiment_time)
     experiment_filemap["ExperimentTime"] = experiment_time
     # keep only the ExperimentTime column

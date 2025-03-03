@@ -3,8 +3,8 @@ import os
 import numpy as np
 import pandas as pd
 import utils
-from joblib import Parallel, delayed
-from towbintools.data_analysis import compute_series_at_time_classified, smooth_series_classified
+from joblib import Parallel, delayed, parallel_config
+from towbintools.data_analysis import compute_series_at_time_classified
 from towbintools.foundation import detect_molts
 from towbintools.foundation.worm_features import get_features_to_compute_at_molt
 
@@ -40,17 +40,7 @@ def run_detect_molts(
             "M3": np.nan,
             "M4": np.nan,
         }
-        # volume_at_ecdysis = {
-        #     "volume_at_hatch": np.nan,
-        #     "volume_at_M1": np.nan,
-        #     "volume_at_M2": np.nan,
-        #     "volume_at_M3": np.nan,
-        #     "volume_at_M4": np.nan,
-        # }
 
-    # volume_names = [
-    #     f"{volume_column}_at_{molt}" for molt in ["HatchTime", "M1", "M2", "M3", "M4"]
-    # ]
     print(f"Point {point} done, ecdysis: {ecdysis}")
 
     return {
@@ -108,28 +98,31 @@ def main(input_dataframe_path, output_file, config, n_jobs):
     analysis_filemap = pd.read_pickle(input_dataframe_path)
 
     os.makedirs(os.path.dirname(output_file), exist_ok=True)
-    molts_and_volume = Parallel(n_jobs=n_jobs)(
-        delayed(run_detect_molts)(
-            analysis_filemap,
-            config["molt_detection_volume"],
-            config["molt_detection_worm_type"],
-            point,
+
+    with parallel_config(backend="loky", n_jobs=n_jobs):
+        molts_and_volume = Parallel()(
+            delayed(run_detect_molts)(
+                analysis_filemap,
+                config["molt_detection_volume"],
+                config["molt_detection_worm_type"],
+                point,
+            )
+            for point in analysis_filemap["Point"].unique()
         )
-        for point in analysis_filemap["Point"].unique()
-    )
     molts_dataframe = pd.DataFrame(molts_and_volume)
 
     # compute other features at each molt
-    other_features_at_molt = Parallel(n_jobs=n_jobs)(
-        delayed(compute_features_at_molt)(
-            analysis_filemap,
-            molts_dataframe,
-            config["molt_detection_volume"],
-            config["molt_detection_worm_type"],
-            point,
+    with parallel_config(backend="loky", n_jobs=n_jobs):
+        other_features_at_molt = Parallel()(
+            delayed(compute_features_at_molt)(
+                analysis_filemap,
+                molts_dataframe,
+                config["molt_detection_volume"],
+                config["molt_detection_worm_type"],
+                point,
+            )
+            for point in analysis_filemap["Point"].unique()
         )
-        for point in analysis_filemap["Point"].unique()
-    )
 
     other_features_at_molt_dataframe = pd.DataFrame(other_features_at_molt)
     molts_dataframe = molts_dataframe.merge(

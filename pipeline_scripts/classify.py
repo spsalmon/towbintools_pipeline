@@ -4,7 +4,7 @@ import re
 import pandas as pd
 import utils
 import xgboost as xgb
-from joblib import Parallel, delayed
+from joblib import Parallel, delayed, parallel_config
 from towbintools.classification import classification_tools
 from towbintools.foundation import image_handling
 
@@ -40,12 +40,14 @@ def main(input_pickle, output_file, config, n_jobs):
     classifier.load_model(classifier_path)
 
     os.makedirs(os.path.dirname(output_file), exist_ok=True)
-    worm_types = Parallel(n_jobs=n_jobs)(
-        delayed(classify_worm_type_from_file_path)(
-            input_file, config["pixelsize"], classifier
+
+    with parallel_config(backend="loky", n_jobs=n_jobs):
+        worm_types = Parallel()(
+            delayed(classify_worm_type_from_file_path)(
+                input_file, config["pixelsize"], classifier
+            )
+            for input_file in input_files
         )
-        for input_file in input_files
-    )
     worm_types_dataframe = pd.DataFrame(worm_types)
 
     # rename the WormType column to the output file

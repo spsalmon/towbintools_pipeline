@@ -3,7 +3,7 @@ import os
 
 import numpy as np
 import utils
-from joblib import Parallel, delayed
+from joblib import Parallel, delayed, parallel_config
 from tifffile import imwrite
 from towbintools.foundation.image_handling import read_tiff_file, check_if_zstack
 from towbintools.segmentation.segmentation_tools import segment_image
@@ -47,28 +47,16 @@ def main(input_pickle, output_pickle, config, n_jobs):
 
     is_zstack = check_if_zstack(input_files[0][0])
 
-    if config["segmentation_method"] == "edge_based":
-        Parallel(n_jobs=n_jobs)(
+    with parallel_config(backend="loky", n_jobs=n_jobs):
+        Parallel()(
             delayed(segment_and_save)(
                 input_file,
                 output_path,
-                method="edge_based",
+                method=config["segmentation_method"],
                 channels=config["segmentation_channels"],
                 is_zstack=is_zstack,
                 pixelsize=config["pixelsize"],
                 gaussian_filter_sigma=config["gaussian_filter_sigma"],
-            )
-            for input_file, output_path in zip(input_files, output_files)
-        )
-
-    elif config["segmentation_method"] == "double_threshold":
-        Parallel(n_jobs=n_jobs)(
-            delayed(segment_and_save)(
-                input_file,
-                output_path,
-                method="double_threshold",
-                channels=config["segmentation_channels"],
-                is_zstack=is_zstack,
             )
             for input_file, output_path in zip(input_files, output_files)
         )
