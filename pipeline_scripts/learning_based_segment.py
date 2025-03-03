@@ -122,7 +122,7 @@ def main(input_pickle, output_pickle, config, n_jobs):
                 # Reshape predictions to original shape
                 predictions = reshape_images_to_original_shape(predictions, image_shapes, padded_or_cropped="pad")
 
-                with parallel_config(backend="threading", n_jobs=n_jobs//2, inner_max_num_threads=1):
+                with parallel_config(backend="threading", n_jobs=n_jobs//2):
                     # Save predictions
                     Parallel()(
                         delayed(save_prediction)(prediction, output_path) for prediction, output_path in zip(predictions, output_files)
