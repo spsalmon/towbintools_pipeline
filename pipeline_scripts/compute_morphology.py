@@ -3,7 +3,7 @@ import os
 import re
 import pandas as pd
 import utils
-from joblib import Parallel, delayed
+from joblib import Parallel, delayed, parallel_config
 from towbintools.foundation import image_handling, worm_features
 
 def compute_morphological_features_from_file_path(straightened_mask_path, pixelsize, features):
@@ -33,10 +33,11 @@ def main(input_pickle, output_file, config, n_jobs):
 
 
     os.makedirs(os.path.dirname(output_file), exist_ok=True)
-    morphological_features = Parallel(n_jobs=n_jobs)(
-        delayed(compute_morphological_features_from_file_path)(input_file, config["pixelsize"], config["morphological_features"])
-        for input_file in input_files
-    )
+    with parallel_config(backend="loky", n_jobs=n_jobs):
+        morphological_features = Parallel()(
+            delayed(compute_morphological_features_from_file_path)(input_file, config["pixelsize"], config["morphological_features"])
+            for input_file in input_files
+        )
     morphological_features_dataframe = pd.DataFrame(morphological_features)
 
     # rename columns to match the rest of the pipeline

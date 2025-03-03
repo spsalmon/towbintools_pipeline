@@ -3,7 +3,7 @@ import os
 import cv2
 import numpy as np
 import utils
-from joblib import Parallel, delayed
+from joblib import Parallel, delayed, parallel_config
 from scipy.ndimage import binary_fill_holes
 from tifffile import imwrite
 from towbintools.foundation import binary_image, image_handling
@@ -198,20 +198,21 @@ def main(input_pickle, output_pickle, config, n_jobs):
     keep_biggest_object = config.get("keep_biggest_object", False)
     channel_to_allign = config.get("channel_to_allign", [2])
 
-    Parallel(n_jobs=n_jobs)(
-        delayed(straighten_and_save)(
-            source_file,
-            config["straightening_source"][1],
-            mask_file,
-            output_path,
-            is_zstack=is_zstack,
-            channel_to_allign=channel_to_allign,
-            keep_biggest_object = keep_biggest_object,
+    with parallel_config(backend="loky", n_jobs=n_jobs):
+        Parallel()(
+            delayed(straighten_and_save)(
+                source_file,
+                config["straightening_source"][1],
+                mask_file,
+                output_path,
+                is_zstack=is_zstack,
+                channel_to_allign=channel_to_allign,
+                keep_biggest_object = keep_biggest_object,
+            )
+            for source_file, mask_file, output_path in zip(
+                source_files, mask_files, output_files
+            )
         )
-        for source_file, mask_file, output_path in zip(
-            source_files, mask_files, output_files
-        )
-    )
 
 
 if __name__ == "__main__":

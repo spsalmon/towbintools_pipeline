@@ -5,15 +5,13 @@ import numpy as np
 import torch
 import utils
 from ilastik.experimental.api import PixelClassificationPipeline
-from joblib import Parallel, delayed
-from pytorch_toolbelt.inference.tiles import ImageSlicer
+from joblib import Parallel, delayed, parallel_config
 from tifffile import imwrite
 from towbintools.deep_learning.deep_learning_tools import (
     load_segmentation_model_from_checkpoint,
 )
 from towbintools.deep_learning.utils.augmentation import get_prediction_augmentation_from_model
 from towbintools.foundation import image_handling
-from towbintools.segmentation import segmentation_tools
 from xarray import DataArray
 from towbintools.deep_learning.utils.dataset import SegmentationPredictionDataset
 from torch.utils.data import DataLoader
@@ -124,10 +122,11 @@ def main(input_pickle, output_pickle, config, n_jobs):
                 # Reshape predictions to original shape
                 predictions = reshape_images_to_original_shape(predictions, image_shapes, padded_or_cropped="pad")
 
-                # Save predictions
-                Parallel(n_jobs=n_jobs//2, prefer="threads")(
-                    delayed(save_prediction)(prediction, output_path) for prediction, output_path in zip(predictions, output_files)
-                )
+                with parallel_config(backend="threading", n_jobs=n_jobs//2, inner_max_num_threads=1):
+                    # Save predictions
+                    Parallel()(
+                        delayed(save_prediction)(prediction, output_path) for prediction, output_path in zip(predictions, output_files)
+                    )
 
                 # remove the output paths that have been processed
                 output_files = output_files[len(image_paths):]
@@ -135,18 +134,20 @@ def main(input_pickle, output_pickle, config, n_jobs):
     elif config["segmentation_method"] == "ilastik":
         if config["ilastik_project_path"] is None:
             raise ValueError("ilastik_project_path must be set in the config file for ilastik segmentation.")
-        Parallel(n_jobs=n_jobs)(
-            delayed(segment_and_save_ilastik)(
-                input_file,
-                output_path,
-                ilastik_project_path=config["ilastik_project_path"],
-                augment_contrast=config["augment_contrast"],
-                channels=config["segmentation_channels"],
-                is_zstack=is_zstack,
-                result_channel=config["ilastik_result_channel"],
+
+        with parallel_config(backend="loky", n_jobs=n_jobs):
+            Parallel()(
+                delayed(segment_and_save_ilastik)(
+                    input_file,
+                    output_path,
+                    ilastik_project_path=config["ilastik_project_path"],
+                    augment_contrast=config["augment_contrast"],
+                    channels=config["segmentation_channels"],
+                    is_zstack=is_zstack,
+                    result_channel=config["ilastik_result_channel"],
+                )
+                for input_file, output_path in zip(input_files, output_files)
             )
-            for input_file, output_path in zip(input_files, output_files)
-        )
 
 
 if __name__ == "__main__":

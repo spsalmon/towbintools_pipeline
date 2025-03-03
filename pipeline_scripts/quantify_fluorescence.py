@@ -3,7 +3,7 @@ import re
 
 import pandas as pd
 import utils
-from joblib import Parallel, delayed
+from joblib import Parallel, delayed, parallel_config
 from towbintools.foundation import image_handling
 from towbintools.quantification import (
     compute_background_fluorescence,
@@ -56,16 +56,18 @@ def main(input_pickle, output_file, config, n_jobs):
     background_aggregation = config["fluorescence_background_aggregation"]
 
     os.makedirs(os.path.dirname(output_file), exist_ok=True)
-    fluo = Parallel(n_jobs=n_jobs)(
-        delayed(quantify_fluorescence_from_file_path)(
-            source_file,
-            config["fluorescence_quantification_source"][1],
-            mask_file,
-            aggregation=aggregation,
-            background_aggregation=background_aggregation,
+
+    with parallel_config(backend="loky", n_jobs=n_jobs):
+        fluo = Parallel()(
+            delayed(quantify_fluorescence_from_file_path)(
+                source_file,
+                config["fluorescence_quantification_source"][1],
+                mask_file,
+                aggregation=aggregation,
+                background_aggregation=background_aggregation,
+            )
+            for source_file, mask_file in zip(source_files, mask_files)
         )
-        for source_file, mask_file in zip(source_files, mask_files)
-    )
     fluo_dataframe = pd.DataFrame(fluo)
 
     # rename columns to match the rest of the pipeline
