@@ -1,4 +1,5 @@
 import os
+os.environ["OPENBLAS_NUM_THREADS"] = "1"
 
 import cv2
 import numpy as np
@@ -8,6 +9,11 @@ from scipy.ndimage import binary_fill_holes
 from tifffile import imwrite
 from towbintools.foundation import binary_image, image_handling
 from towbintools.straightening import Warper
+
+from threadpoolctl import threadpool_limits, ThreadpoolController, threadpool_info
+
+cv2.setNumThreads(1)
+controller = ThreadpoolController()
 
 def mask_preprocessing(mask):
     if mask.ndim == 2:
@@ -46,7 +52,7 @@ def image_preprocessing(image, keep_biggest_object = False):
         image = np.array([binary_fill_holes(i) for i in image])
     return image
 
-
+@controller.wrap(limits=1, user_api="blas")
 def straighten_and_save(
     source_image_path,
     source_image_channels,
@@ -57,6 +63,8 @@ def straighten_and_save(
     keep_biggest_object = False,
 ):
     """Straighten image and save to output_path."""
+
+    print(threadpool_info())
     mask = image_handling.read_tiff_file(mask_path)
     mask = mask_preprocessing(mask)
     try:
@@ -198,10 +206,6 @@ def main(input_pickle, output_pickle, config, n_jobs):
     channel_to_allign = config.get("channel_to_allign", [2])
 
     with parallel_config(backend="loky", n_jobs=n_jobs):
-        # Returns `None` if the key doesn't exist
-        print(os.environ.get('MKL_NUM_THREADS'))
-        print(os.environ.get('OMP_NUM_THREADS'))
-        print(os.environ.get('OPENBLAS_NUM_THREADS'))
         Parallel()(
             delayed(straighten_and_save)(
                 source_file,
@@ -216,7 +220,6 @@ def main(input_pickle, output_pickle, config, n_jobs):
                 source_files, mask_files, output_files
             )
         )
-
 
 if __name__ == "__main__":
     args = utils.basic_get_args()
