@@ -10,7 +10,7 @@ def compute_morphological_features_from_file_path(straightened_mask_path, pixels
     """Compute the volume of a straightened mask."""
     str_mask = image_handling.read_tiff_file(straightened_mask_path)
 
-    features = worm_features.compute_worm_morphological_features(str_mask, pixelsize, features)
+    features = worm_features.compute_mask_morphological_features(str_mask, pixelsize, features)
 
     pattern = re.compile(r"Time(\d+)_Point(\d+)")
     match = pattern.search(straightened_mask_path)

@@ -7,6 +7,8 @@
 #SBATCH -t 48:00:00
 #SBATCH --mem=8GB
 
+OMP_NUM_THREADS=1
+
 # Default configuration file
 DEFAULT_CONFIG_FILE="./configs/config.yaml"
 CONFIG_FILE="$DEFAULT_CONFIG_FILE"

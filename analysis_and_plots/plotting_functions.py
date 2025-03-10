@@ -775,7 +775,7 @@ def boxplot_at_molt(
     legend=None,
     y_axis_label=None,
     titles=None,
-    share_y_axis: bool = True,
+    share_y_axis: bool = False,
 ):
     if colors is None:
         color_palette = sns.color_palette("colorblind", len(conditions_to_plot))
@@ -793,6 +793,7 @@ def boxplot_at_molt(
                         "Condition": condition_id,
                         "Molt": j,
                         column: np.log(value) if log_scale else value,
+                        "Order": conditions_to_plot.index(condition_id),
                     }
                 )
     df = pd.DataFrame(data_list)
@@ -827,20 +828,20 @@ def boxplot_at_molt(
     for i in range(df["Molt"].nunique()):
         sns.boxplot(
             data=df[df["Molt"] == i],
-            x="Condition",
+            x="Order",
             y=column,
-            hue="Condition",
+            hue="Order",
             palette=color_palette,
             showfliers=False,
             ax=ax[i],
             dodge=False,
             linewidth=2,
-            legend=False
+            legend=False,
         )
         
         sns.stripplot(
             data=df[df["Molt"] == i],
-            x="Condition",
+            x="Order",
             y=column,
             ax=ax[i],
             alpha=0.5,
@@ -868,21 +869,21 @@ def boxplot_at_molt(
         )
         
         if plot_significance:
-            pairs = list(combinations(df["Condition"].unique(), 2))
+            pairs = list(combinations(df["Order"].unique(), 2))
             bars = []
             for pair in pairs:
-                data1 = df[(df["Condition"] == pair[0]) & (df["Molt"] == i)][
+                data1 = df[(df["Order"] == pair[0]) & (df["Molt"] == i)][
                     column
                 ].dropna()
-                data2 = df[(df["Condition"] == pair[1]) & (df["Molt"] == i)][
+                data2 = df[(df["Order"] == pair[1]) & (df["Molt"] == i)][
                     column
                 ].dropna()
                 if len(data1) == 0 or len(data2) == 0:
                     continue
                 p_value = mannwhitneyu(data1, data2).pvalue
                 bar = [
-                    conditions_to_plot.index(pair[0]),
-                    conditions_to_plot.index(pair[1]),
+                    pair[0],
+                    pair[1],
                     p_value,
                 ]
                 bars.append(bar)
@@ -2125,6 +2126,26 @@ def rescale(conditions_struct, series_name, rescaled_series_name, experiment_tim
         # reshape into (n_worms, 4*n_points)
 
         rescaled_series = rescaled_series.reshape(rescaled_series.shape[0], -1)
+
+        condition[rescaled_series_name] = rescaled_series
+
+    return conditions_struct
+
+def rescale_without_flattening(conditions_struct, series_name, rescaled_series_name, experiment_time=True, n_points=100):
+    for condition in conditions_struct:
+        series_values = condition[series_name]
+        # TEMPORARY, ONLY WORKS WITH SINGLE CLASSIFICATION, FIND A WAY TO GENERALIZE
+        worm_type_key = [key for key in condition.keys() if "worm_type" in key][0]
+        worm_type = condition[worm_type_key]
+        ecdysis = condition["ecdysis_time_step"]
+
+        if experiment_time:
+            time = condition['experiment_time']
+        else:
+            time = condition['time']
+
+        _, rescaled_series = rescale_series(
+        series_values, time, ecdysis, worm_type, n_points=n_points) # shape (n_worms, 4, n_points)
 
         condition[rescaled_series_name] = rescaled_series
 
