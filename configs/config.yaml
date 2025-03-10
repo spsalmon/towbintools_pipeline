@@ -22,7 +22,7 @@ rerun_custom_script: [True]
 segmentation_column: ['raw']
 segmentation_name_suffix: [null]
 segmentation_method: ["deep_learning"]
-segmentation_channels: [[0]]
+segmentation_channels: [[1]]
 run_segmentation_on: [null]
 
 # edge-based segmentation parameters
