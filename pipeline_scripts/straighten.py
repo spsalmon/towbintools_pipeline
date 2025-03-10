@@ -10,10 +10,9 @@ from tifffile import imwrite
 from towbintools.foundation import binary_image, image_handling
 from towbintools.straightening import Warper
 
-from threadpoolctl import threadpool_limits, ThreadpoolController, threadpool_info
+from threadpoolctl import threadpool_limits, threadpool_info
 
 cv2.setNumThreads(1)
-controller = ThreadpoolController()
 
 def mask_preprocessing(mask):
     if mask.ndim == 2:
@@ -52,7 +51,6 @@ def image_preprocessing(image, keep_biggest_object = False):
         image = np.array([binary_fill_holes(i) for i in image])
     return image
 
-@controller.wrap(limits=1, user_api="blas")
 def straighten_and_save(
     source_image_path,
     source_image_channels,
@@ -64,7 +62,6 @@ def straighten_and_save(
 ):
     """Straighten image and save to output_path."""
 
-    print(threadpool_info())
     mask = image_handling.read_tiff_file(mask_path)
     mask = mask_preprocessing(mask)
     try:
@@ -200,7 +197,11 @@ def main(input_pickle, output_pickle, config, n_jobs):
     mask_files = [f["mask_path"] for f in input_files]
     os.makedirs(os.path.dirname(output_files[0]), exist_ok=True)
 
-    is_zstack = image_handling.check_if_zstack(source_files[0])
+    try:
+        is_zstack = image_handling.check_if_zstack(source_files[0])
+    except Exception as e:
+        print(e)
+        is_zstack = False
 
     keep_biggest_object = config.get("keep_biggest_object", False)
     channel_to_allign = config.get("channel_to_allign", [2])
