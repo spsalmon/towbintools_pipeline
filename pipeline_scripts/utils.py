@@ -196,7 +196,7 @@ def process_row_input_output_files(row, columns, output_dir, rerun):
 def get_input_and_output_files_parallel(
     experiment_filemap, columns: list, output_dir: str, rerun=True, n_jobs=-1
 ):
-    with parallel_config(backend="threading", n_jobs=n_jobs):
+    with parallel_config(backend="loky", n_jobs=n_jobs):
         results = Parallel()(
             delayed(process_row_input_output_files)(row, columns, output_dir, rerun)
             for _, row in experiment_filemap.iterrows()
@@ -404,9 +404,9 @@ def create_sbatch_file(job_name, cores, time_limit, memory, command, gpus=0):
 #SBATCH --mem={memory}
 #SBATCH --wait
 
-OMP_NUM_THREADS=1
-MKL_NUM_THREADS=1
-OPENBLAS_NUM_THREADS=1
+export OMP_NUM_THREADS=1
+export MKL_NUM_THREADS=1
+export OPENBLAS_NUM_THREADS=1
 
 {command}
 """

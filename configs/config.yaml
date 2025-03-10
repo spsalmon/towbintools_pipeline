@@ -7,10 +7,11 @@ analysis_dir_name: "analysis"
 
 get_experiment_time: True
 
-building_blocks: ["segmentation", "straightening", "morphology", "classification", "molt_detection", "custom"]
+# building_blocks: ["segmentation", "straightening", "morphology", "classification", "molt_detection", "custom"]
+building_blocks: ["segmentation", "straightening"]
 
 rerun_segmentation: [False]
-rerun_straightening: [False]
+rerun_straightening: [True]
 rerun_morphology_computation: [False]
 rerun_classification: [False]
 rerun_molt_detection: [False]
