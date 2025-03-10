@@ -9,7 +9,6 @@ from tifffile import imwrite
 from towbintools.foundation import binary_image, image_handling
 from towbintools.straightening import Warper
 
-
 def mask_preprocessing(mask):
     if mask.ndim == 2:
         mask = binary_fill_holes(mask)
@@ -199,6 +198,10 @@ def main(input_pickle, output_pickle, config, n_jobs):
     channel_to_allign = config.get("channel_to_allign", [2])
 
     with parallel_config(backend="loky", n_jobs=n_jobs):
+        # Returns `None` if the key doesn't exist
+        print(os.environ.get('MKL_NUM_THREADS'))
+        print(os.environ.get('OMP_NUM_THREADS'))
+        print(os.environ.get('OPENBLAS_NUM_THREADS'))
         Parallel()(
             delayed(straighten_and_save)(
                 source_file,
