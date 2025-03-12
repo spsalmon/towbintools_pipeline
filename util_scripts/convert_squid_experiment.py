@@ -3,7 +3,7 @@ import re
 import tifffile
 import numpy as np
 from collections import OrderedDict, defaultdict
-from joblib import Parallel, delayed
+from joblib import Parallel, delayed, parallel_config
 from aicsimageio.writers import OmeTiffWriter
 import ome_types
 from ome_types.model import Image, Pixels, Channel
@@ -118,7 +118,8 @@ def process_directory(dir_path, output_dir, time, overwrite=False):
     point_lists = list(point_groups.values())
 
     # Parallel processing
-    Parallel(n_jobs=-1, prefer='threads')(delayed(process_point)(point_list, time, dir_path, fluorescence_pattern, brightfield_pattern, overwrite) for point_list in point_lists)
+    with parallel_config(backend="loky", n_jobs=-1):
+        Parallel()(delayed(process_point)(point_list, time, dir_path, fluorescence_pattern, brightfield_pattern, overwrite) for point_list in point_lists)
 
 
 def merge_and_rename_images(source_dir, output_dir, overwrite=False):
