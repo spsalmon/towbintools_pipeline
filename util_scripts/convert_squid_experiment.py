@@ -65,7 +65,6 @@ def process_point(point_list, time, dir_path, fluorescence_pattern, brightfield_
 
     # merge metadata
     all_metadata = [channel[1].images[0] for channel in sorted_channels]
-    print(all_metadata)
 
     size_x = all_metadata[0].pixels.size_x
     size_y = all_metadata[0].pixels.size_y
@@ -98,9 +97,6 @@ def process_point(point_list, time, dir_path, fluorescence_pattern, brightfield_
     merged_metadata.acquisition_date = all_metadata[0].acquisition_date
 
     merged_OME = ome_types.OME(images = [merged_metadata])
-
-    print(merged_OME.images[0].pixels)
-
     # Save the image with compression and metadata
     
     combined_channels_data = np.expand_dims(combined_channels_data, axis=(0, 1))
@@ -125,14 +121,14 @@ def process_directory(dir_path, output_dir, time, overwrite=False):
 def merge_and_rename_images(source_dir, output_dir, overwrite=False):
     os.makedirs(output_dir, exist_ok=True)
 
-    for dir_name in sorted(os.listdir(source_dir))[0]:
+    for dir_name in sorted(os.listdir(source_dir)):
         dir_path = os.path.join(source_dir, dir_name)
         if os.path.isdir(dir_path) and dir_name.isdigit():
             process_directory(dir_path, output_dir, dir_name, overwrite)
 
 if __name__ == "__main__":
 
-    experiment_dir = "/mnt/towbin.data/shared/spsalmon/20241018_SQUID_dpy_11_yap1_del"
+    experiment_dir = "/mnt/towbin.data/shared/spsalmon/20250314_squid_10x_yap_aid"
     source_dir = os.path.join(experiment_dir, "squid_raw")
     output_dir = os.path.join(experiment_dir, "raw")
 

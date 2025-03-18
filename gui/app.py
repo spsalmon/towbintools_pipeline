@@ -22,7 +22,7 @@ KEY_CONVERSION_MAP = {
     "ecdys": "ecdysis",
 }
 
-filemap_path = "/mnt/towbin.data/shared/kstojanovski/20240212_Orca_10x_yap-1del_col-10-tir_wBT160-186-310-337-380-393_25C_20240212_164059_429/analysis_sacha/report/analysis_filemap.csv"
+filemap_path = "/mnt/towbin.data/shared/spsalmon/20250314_squid_10x_yap_aid/analysis/report/analysis_filemap.csv"
 
 filemap = pd.read_csv(filemap_path)
 
@@ -72,9 +72,9 @@ else:
 times = filemap["Time"].unique().tolist()
 points = filemap["Point"].unique().tolist()
 
-# channels = image_handling.read_tiff_file(filemap["raw"].iloc[0]).shape[0]
+channels = image_handling.read_tiff_file(filemap["raw"].iloc[0]).shape[0]
 # channels = int(aicsimageio.AICSImage(filemap["raw"].iloc[1]).dims["C"][0])
-channels = 2
+
 list_channels = [f"Channel {i+1}" for i in range(channels)]
 list_channels = ["None"] + list_channels
 

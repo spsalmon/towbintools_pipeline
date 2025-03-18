@@ -396,8 +396,8 @@ def run_command(command, script_name, config, requires_gpu=False):
 def create_sbatch_file(job_name, cores, time_limit, memory, command, gpus=0):
     content = f"""#!/bin/bash
 #SBATCH -J {job_name}
-#SBATCH -o ./temp_files/sbatch_output/{job_name}.out
-#SBATCH -e ./temp_files/sbatch_output/{job_name}.err
+#SBATCH -o ./temp_files/sbatch_output/{job_name}-%j.out
+#SBATCH -e ./temp_files/sbatch_output/{job_name}-%j.err
 #SBATCH -c {cores}
 #SBATCH --gres=gpu:{gpus}
 #SBATCH -t {time_limit}
