@@ -1,8 +1,8 @@
 #!/bin/bash
 
 #SBATCH -J pipeline
-#SBATCH -o ./sbatch_output/pipeline.out
-#SBATCH -e ./sbatch_output/pipeline.err
+#SBATCH -o ./sbatch_output/pipeline-%j.out
+#SBATCH -e ./sbatch_output/pipeline-%j.err
 #SBATCH -c 8
 #SBATCH -t 48:00:00
 #SBATCH --mem=8GB
