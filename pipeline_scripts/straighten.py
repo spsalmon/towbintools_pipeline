@@ -1,4 +1,6 @@
 import os
+import logging
+import time
 os.environ["OPENBLAS_NUM_THREADS"] = "1"
 
 import cv2
@@ -62,15 +64,20 @@ def straighten_and_save(
 ):
     """Straighten image and save to output_path."""
 
+    logging.info(f"{time.strftime('%Y-%m-%d %H:%M:%S')}: {source_image_path}")
     mask = image_handling.read_tiff_file(mask_path)
     mask = mask_preprocessing(mask)
-    try:
+
+    if source_image_path == mask_path:
+        image = image_preprocessing(mask, keep_biggest_object)
+    else:
+        logging.info(f"{time.strftime('%Y-%m-%d %H:%M:%S')}: {source_image_path}")
         image = get_image(
             source_image_path, mask, is_zstack, channel_to_allign, source_image_channels
         )
-
         image = image_preprocessing(image, keep_biggest_object)
 
+    try:
         if is_zstack:
             straightened_image = straighten_zstack_image(image, mask)
         else:

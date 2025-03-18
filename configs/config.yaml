@@ -9,13 +9,13 @@ get_experiment_time: True
 
 building_blocks: ["segmentation", "straightening", "morphology_computation", "classification", "molt_detection", "custom"]
 
-rerun_segmentation: [True]
+rerun_segmentation: [False]
 rerun_straightening: [True]
-rerun_morphology_computation: [True]
-rerun_classification: [True]
-rerun_molt_detection: [True]
+rerun_morphology_computation: [False]
+rerun_classification: [False]
+rerun_molt_detection: [False]
 rerun_fluorescence_quantification: [False]
-rerun_custom_script: [True]
+rerun_custom_script: [False]
 
 # segmentation parameters
 segmentation_column: ['raw']
