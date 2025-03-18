@@ -224,10 +224,14 @@ def remove_ignored_molts(filemap):
                 continue
                 
             # Find if this molt should be ignored
-            if point_df[point_df['Time'] == molt_time]['Ignore'].iloc[0]:
-                # Use .loc to avoid chained indexing warning
+            try:
+                if point_df[point_df['Time'] == molt_time]['Ignore'].iloc[0]:
+                    # Use .loc to avoid chained indexing warning
+                    df.loc[point_mask, col] = np.nan
+            except IndexError:
+                print(f'No row found for time {molt_time} in point {point}')
                 df.loc[point_mask, col] = np.nan
-    
+        
     return df
 
 
@@ -297,6 +301,9 @@ def build_plotting_struct(
         condition_dict["ecdysis_experiment_time"] = ecdysis_experiment_time
         condition_dict["larval_stage_durations_experiment_time"] = (
             larval_stage_durations_experiment_time
+        )
+        condition_dict["larval_stage_durations_experiment_time_hours"] = (
+            larval_stage_durations_experiment_time / 3600
         )
         condition_dict["experiment"] = np.array([experiment_dir]*condition_df['Point'].nunique())[:, np.newaxis]
         condition_dict["filemap_path"] = np.array([filemap_path]*condition_df['Point'].nunique())[:, np.newaxis]
@@ -768,6 +775,7 @@ def boxplot_at_molt(
     conditions_struct,
     column,
     conditions_to_plot,
+    remove_hatch=False,
     log_scale: bool = True,
     figsize: tuple = None,
     colors=None,
@@ -786,7 +794,8 @@ def boxplot_at_molt(
     for condition_id in conditions_to_plot:
         condition_dict = conditions_struct[condition_id]
         data = condition_dict[column]
-        for j in range(data.shape[1]):
+        range_start = 1 if remove_hatch else 0
+        for j in range(range_start, data.shape[1]):
             for value in data[:, j]:
                 data_list.append(
                     {
@@ -897,6 +906,187 @@ def boxplot_at_molt(
     
     # Add legend to the right of the subplots
     legend_labels = [build_legend(conditions_struct[condition_id], legend)
+                    for condition_id in conditions_to_plot]
+    legend_handles = dummy_ax.get_legend_handles_labels()[0]
+    
+    # Place legend to the right of the subplots
+    fig.legend(legend_handles, legend_labels,
+              bbox_to_anchor=(0.9, 0.5),
+              loc='center left',
+              title=None,
+              frameon=True)
+    
+    # Ensure all subplots share the same scale
+    # This is needed in addition to sharey=True to handle edge cases
+    fig.canvas.draw()  # This ensures that the plots are drawn before we adjust them
+    
+    if share_y_axis:
+        # Get the global y-axis limits
+        all_ylims = [ax[i].get_ylim() for i in range(len(ax))]
+        y_min = min([lim[0] for lim in all_ylims])
+        y_max = max([lim[1] for lim in all_ylims])
+        
+        # Apply the global limits to all axes
+        for i in range(len(ax)):
+            ax[i].set_ylim(y_min, y_max)
+
+    # Make subplots closer together while leaving space for legend
+    plt.tight_layout(rect=[0, 0, 0.9, 1])
+    
+    fig = plt.gcf()
+    plt.show()
+
+    return fig
+
+def boxplot_larval_stage(
+    conditions_struct,
+    column,
+    conditions_to_plot,
+    aggregation: str = "mean",
+    n_points: int = 100,
+    fraction: float = 0.8,
+    log_scale: bool = True,
+    figsize: tuple = None,
+    colors=None,
+    plot_significance: bool = False,
+    legend=None,
+    y_axis_label=None,
+    titles=None,
+    share_y_axis: bool = False,
+):
+
+    new_column = column + "_rescaled"
+    struct = rescale_without_flattening(conditions_struct, column, new_column, aggregation, n_points)
+    if colors is None:
+        color_palette = sns.color_palette("colorblind", len(conditions_to_plot))
+    else:
+        color_palette = colors
+    # Prepare data
+    data_list = []
+    for condition_id in conditions_to_plot:
+        condition_dict = struct[condition_id]
+        data = condition_dict[new_column]
+        for i in range(data.shape[1]):
+            data_of_stage = data[:, i]
+            data_of_stage = data_of_stage[:, 0:int(fraction * data_of_stage.shape[1])]
+
+            data_of_stage = np.log(data_of_stage) if log_scale else data_of_stage
+            if aggregation == 'mean':
+                aggregated_data_of_stage = np.nanmean(data_of_stage, axis=1)
+            elif aggregation == 'median':
+                aggregated_data_of_stage = np.nanmedian(data_of_stage, axis=1)
+
+            for j in range(aggregated_data_of_stage.shape[0]):
+                data_list.append(
+                    {
+                        "Condition": condition_id,
+                        "LarvalStage": i,
+                        column: aggregated_data_of_stage[j], 
+                        "Order": conditions_to_plot.index(condition_id),
+                    }
+                )
+
+    df = pd.DataFrame(data_list)
+    
+    # Determine figure size
+    if figsize is None:
+        figsize = (6 * df["LarvalStage"].nunique(), 10)
+    if titles is not None and len(titles) != df["LarvalStage"].nunique():
+        print("Number of titles does not match the number of ecdysis events.")
+        titles = None
+    
+    # Create figure with extra space on the right for legend
+    fig, ax = plt.subplots(1, df["LarvalStage"].nunique(), figsize=(figsize[0] + 3, figsize[1]), sharey=share_y_axis)
+    
+    # Create a dummy plot to get proper legend handles
+    dummy_ax = fig.add_axes([0, 0, 0, 0])
+    for i, condition in enumerate(conditions_to_plot):
+        dummy_ax.boxplot([], [], patch_artist = True, label=build_legend(struct[condition], legend))
+        for j, patch in enumerate(dummy_ax.patches):
+            patch.set_facecolor(color_palette[j])
+    dummy_ax.set_visible(False)
+    
+    # Find global min and max values for y-axis
+    min_val = df[column].min()
+    max_val = df[column].max()
+    
+    # Add some padding to the min and max values
+    range_padding = (max_val - min_val) * 0.1  # 10% padding
+    global_min = min_val - range_padding
+    global_max = max_val + range_padding
+    
+    for i in range(df["LarvalStage"].nunique()):
+        sns.boxplot(
+            data=df[df["LarvalStage"] == i],
+            x="Order",
+            y=column,
+            hue="Order",
+            palette=color_palette,
+            showfliers=False,
+            ax=ax[i],
+            dodge=False,
+            linewidth=2,
+            legend=False,
+        )
+        
+        sns.stripplot(
+            data=df[df["LarvalStage"] == i],
+            x="Order",
+            y=column,
+            ax=ax[i],
+            alpha=0.5,
+            color="black",
+            dodge=True,
+        )
+        
+        ax[i].set_xlabel("")
+        # Hide y-axis labels and ticks for all subplots except the first one
+        if i > 0:
+            ax[i].set_ylabel("")
+        
+        if share_y_axis:
+            # Set all plots to use the same y-axis limits
+            ax[i].set_ylim(global_min, global_max)         
+            if i > 0:
+                ax[i].tick_params(axis='y', which='both', left=False, labelleft=False)
+        
+        if titles is not None:
+            ax[i].set_title(titles[i])
+        
+        # remove ticks
+        ax[i].tick_params(
+            axis="x", which="both", bottom=False, top=False, labelbottom=False
+        )
+        
+        if plot_significance:
+            pairs = list(combinations(df["Order"].unique(), 2))
+            bars = []
+            for pair in pairs:
+                data1 = df[(df["Order"] == pair[0]) & (df["LarvalStage"] == i)][
+                    column
+                ].dropna()
+                data2 = df[(df["Order"] == pair[1]) & (df["LarvalStage"] == i)][
+                    column
+                ].dropna()
+                if len(data1) == 0 or len(data2) == 0:
+                    continue
+                p_value = mannwhitneyu(data1, data2).pvalue
+                bar = [
+                    pair[0],
+                    pair[1],
+                    p_value,
+                ]
+                bars.append(bar)
+            starbars.draw_annotation(bars, ax=ax[i])
+    
+    # Set y label for the first plot
+    if y_axis_label is not None:
+        ax[0].set_ylabel(y_axis_label)
+    else:
+        ax[0].set_ylabel(column)
+    
+    # Add legend to the right of the subplots
+    legend_labels = [build_legend(struct[condition_id], legend)
                     for condition_id in conditions_to_plot]
     legend_handles = dummy_ax.get_legend_handles_labels()[0]
     
