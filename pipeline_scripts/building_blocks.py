@@ -13,6 +13,7 @@ from pipeline_scripts.utils import (
     pickle_objects,
     run_command,
     filter_files_of_group,
+    sync_backup_folder,
 )
 
 OPTIONS_MAP = {
@@ -169,11 +170,13 @@ class BuildingBlock(ABC):
 
             if len(input_files) != 0:
                 input_pickle_path, output_pickle_path = pickle_objects(
+                    config["temp_dir"],
                     {"path": "input_files", "obj": input_files},
                     {"path": f"{self.name}_output_files", "obj": output_files},
                 )
 
                 pickled_block_config = pickle_objects(
+                    config["temp_dir"],
                     {"path": "block_config", "obj": block_config}
                 )[0]
 
@@ -181,12 +184,7 @@ class BuildingBlock(ABC):
                     input_pickle_path, output_pickle_path, pickled_block_config, config
                 )
 
-                sbatch_output_file, sbatch_error_file = self.run_command(
-                    command, self.name, config
-                )
-
-                backup_file(sbatch_output_file, pipeline_backup_dir)
-                backup_file(sbatch_error_file, pipeline_backup_dir)
+                self.run_command(command, self.name, config)
 
                 cleanup_files(
                     input_pickle_path, output_pickle_path, pickled_block_config
@@ -206,10 +204,12 @@ class BuildingBlock(ABC):
 
             if len(input_files) != 0 and rerun:
                 input_pickle_path = pickle_objects(
+                    config["temp_dir"],
                     {"path": "input_files", "obj": input_files}
                 )[0]
 
                 pickled_block_config = pickle_objects(
+                    config["temp_dir"],
                     {"path": "block_config", "obj": block_config}
                 )[0]
 
@@ -217,15 +217,11 @@ class BuildingBlock(ABC):
                     input_pickle_path, output_file, pickled_block_config, config
                 )
 
-                sbatch_output_file, sbatch_error_file = self.run_command(
-                    command, self.name, config
-                )
-
-                backup_file(sbatch_output_file, pipeline_backup_dir)
-                backup_file(sbatch_error_file, pipeline_backup_dir)
+                self.run_command(command, self.name, config)
 
                 cleanup_files(input_pickle_path, pickled_block_config)
-
+   
+            sync_backup_folder(config['temp_dir'], pipeline_backup_dir)
             return output_file
 
 

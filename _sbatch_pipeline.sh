@@ -53,4 +53,4 @@ cp "$CONFIG_FILE" "$TEMP_DIR"
 config_file_name=$(basename "$CONFIG_FILE")
 CONFIG_FILE="$TEMP_DIR/$config_file_name"
 # Run the Python script with the specified or default configuration file
-~/.local/bin/micromamba run -n towbintools python3 pimp_your_pipeline.py -c "$CONFIG_FILE"
+~/.local/bin/micromamba run -n towbintools python3 pimp_your_pipeline.py -c "$CONFIG_FILE" --temp_dir "$TEMP_DIR"
