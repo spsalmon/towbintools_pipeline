@@ -16,14 +16,14 @@ from threadpoolctl import threadpool_limits, threadpool_info
 
 cv2.setNumThreads(1)
 
-# Create a console handler
-console_handler = logging.StreamHandler()
-console_handler.setLevel(logging.INFO)
-formatter = logging.Formatter("%(asctime)s - %(message)s", "%Y-%m-%d %H:%M:%S")
-console_handler.setFormatter(formatter)
-
-# Add the handler to the root logger
-logging.getLogger('').addHandler(console_handler)
+def start_logger_if_necessary(level=logging.DEBUG):
+    logger = logging.getLogger("mylogger")
+    if len(logger.handlers) == 0:
+        logger.setLevel(level)
+        sh = logging.StreamHandler()
+        sh.setFormatter(logging.Formatter("%(levelname)s - %(asctime)s - %(message)s"))
+        logger.addHandler(sh)
+    return logger
 
 def mask_preprocessing(mask):
     if mask.ndim == 2:
@@ -73,14 +73,15 @@ def straighten_and_save(
 ):
     """Straighten image and save to output_path."""
 
-    logging.info(f"Accessing {mask_path}")
+    logger = start_logger_if_necessary()
+    logger.debug(f"Accessing {mask_path}")
     mask = image_handling.read_tiff_file(mask_path)
     mask = mask_preprocessing(mask)
 
     if source_image_path == mask_path:
         image = image_preprocessing(mask, keep_biggest_object)
     else:
-        logging.info(f"Accessing {source_image_path}")
+        logger.debug(f"Accessing {source_image_path}")
         image = get_image(
             source_image_path, mask, is_zstack, channel_to_allign, source_image_channels
         )
@@ -92,7 +93,7 @@ def straighten_and_save(
         else:
             straightened_image = straighten_2D_image(image, mask)
     except Exception as e:
-        logging.exception(
+        logger.exception(
             f"Straightening failed for {source_image_path} with error: {e}"
         )
         straightened_image = np.zeros_like(mask).astype(np.uint8)
@@ -209,6 +210,8 @@ def straighten_2D_image(image, mask):
 
 def main(input_pickle, output_pickle, config, n_jobs):
     config = utils.load_pickles(config)[0]
+    start_logger_if_necessary()
+    logging.debug(f"Using config: {config}")
 
     input_files, output_files = utils.load_pickles(input_pickle, output_pickle)
     source_files = [f["source_image_path"] for f in input_files]
