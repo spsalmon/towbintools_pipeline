@@ -159,7 +159,7 @@ class BuildingBlock(ABC):
 
     def run(self, experiment_filemap, config, pad=None):
         block_config = self.block_config
-        sbatch_backup_dir = config["sbatch_backup_dir"]
+        pipeline_backup_dir = config["pipeline_backup_dir"]
 
         if self.return_type == "subdir":
             subdir = self.get_output_name(config, pad)
@@ -185,8 +185,8 @@ class BuildingBlock(ABC):
                     command, self.name, config
                 )
 
-                backup_file(sbatch_output_file, sbatch_backup_dir)
-                backup_file(sbatch_error_file, sbatch_backup_dir)
+                backup_file(sbatch_output_file, pipeline_backup_dir)
+                backup_file(sbatch_error_file, pipeline_backup_dir)
 
                 cleanup_files(
                     input_pickle_path, output_pickle_path, pickled_block_config
@@ -221,8 +221,8 @@ class BuildingBlock(ABC):
                     command, self.name, config
                 )
 
-                backup_file(sbatch_output_file, sbatch_backup_dir)
-                backup_file(sbatch_error_file, sbatch_backup_dir)
+                backup_file(sbatch_output_file, pipeline_backup_dir)
+                backup_file(sbatch_error_file, pipeline_backup_dir)
 
                 cleanup_files(input_pickle_path, pickled_block_config)
 

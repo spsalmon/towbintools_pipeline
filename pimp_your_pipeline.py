@@ -7,15 +7,6 @@ import yaml
 from towbintools.foundation import file_handling as file_handling
 
 from pipeline_scripts.building_blocks import parse_and_create_building_blocks
-from pipeline_scripts.run_functions import (
-    run_classification,
-    run_compute_volume,
-    run_custom,
-    run_detect_molts,
-    run_fluorescence_quantification,
-    run_segmentation,
-    run_straightening,
-)
 from pipeline_scripts.utils import (
     add_dir_to_experiment_filemap,
     backup_file,
@@ -31,32 +22,40 @@ from pipeline_scripts.utils import (
 def get_args():
     parser = argparse.ArgumentParser()
     parser.add_argument("-c", "--config", help="Path to the config file", required=True)
+    parser.add_argument("-t", "--temp_dir", help="Path to the directory storing temporary files", required=False)
     args = parser.parse_args()
     return args
 
-
 config_file = get_args().config
+temp_dir = get_args().temp_dir
 with open(config_file) as f:
     config = yaml.load(f, Loader=yaml.FullLoader)
 
-create_temp_folders()
+if temp_dir:
+    temp_dir = os.path.abspath(temp_dir)
+else:
+    temp_dir = os.path.abspath(os.path.join(os.getcwd(), "temp_files"))
+    # if the temp_dir does not exist, create it
+    if not os.path.exists(temp_dir):
+        os.makedirs(temp_dir)
 
+create_temp_folders(temp_dir)
 
 def main(config, pad=None):
-    experiment_dir, raw_subdir, analysis_subdir, report_subdir, sbatch_backup_dir = (
+    experiment_dir, raw_subdir, analysis_subdir, report_subdir, pipeline_backup_dir = (
         get_and_create_folders(config)
     )
 
     if pad:
         raw_subdir = os.path.join(raw_subdir, pad)
         report_subdir = os.path.join(report_subdir, pad)
-        sbatch_backup_dir = os.path.join(sbatch_backup_dir, pad)
+        pipeline_backup_dir = os.path.join(pipeline_backup_dir, pad)
 
     # add the directories to the config dictionary for easy access
     config["raw_subdir"] = raw_subdir
     config["analysis_subdir"] = analysis_subdir
     config["report_subdir"] = report_subdir
-    config["sbatch_backup_dir"] = sbatch_backup_dir
+    config["pipeline_backup_dir"] = pipeline_backup_dir
 
     extract_experiment_time = config.get("get_experiment_time", True)
 
