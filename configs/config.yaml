@@ -68,6 +68,6 @@ custom_script_parameters: [["-i testinput"]]
 
 # sbatch parameters
 sbatch_memory: 64G
-sbatch_time: 0-48:00:00
+sbatch_time: 0-24:00:00
 sbatch_cpus: 64
 sbatch_gpus: "rtx6000:1"
