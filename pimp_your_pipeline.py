@@ -16,6 +16,7 @@ from pipeline_scripts.utils import (
     get_experiment_time_from_filemap_parallel,
     merge_and_save_csv,
     rename_merge_and_save_csv,
+    sync_backup_folder
 )
 
 
@@ -39,23 +40,34 @@ else:
     if not os.path.exists(temp_dir):
         os.makedirs(temp_dir)
 
+temp_dir_basename = os.path.basename(temp_dir)
 create_temp_folders(temp_dir)
 
 def main(config, pad=None):
+    global temp_dir_basename
+    global temp_dir
+
     experiment_dir, raw_subdir, analysis_subdir, report_subdir, pipeline_backup_dir = (
         get_and_create_folders(config)
     )
+
+    pipeline_backup_dir = os.path.join(pipeline_backup_dir, temp_dir_basename)
+    os.makedirs(pipeline_backup_dir, exist_ok=True)
 
     if pad:
         raw_subdir = os.path.join(raw_subdir, pad)
         report_subdir = os.path.join(report_subdir, pad)
         pipeline_backup_dir = os.path.join(pipeline_backup_dir, pad)
+        temp_dir = os.path.join(temp_dir, pad)
 
     # add the directories to the config dictionary for easy access
     config["raw_subdir"] = raw_subdir
     config["analysis_subdir"] = analysis_subdir
     config["report_subdir"] = report_subdir
     config["pipeline_backup_dir"] = pipeline_backup_dir
+    config["temp_dir"] = temp_dir
+
+    sync_backup_folder(temp_dir, pipeline_backup_dir)
 
     extract_experiment_time = config.get("get_experiment_time", True)
 

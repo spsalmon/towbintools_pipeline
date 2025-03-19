@@ -53,6 +53,29 @@ def backup_file(file_path, destination_dir):
         print(f"Failed to backup file: {e}")
         return False
 
+def sync_backup_folder(dir, backup_dir):
+    """
+    Simple synchronization of a directory to a backup directory.
+    Only copies files that don't exist or are older in the temp directory.
+    """
+    
+    # Walk through backup directory
+    for root, dirs, files in os.walk(dir):
+        # Get the relative path
+        rel_path = os.path.relpath(root, dir)
+        backup_path = os.path.join(backup_dir, rel_path)
+        
+        # Create directory in temp if it doesn't exist
+        os.makedirs(backup_path, exist_ok=True)
+        
+        # Copy each file if needed
+        for file in files:
+            src_file = os.path.join(root, file)
+            dst_file = os.path.join(backup_path, file)
+            
+            # Copy if destination doesn't exist or source is newer
+            if not os.path.exists(dst_file) or os.path.getmtime(src_file) > os.path.getmtime(dst_file):
+                shutil.copy2(src_file, dst_file)
 
 def get_experiment_pads(config):
     experiment_dir = config["experiment_dir"]
@@ -331,11 +354,11 @@ def load_pickles(*pickle_paths):
     return loaded_pickles
 
 
-def pickle_objects(*objects):
+def pickle_objects(temp_dir, *objects):
     pickled_paths = []
     for obj in objects:
         path = obj["path"]
-        pickled_path = f"./temp_files/pickles/{path}.pkl"
+        pickled_path = f"{os.path.join(temp_dir, 'pickles', path)}.pkl"
 
         if hasattr(obj["obj"], "to_pickle"):
             obj["obj"].to_pickle(pickled_path)
@@ -364,16 +387,18 @@ def cleanup_files(*filepaths):
 
 def run_command(command, script_name, config, requires_gpu=False):
     if config["sbatch_gpus"] == 0 or config["sbatch_gpus"] is None:
-        sbatch_output_file, sbatch_error_file = create_sbatch_file(
+        script_path = create_sbatch_file(
             script_name,
+            config["temp_dir"],
             config["sbatch_cpus"],
             config["sbatch_time"],
             config["sbatch_memory"],
             command,
         )
     elif requires_gpu:
-        sbatch_output_file, sbatch_error_file = create_sbatch_file(
+        script_path = create_sbatch_file(
             script_name,
+            config["temp_dir"],
             config["sbatch_cpus"],
             config["sbatch_time"],
             config["sbatch_memory"],
@@ -381,22 +406,22 @@ def run_command(command, script_name, config, requires_gpu=False):
             gpus=config["sbatch_gpus"],
         )
     else:
-        sbatch_output_file, sbatch_error_file = create_sbatch_file(
+        script_path = create_sbatch_file(
             script_name,
+            config["temp_dir"],
             config["sbatch_cpus"],
             config["sbatch_time"],
             config["sbatch_memory"],
             command,
         )
-    subprocess.run(["sbatch", f"./temp_files/batch/{script_name}.sh"])
-    return sbatch_output_file, sbatch_error_file
+    subprocess.run(["sbatch", script_path])
 
 
-def create_sbatch_file(job_name, cores, time_limit, memory, command, gpus=0):
+def create_sbatch_file(job_name, temp_dir, cores, time_limit, memory, command, gpus=0):
     content = f"""#!/bin/bash
 #SBATCH -J {job_name}
-#SBATCH -o ./temp_files/sbatch_output/{job_name}-%j.out
-#SBATCH -e ./temp_files/sbatch_output/{job_name}-%j.err
+#SBATCH -o {os.path.join(temp_dir, 'sbatch_output', job_name)}-%j.out
+#SBATCH -e {os.path.join(temp_dir, 'sbatch_output', job_name)}-%j.err
 #SBATCH -c {cores}
 #SBATCH --gres=gpu:{gpus}
 #SBATCH -t {time_limit}
@@ -410,13 +435,11 @@ export OPENBLAS_NUM_THREADS=1
 {command}
 """
 
-    with open(f"./temp_files/batch/{job_name}.sh", "w") as file:
+    script_path = os.path.join(temp_dir, "batch", f"{job_name}.sh")
+    with open(script_path, "w") as file:
         file.write(content)
 
-    sbatch_output_file = f"./temp_files/sbatch_output/{job_name}.out"
-    sbatch_error_file = f"./temp_files/sbatch_output/{job_name}.err"
-    return sbatch_output_file, sbatch_error_file
-
+    return script_path
 
 # ----BOILERPLATE CODE FOR COMMAND LINE INTERFACE----
 
