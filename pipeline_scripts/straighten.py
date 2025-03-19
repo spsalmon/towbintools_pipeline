@@ -92,7 +92,9 @@ def straighten_and_save(
         else:
             straightened_image = straighten_2D_image(image, mask)
     except Exception as e:
-        print(e)
+        logging.exception(
+            f"Straightening failed for {source_image_path} with error: {e}"
+        )
         straightened_image = np.zeros_like(mask).astype(np.uint8)
         # add empty channel dimension if is_zstack is True
         if is_zstack:
@@ -216,7 +218,9 @@ def main(input_pickle, output_pickle, config, n_jobs):
     try:
         is_zstack = image_handling.check_if_zstack(source_files[0])
     except Exception as e:
-        print(e)
+        logging.exception(
+            f"Error checking if the image is a zstack: {e}. Assuming it is not a zstack."
+        )
         is_zstack = False
 
     keep_biggest_object = config.get("keep_biggest_object", False)
