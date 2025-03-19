@@ -12,6 +12,7 @@ OMP_NUM_THREADS=1
 # Default configuration file
 DEFAULT_CONFIG_FILE="./configs/config.yaml"
 CONFIG_FILE="$DEFAULT_CONFIG_FILE"
+TEMP_DIR="./temp_files"
 
 # Function to show usage
 usage() {
@@ -40,5 +41,16 @@ if [ ! -f "$CONFIG_FILE" ]; then
     exit 1
 fi
 
+# Get the number of the slurm job
+SLURM_JOB_ID=${SLURM_JOB_ID:-0}
+# Create a temporary directory for the job
+TEMP_DIR="$TEMP_DIR/pipeline_$SLURM_JOB_ID"
+
+mkdir -p "$TEMP_DIR"
+# Copy the configuration file to the temporary directory
+cp "$CONFIG_FILE" "$TEMP_DIR"
+
+config_file_name=$(basename "$CONFIG_FILE")
+CONFIG_FILE="$TEMP_DIR/$config_file_name"
 # Run the Python script with the specified or default configuration file
 ~/.local/bin/micromamba run -n towbintools python3 pimp_your_pipeline.py -c "$CONFIG_FILE"

@@ -77,10 +77,10 @@ def get_and_create_folders_pad(config, pad):
     os.makedirs(analysis_subdir, exist_ok=True)
     report_subdir = os.path.join(analysis_subdir, "report", pad)
     os.makedirs(report_subdir, exist_ok=True)
-    sbatch_backup_dir = os.path.join(report_subdir, "sbatch_backup")
-    os.makedirs(sbatch_backup_dir, exist_ok=True)
+    pipeline_backup_dir = os.path.join(report_subdir, "pipeline_backup")
+    os.makedirs(pipeline_backup_dir, exist_ok=True)
 
-    return experiment_dir, raw_subdir, analysis_subdir, report_subdir, sbatch_backup_dir
+    return experiment_dir, raw_subdir, analysis_subdir, report_subdir, pipeline_backup_dir
 
 
 def get_and_create_folders(config):
@@ -95,10 +95,10 @@ def get_and_create_folders(config):
     os.makedirs(analysis_subdir, exist_ok=True)
     report_subdir = os.path.join(analysis_subdir, "report")
     os.makedirs(report_subdir, exist_ok=True)
-    sbatch_backup_dir = os.path.join(report_subdir, "sbatch_backup")
-    os.makedirs(sbatch_backup_dir, exist_ok=True)
+    pipeline_backup_dir = os.path.join(report_subdir, "pipeline_backup")
+    os.makedirs(pipeline_backup_dir, exist_ok=True)
 
-    return experiment_dir, raw_subdir, analysis_subdir, report_subdir, sbatch_backup_dir
+    return experiment_dir, raw_subdir, analysis_subdir, report_subdir, pipeline_backup_dir
 
 def get_groups(config):
     try:
@@ -168,8 +168,7 @@ def get_output_name(
     return output_name
 
 
-def create_temp_folders():
-    temp_dir = "./temp_files"
+def create_temp_folders(temp_dir):
     os.makedirs(temp_dir, exist_ok=True)
     os.makedirs(os.path.join(temp_dir, "pickles"), exist_ok=True)
     os.makedirs(os.path.join(temp_dir, "batch"), exist_ok=True)
