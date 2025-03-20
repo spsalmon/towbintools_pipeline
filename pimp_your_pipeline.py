@@ -71,13 +71,13 @@ def main(config, pad=None):
 
     extract_experiment_time = config.get("get_experiment_time", True)
 
-    # copy the config file to the report folder
-    # if it already exists, change the name of the new one by adding a number
-    config_dir = os.path.join(report_subdir, "config")
+    # # copy the config file to the report folder
+    # # if it already exists, change the name of the new one by adding a number
+    # config_dir = os.path.join(report_subdir, "config")
 
-    os.makedirs(config_dir, exist_ok=True)
+    # os.makedirs(config_dir, exist_ok=True)
 
-    backup_file(config_file, config_dir)
+    # backup_file(config_file, config_dir)
 
     if not os.path.exists(os.path.join(report_subdir, "analysis_filemap.csv")):
         experiment_filemap = file_handling.get_dir_filemap(raw_subdir)
