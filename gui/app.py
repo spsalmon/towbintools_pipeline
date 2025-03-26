@@ -22,7 +22,7 @@ KEY_CONVERSION_MAP = {
     "ecdys": "ecdysis",
 }
 
-filemap_path = "/mnt/towbin.data/shared/spsalmon/20250314_squid_10x_yap_aid/analysis/report/analysis_filemap.csv"
+filemap_path = "/mnt/towbin.data/shared/spsalmon/20250314_squid_10x_yap_aid_160_438_492_493/analysis/report/analysis_filemap.csv"
 
 filemap = pd.read_csv(filemap_path)
 
@@ -645,6 +645,7 @@ def server(input, output, session):
         ].values.tolist()
 
         segmentation_of_point = segmentation_of_point_paths
+
         return segmentation_of_point
 
     def get_custom_annotations():
@@ -1279,7 +1280,7 @@ def server(input, output, session):
         img_to_plot = image_handling.normalize_image(img_to_plot, dest_dtype=np.float64)
 
         if len(segmentation_of_point) > 0:
-            segmentation = segmentation_of_point[int(input.time())]
+            segmentation = segmentation_of_point[np.where(np.array(times) == int(input.time()))[0][0]]
             segmentation = image_handling.read_tiff_file(segmentation)
             fig, ax = plt.subplots()
             ax.imshow(img_to_plot, cmap="viridis")
