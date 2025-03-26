@@ -426,7 +426,6 @@ def create_sbatch_file(job_name, temp_dir, cores, time_limit, memory, command, g
     #SBATCH --gres=gpu:{gpus}
     #SBATCH -t {time_limit}
     #SBATCH --mem={memory}
-    #SBATCH --gres=pipelinecapacity:{1 if gpus==0 else 2}
     #SBATCH --wait
 
     export OMP_NUM_THREADS=1
