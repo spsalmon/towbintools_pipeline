@@ -419,21 +419,22 @@ def run_command(command, script_name, config, requires_gpu=False):
 
 def create_sbatch_file(job_name, temp_dir, cores, time_limit, memory, command, gpus=0):
     content = f"""#!/bin/bash
-#SBATCH -J {job_name}
-#SBATCH -o {os.path.join(temp_dir, 'sbatch_output', job_name)}-%j.out
-#SBATCH -e {os.path.join(temp_dir, 'sbatch_output', job_name)}-%j.err
-#SBATCH -c {cores}
-#SBATCH --gres=gpu:{gpus}
-#SBATCH -t {time_limit}
-#SBATCH --mem={memory}
-#SBATCH --wait
+    #SBATCH -J {job_name}
+    #SBATCH -o {os.path.join(temp_dir, 'sbatch_output', job_name)}-%j.out
+    #SBATCH -e {os.path.join(temp_dir, 'sbatch_output', job_name)}-%j.err
+    #SBATCH -c {cores}
+    #SBATCH --gres=gpu:{gpus}
+    #SBATCH -t {time_limit}
+    #SBATCH --mem={memory}
+    #SBATCH --gres=pipelinecapacity:{1 if gpus==0 else 2}
+    #SBATCH --wait
 
-export OMP_NUM_THREADS=1
-export MKL_NUM_THREADS=1
-export OPENBLAS_NUM_THREADS=1
+    export OMP_NUM_THREADS=1
+    export MKL_NUM_THREADS=1
+    export OPENBLAS_NUM_THREADS=1
 
-{command}
-"""
+    {command}
+    """
 
     script_path = os.path.join(temp_dir, "batch", f"{job_name}.sh")
     with open(script_path, "w") as file:

@@ -6,6 +6,7 @@
 #SBATCH -c 8
 #SBATCH -t 24:00:00
 #SBATCH --mem=8GB
+#SBATCH --gres=pipelinecapacity:1
 
 OMP_NUM_THREADS=1
 

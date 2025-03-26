@@ -17,9 +17,11 @@ from towbintools.deep_learning.utils.augmentation import (
 from towbintools.deep_learning.utils.dataset import (
     create_segmentation_dataloaders_from_filemap,
     create_segmentation_training_dataframes_and_dataloaders,
+    create_segmentation_dataloaders,
 )
+import pandas as pd
 from towbintools.deep_learning.utils.loss import BCELossWithIgnore, FocalTverskyLoss
-
+import shutil
 
 def get_args():
     parser = argparse.ArgumentParser()
@@ -32,9 +34,12 @@ config_file = get_args().config
 with open(config_file) as f:
     config = yaml.load(f, Loader=yaml.FullLoader)
 
-image_directories = config["image_directories"]
-mask_directories = config["mask_directories"]
+image_directories = config.get("image_directories", None)
+mask_directories = config.get("mask_directories", None)
 training_filemap = config.get("training_filemap", None)
+training_dataframes = config.get("training_dataframes", None)
+validation_dataframes = config.get("validation_dataframes", None)
+test_dataframes = config.get("test_dataframes", None)
 save_dir = config["save_dir"]
 model_name = config["model_name"]
 pretrained = config.get("pretrained", True)
@@ -84,6 +89,9 @@ checkpoint_path = config.get("continue_training_from_checkpoint", None)
 model_save_dir = os.path.join(save_dir, model_name)
 os.makedirs(model_save_dir, exist_ok=True)
 
+# copy the config file to the model save directory
+shutil.copy(config_file, model_save_dir)
+
 input_channels = len(channels_to_segment)
 
 if training_filemap is not None:
@@ -93,6 +101,7 @@ if training_filemap is not None:
         batch_size=batch_size,
         num_workers=num_workers,
         channels=channels_to_segment,
+        train_on_tiles=train_on_tiles,
         tiler_params=tiler_params,
         training_transform=get_training_augmentation(
             normalization_type, **normalization_parameters
@@ -104,7 +113,7 @@ if training_filemap is not None:
         test_set_ratio=train_test_split_ratio,
     )
 
-else:
+elif image_directories is not None and mask_directories is not None:
     # create dataframes and dataloaders
     (
         training_dataframe,
@@ -128,6 +137,59 @@ else:
         ),
         validation_set_ratio=train_val_split_ratio,
         test_set_ratio=train_test_split_ratio,
+    )
+
+elif training_dataframes is not None and validation_dataframes is not None:
+    # combine the training dataframes together
+    training_df = []
+    for training_dataframe in training_dataframes:
+        training_dataframe = pd.read_csv(training_dataframe)
+        training_df.append(training_dataframe)
+    validation_df = []
+    for validation_dataframe in validation_dataframes:
+        validation_dataframe = pd.read_csv(validation_dataframe)
+        validation_df.append(validation_dataframe)
+
+    combined_training_dataframe = pd.concat(training_df, ignore_index=True)
+    combined_validation_dataframe = pd.concat(validation_df, ignore_index=True)
+
+
+    os.makedirs(os.path.join(model_save_dir, "dataframe_backup"), exist_ok=True)
+    # backup the dataframes
+    combined_training_dataframe.to_csv(
+        os.path.join(model_save_dir, "dataframe_backup", "training_dataframe.csv"), index=False
+    )
+    combined_validation_dataframe.to_csv(
+        os.path.join(model_save_dir, "dataframe_backup", "validation_dataframe.csv"), index=False
+    )
+
+    if test_dataframes is not None:
+        # combine the test dataframes together
+        test_df = []
+        for test_dataframe in test_dataframes:
+            test_dataframe = pd.read_csv(test_dataframe)
+            test_df.append(test_dataframe)
+
+        combined_test_dataframe = pd.concat(test_df, ignore_index=True)
+        combined_test_dataframe.to_csv(
+            os.path.join(model_save_dir, "dataframe_backup", "test_dataframe.csv"), index=False
+        )
+
+    # create dataloaders
+    train_loader, val_loader = create_segmentation_dataloaders(
+        combined_training_dataframe,
+        combined_validation_dataframe,
+        batch_size=batch_size,
+        num_workers=num_workers,
+        channels=channels_to_segment,
+        train_on_tiles=train_on_tiles,
+        tiler_params=tiler_params,
+        training_transform=get_training_augmentation(
+            normalization_type, **normalization_parameters
+        ),
+        validation_transform=get_prediction_augmentation(
+            normalization_type, **normalization_parameters
+        ),
     )
 
 # initialize model
