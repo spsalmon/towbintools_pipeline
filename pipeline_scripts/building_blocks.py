@@ -1,20 +1,17 @@
 import os
-from abc import ABC, abstractmethod
+from abc import ABC
+from abc import abstractmethod
 
 import numpy as np
-from towbintools.foundation import file_handling as file_handling
 
-from pipeline_scripts.utils import (
-    add_dir_to_experiment_filemap,
-    backup_file,
-    cleanup_files,
-    get_input_and_output_files_parallel,
-    get_output_name,
-    pickle_objects,
-    run_command,
-    filter_files_of_group,
-    sync_backup_folder,
-)
+from pipeline_scripts.utils import add_dir_to_experiment_filemap
+from pipeline_scripts.utils import cleanup_files
+from pipeline_scripts.utils import filter_files_of_group
+from pipeline_scripts.utils import get_input_and_output_files_parallel
+from pipeline_scripts.utils import get_output_name
+from pipeline_scripts.utils import pickle_objects
+from pipeline_scripts.utils import run_command
+from pipeline_scripts.utils import sync_backup_folder
 
 OPTIONS_MAP = {
     "segmentation": [
@@ -75,58 +72,47 @@ OPTIONS_MAP = {
 }
 
 DEFAULT_OPTIONS = {
-    "segmentation":
-        {
-            # default options for segmentation, allows user to make their config file shorter
-            "rerun_segmentation": [False],
-            "segmentation_column": ["raw"],
-            "segmentation_name_suffix": [None],
-            "gaussian_filter_sigma": [1.0],
-            "predict_on_tiles": [False],
-            "tiler_config": [None],
-            "enforce_n_channels": [None],
-            "activation_layer": [None],
-
-            # default options for segmentation that are either almost never used, or allow the user to make their config file shorter
-            # if some of those options are missing, some methods will not work (ie. ilastik if ilastik_project_path is missing)
-            "run_segmentation_on": [None],
-            "ilastik_project_path": [None],
-            "ilastik_result_channel": [None],
-            "model_path": [None],
-            "batch_size": [1],
-        },
-    "straightening":
-        {
-            "rerun_straightening": [False],
-            "keep_biggest_object": [False],
-        },
-    "morphology_computation":
-        {
-            "rerun_morphology_computation": [False],
-            "morphological_features": [["volume", "length", "area"]],
-
-        },
-    "classification":
-        {
-            "rerun_classification": [False],
-        },
-    "molt_detection":
-        {
-            "rerun_molt_detection": [False],
-        },
-    "fluorescence_quantification":
-        {
-            "rerun_fluorescence_quantification": [False],
-            "fluorescence_quantification_aggregation": ["median"],
-            "fluorescence_background_aggregation": ["median"],
-        },
-    "custom":
-        {
-            "rerun_custom_script": [False],
-        },
+    "segmentation": {
+        # default options for segmentation, allows user to make their config file shorter
+        "rerun_segmentation": [False],
+        "segmentation_column": ["raw"],
+        "segmentation_name_suffix": [None],
+        "gaussian_filter_sigma": [1.0],
+        "predict_on_tiles": [False],
+        "tiler_config": [None],
+        "enforce_n_channels": [None],
+        "activation_layer": [None],
+        # default options for segmentation that are either almost never used, or allow the user to make their config file shorter
+        # if some of those options are missing, some methods will not work (ie. ilastik if ilastik_project_path is missing)
+        "run_segmentation_on": [None],
+        "ilastik_project_path": [None],
+        "ilastik_result_channel": [None],
+        "model_path": [None],
+        "batch_size": [1],
+    },
+    "straightening": {
+        "rerun_straightening": [False],
+        "keep_biggest_object": [False],
+    },
+    "morphology_computation": {
+        "rerun_morphology_computation": [False],
+        "morphological_features": [["volume", "length", "area"]],
+    },
+    "classification": {
+        "rerun_classification": [False],
+    },
+    "molt_detection": {
+        "rerun_molt_detection": [False],
+    },
+    "fluorescence_quantification": {
+        "rerun_fluorescence_quantification": [False],
+        "fluorescence_quantification_aggregation": ["median"],
+        "fluorescence_background_aggregation": ["median"],
+    },
+    "custom": {
+        "rerun_custom_script": [False],
+    },
 }
-
-
 
 
 class BuildingBlock(ABC):
@@ -156,7 +142,7 @@ class BuildingBlock(ABC):
 
     @abstractmethod
     def run_command(self, command, name, config):
-        pass   
+        pass
 
     def run(self, experiment_filemap, config, pad=None):
         block_config = self.block_config
@@ -176,8 +162,7 @@ class BuildingBlock(ABC):
                 )
 
                 pickled_block_config = pickle_objects(
-                    config["temp_dir"],
-                    {"path": "block_config", "obj": block_config}
+                    config["temp_dir"], {"path": "block_config", "obj": block_config}
                 )[0]
 
                 command = self.create_command(
@@ -204,13 +189,11 @@ class BuildingBlock(ABC):
 
             if len(input_files) != 0 and rerun:
                 input_pickle_path = pickle_objects(
-                    config["temp_dir"],
-                    {"path": "input_files", "obj": input_files}
+                    config["temp_dir"], {"path": "input_files", "obj": input_files}
                 )[0]
 
                 pickled_block_config = pickle_objects(
-                    config["temp_dir"],
-                    {"path": "block_config", "obj": block_config}
+                    config["temp_dir"], {"path": "block_config", "obj": block_config}
                 )[0]
 
                 command = self.create_command(
@@ -220,8 +203,8 @@ class BuildingBlock(ABC):
                 self.run_command(command, self.name, config)
 
                 cleanup_files(input_pickle_path, pickled_block_config)
-   
-            sync_backup_folder(config['temp_dir'], pipeline_backup_dir)
+
+            sync_backup_folder(config["temp_dir"], pipeline_backup_dir)
             return output_file
 
 
@@ -251,11 +234,14 @@ class SegmentationBuildingBlock(BuildingBlock):
             rerun=self.block_config["rerun_segmentation"],
         )
 
-        input_files = filter_files_of_group(input_files, config, self.block_config["run_segmentation_on"])
-        output_files = filter_files_of_group(output_files, config, self.block_config["run_segmentation_on"])
-        
-        return input_files, output_files
+        input_files = filter_files_of_group(
+            input_files, config, self.block_config["run_segmentation_on"]
+        )
+        output_files = filter_files_of_group(
+            output_files, config, self.block_config["run_segmentation_on"]
+        )
 
+        return input_files, output_files
 
     def create_command(
         self, input_pickle_path, output_pickle_path, pickled_block_config, config
@@ -308,7 +294,7 @@ class StraighteningBuildingBlock(BuildingBlock):
             if column not in experiment_filemap.columns:
                 try:
                     report_subdir = config["report_subdir"]
-                    column_subdir = os.path.join(config['experiment_dir'], column)
+                    column_subdir = os.path.join(config["experiment_dir"], column)
                     experiment_filemap = add_dir_to_experiment_filemap(
                         experiment_filemap, column_subdir, column
                     )
@@ -350,7 +336,10 @@ class StraighteningBuildingBlock(BuildingBlock):
 class MorphologyComputationBuildingBlock(BuildingBlock):
     def __init__(self, block_config):
         super().__init__(
-            "morphology_computation", OPTIONS_MAP["morphology_computation"], block_config, "csv"
+            "morphology_computation",
+            OPTIONS_MAP["morphology_computation"],
+            block_config,
+            "csv",
         )
 
     def get_output_name(self, config, pad):
@@ -363,11 +352,16 @@ class MorphologyComputationBuildingBlock(BuildingBlock):
         )
 
     def get_input_and_output_files(self, config, experiment_filemap, subdir):
-        morphology_computation_masks = [self.block_config["morphology_computation_masks"]]
+        morphology_computation_masks = [
+            self.block_config["morphology_computation_masks"]
+        ]
         analysis_subdir = config["analysis_subdir"]
 
         input_files, _ = get_input_and_output_files_parallel(
-            experiment_filemap, morphology_computation_masks, analysis_subdir, rerun=True
+            experiment_filemap,
+            morphology_computation_masks,
+            analysis_subdir,
+            rerun=True,
         )
 
         input_files = [input_file[0] for input_file in input_files]
@@ -598,13 +592,17 @@ def parse_building_blocks_config(config):
 
                 except KeyError:
                     if option in DEFAULT_OPTIONS[building_block_name]:
-                        config_copy[option] = DEFAULT_OPTIONS[building_block_name][option]
-                        print(f'{option} not found in config file, using default value: {config_copy[option]}')
+                        config_copy[option] = DEFAULT_OPTIONS[building_block_name][
+                            option
+                        ]
+                        print(
+                            f"{option} not found in config file, using default value: {config_copy[option]}"
+                        )
                     else:
                         raise KeyError(
                             f"{option} is not in the config file, but is required for the {building_block_name} building block."
                         )
-                        
+
             # expand single options to match the number of blocks
             for option in options:
                 if len(config_copy[option]) == 1:
@@ -639,7 +637,10 @@ def create_building_blocks(blocks_config):
             building_block = SegmentationBuildingBlock(block_config)
         elif block_config["name"] == "straightening":
             building_block = StraighteningBuildingBlock(block_config)
-        elif block_config["name"] == "morphology_computation" or block_config["name"] == "volume_computation": # volume_computation is there for backward compatibility
+        elif (
+            block_config["name"] == "morphology_computation"
+            or block_config["name"] == "volume_computation"
+        ):  # volume_computation is there for backward compatibility
             building_block = MorphologyComputationBuildingBlock(block_config)
         elif block_config["name"] == "classification":
             building_block = ClassificationBuildingBlock(block_config)

@@ -1,26 +1,39 @@
 import os
 import re
-import tifffile
+from collections import defaultdict
+
 import numpy as np
-from collections import OrderedDict, defaultdict
-from joblib import Parallel, delayed, parallel_config
-from aicsimageio.writers import OmeTiffWriter
 import ome_types
-from ome_types.model import Image, Pixels, Channel
+import tifffile
+from aicsimageio.writers import OmeTiffWriter
+from joblib import delayed
+from joblib import Parallel
+from joblib import parallel_config
+from ome_types.model import Channel
+from ome_types.model import Image
+from ome_types.model import Pixels
+
 
 def group_files_by_point(dir_path):
     groups = defaultdict(list)
     for file in os.listdir(dir_path):
-        if file.endswith('.tiff') or file.endswith('.tif'):
+        if file.endswith(".tiff") or file.endswith(".tif"):
             try:
-                point_number = int(file.split('_')[0])
+                point_number = int(file.split("_")[0])
                 groups[point_number].append(file)
             except Exception as e:
-                print(f'Could not extract point number from file: {file}, {e}')
+                print(f"Could not extract point number from file: {file}, {e}")
     return groups
 
-def process_point(point_list, time, dir_path, fluorescence_pattern, brightfield_pattern, overwrite=False):
 
+def process_point(
+    point_list,
+    time,
+    dir_path,
+    fluorescence_pattern,
+    brightfield_pattern,
+    overwrite=False,
+):
     channels_data = []
     channels_metadata = []
     channels_names = []
@@ -54,7 +67,9 @@ def process_point(point_list, time, dir_path, fluorescence_pattern, brightfield_
         channels_names.append(channel_name)
 
     # sort the channels
-    sorted_channels = sorted(zip(channels_data, channels_metadata, channels_names), key=lambda x: x[2])
+    sorted_channels = sorted(
+        zip(channels_data, channels_metadata, channels_names), key=lambda x: x[2]
+    )
     # put the first element to the end if it is a brightfield image
     if sorted_channels[0][2] == "BF":
         sorted_channels.append(sorted_channels.pop(0))
@@ -75,9 +90,8 @@ def process_point(point_list, time, dir_path, fluorescence_pattern, brightfield_
     physical_size_x = all_metadata[0].pixels.physical_size_x
     physical_size_y = all_metadata[0].pixels.physical_size_y
 
-    
     dtype = all_metadata[0].pixels.type
-    dimension_order = 'XYCZT'
+    dimension_order = "XYCZT"
 
     id = all_metadata[0].pixels.id
 
@@ -86,36 +100,60 @@ def process_point(point_list, time, dir_path, fluorescence_pattern, brightfield_
     combined_channels_metadata = []
 
     for i, meta in enumerate(all_metadata):
-        channel = Channel(name=ordered_channel_names[i], id=f'Channel:{i}', samples_per_pixel=1)
+        channel = Channel(
+            name=ordered_channel_names[i], id=f"Channel:{i}", samples_per_pixel=1
+        )
         combined_channels_metadata.append(channel)
 
-    merged_pixels = Pixels(size_x=size_x, size_y=size_y, size_c=size_c, size_t=size_t, size_z=size_z, dimension_order=dimension_order, type=dtype, physical_size_x=physical_size_x, physical_size_y=physical_size_y, id=id, channels=combined_channels_metadata, tiff_data_blocks=[{}])
+    merged_pixels = Pixels(
+        size_x=size_x,
+        size_y=size_y,
+        size_c=size_c,
+        size_t=size_t,
+        size_z=size_z,
+        dimension_order=dimension_order,
+        type=dtype,
+        physical_size_x=physical_size_x,
+        physical_size_y=physical_size_y,
+        id=id,
+        channels=combined_channels_metadata,
+        tiff_data_blocks=[{}],
+    )
     merged_metadata = Image(pixels=merged_pixels)
     merged_metadata.id = all_metadata[0].id
 
-    
     merged_metadata.acquisition_date = all_metadata[0].acquisition_date
 
-    merged_OME = ome_types.OME(images = [merged_metadata])
+    merged_OME = ome_types.OME(images=[merged_metadata])
     # Save the image with compression and metadata
-    
+
     combined_channels_data = np.expand_dims(combined_channels_data, axis=(0, 1))
 
     OmeTiffWriter.save(combined_channels_data, output_path, ome_xml=merged_OME)
 
-def process_directory(dir_path, output_dir, time, overwrite=False):
 
+def process_directory(dir_path, output_dir, time, overwrite=False):
     print(f"Processing directory: {dir_path}")
 
-    fluorescence_pattern = re.compile(r'(\d+)_\d+_\d+_\d+_Fluorescence_(\d+)_nm_Ex')
-    brightfield_pattern = re.compile(r'(\d+)_\d+_\d+_\d+_.*LED.*')
+    fluorescence_pattern = re.compile(r"(\d+)_\d+_\d+_\d+_Fluorescence_(\d+)_nm_Ex")
+    brightfield_pattern = re.compile(r"(\d+)_\d+_\d+_\d+_.*LED.*")
 
     point_groups = group_files_by_point(dir_path)
     point_lists = list(point_groups.values())
 
     # Parallel processing
     with parallel_config(backend="loky", n_jobs=-1):
-        Parallel()(delayed(process_point)(point_list, time, dir_path, fluorescence_pattern, brightfield_pattern, overwrite) for point_list in point_lists)
+        Parallel()(
+            delayed(process_point)(
+                point_list,
+                time,
+                dir_path,
+                fluorescence_pattern,
+                brightfield_pattern,
+                overwrite,
+            )
+            for point_list in point_lists
+        )
 
 
 def merge_and_rename_images(source_dir, output_dir, overwrite=False):
@@ -126,8 +164,8 @@ def merge_and_rename_images(source_dir, output_dir, overwrite=False):
         if os.path.isdir(dir_path) and dir_name.isdigit():
             process_directory(dir_path, output_dir, dir_name, overwrite)
 
-if __name__ == "__main__":
 
+if __name__ == "__main__":
     experiment_dir = "/mnt/towbin.data/shared/spsalmon/20250314_squid_10x_yap_aid"
     source_dir = os.path.join(experiment_dir, "squid_raw")
     output_dir = os.path.join(experiment_dir, "raw")

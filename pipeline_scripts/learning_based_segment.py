@@ -5,24 +5,30 @@ import numpy as np
 import torch
 import utils
 from ilastik.experimental.api import PixelClassificationPipeline
-from joblib import Parallel, delayed, parallel_config
+from joblib import delayed
+from joblib import Parallel
+from joblib import parallel_config
 from tifffile import imwrite
+from torch.utils.data import DataLoader
 from towbintools.deep_learning.deep_learning_tools import (
     load_segmentation_model_from_checkpoint,
 )
-from towbintools.deep_learning.utils.augmentation import get_prediction_augmentation_from_model
+from towbintools.deep_learning.utils.augmentation import (
+    get_prediction_augmentation_from_model,
+)
+from towbintools.deep_learning.utils.dataset import SegmentationPredictionDataset
 from towbintools.foundation import image_handling
 from xarray import DataArray
-from towbintools.deep_learning.utils.dataset import SegmentationPredictionDataset
-from torch.utils.data import DataLoader
 
 logging.basicConfig(level=logging.INFO)
+
 
 def segment_image_ilastik(image, pipeline, result_channel=0):
     """Segment image using ilastik pipeline."""
     image = DataArray(image, dims=["y", "x"])
     mask = pipeline.get_probabilities(image)[..., result_channel] > 0.5
     return mask
+
 
 def segment_and_save_ilastik(
     image_path,
@@ -61,13 +67,18 @@ def segment_and_save_ilastik(
         logging.error(f"Caught exception while segmenting {image_path}: {e}")
         return False
 
-def reshape_images_to_original_shape(images, original_shapes, padded_or_cropped = "pad"):
+
+def reshape_images_to_original_shape(images, original_shapes, padded_or_cropped="pad"):
     reshaped_images = []
     for image, original_shape in zip(images, original_shapes):
         if padded_or_cropped == "pad":
-            reshaped_image = image_handling.crop_to_dim_equally(image, original_shape[-2], original_shape[-1])
+            reshaped_image = image_handling.crop_to_dim_equally(
+                image, original_shape[-2], original_shape[-1]
+            )
         elif padded_or_cropped == "crop":
-            reshaped_image = image_handling.pad_to_dim_equally(image, original_shape[-2], original_shape[-1])
+            reshaped_image = image_handling.pad_to_dim_equally(
+                image, original_shape[-2], original_shape[-1]
+            )
         reshaped_images.append(reshaped_image)
     return reshaped_images
 
@@ -82,20 +93,33 @@ def main(input_pickle, output_pickle, config, n_jobs):
 
     if config["segmentation_method"] == "deep_learning":
         if config["model_path"] is None:
-            raise ValueError("model_path must be set in the config file for deep learning segmentation.")
+            raise ValueError(
+                "model_path must be set in the config file for deep learning segmentation."
+            )
         # Load the model
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         model = load_segmentation_model_from_checkpoint(config["model_path"]).to(device)
 
         enforce_n_channels = config.get("enforce_n_channels", None)
         if enforce_n_channels is not None:
-            preprocessing_fn = get_prediction_augmentation_from_model(model, enforce_n_channels=enforce_n_channels)
+            preprocessing_fn = get_prediction_augmentation_from_model(
+                model, enforce_n_channels=enforce_n_channels
+            )
         else:
             preprocessing_fn = get_prediction_augmentation_from_model(model)
 
         batch_size = config["batch_size"]
-        dataset = SegmentationPredictionDataset(input_files, config['segmentation_channels'], preprocessing_fn)
-        dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=False, num_workers=n_jobs//2, pin_memory=True, collate_fn=dataset.collate_fn)
+        dataset = SegmentationPredictionDataset(
+            input_files, config["segmentation_channels"], preprocessing_fn
+        )
+        dataloader = DataLoader(
+            dataset,
+            batch_size=batch_size,
+            shuffle=False,
+            num_workers=n_jobs // 2,
+            pin_memory=True,
+            collate_fn=dataset.collate_fn,
+        )
 
         # Make predictions
         model.eval()
@@ -120,20 +144,25 @@ def main(input_pickle, output_pickle, config, n_jobs):
                 predictions = predictions.astype(np.uint8)
 
                 # Reshape predictions to original shape
-                predictions = reshape_images_to_original_shape(predictions, image_shapes, padded_or_cropped="pad")
+                predictions = reshape_images_to_original_shape(
+                    predictions, image_shapes, padded_or_cropped="pad"
+                )
 
-                with parallel_config(backend="threading", n_jobs=n_jobs//2):
+                with parallel_config(backend="threading", n_jobs=n_jobs // 2):
                     # Save predictions
                     Parallel()(
-                        delayed(save_prediction)(prediction, output_path) for prediction, output_path in zip(predictions, output_files)
+                        delayed(save_prediction)(prediction, output_path)
+                        for prediction, output_path in zip(predictions, output_files)
                     )
 
                 # remove the output paths that have been processed
-                output_files = output_files[len(image_paths):]
+                output_files = output_files[len(image_paths) :]
 
     elif config["segmentation_method"] == "ilastik":
         if config["ilastik_project_path"] is None:
-            raise ValueError("ilastik_project_path must be set in the config file for ilastik segmentation.")
+            raise ValueError(
+                "ilastik_project_path must be set in the config file for ilastik segmentation."
+            )
 
         with parallel_config(backend="loky", n_jobs=n_jobs):
             Parallel()(

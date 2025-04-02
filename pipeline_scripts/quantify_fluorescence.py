@@ -3,12 +3,12 @@ import re
 
 import pandas as pd
 import utils
-from joblib import Parallel, delayed, parallel_config
+from joblib import delayed
+from joblib import Parallel
+from joblib import parallel_config
 from towbintools.foundation import image_handling
-from towbintools.quantification import (
-    compute_background_fluorescence,
-    compute_fluorescence_in_mask,
-)
+from towbintools.quantification import compute_background_fluorescence
+from towbintools.quantification import compute_fluorescence_in_mask
 
 
 def quantify_fluorescence_from_file_path(

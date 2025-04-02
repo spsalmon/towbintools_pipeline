@@ -4,7 +4,9 @@ import re
 import pandas as pd
 import utils
 import xgboost as xgb
-from joblib import Parallel, delayed, parallel_config
+from joblib import delayed
+from joblib import Parallel
+from joblib import parallel_config
 from towbintools.classification import classification_tools
 from towbintools.foundation import image_handling
 

@@ -3,12 +3,15 @@ import os
 import numpy as np
 import pandas as pd
 import utils
-from joblib import Parallel, delayed, parallel_config
+from joblib import delayed
+from joblib import Parallel
+from joblib import parallel_config
 from towbintools.data_analysis import compute_series_at_time_classified
 from towbintools.foundation import detect_molts
 from towbintools.foundation.worm_features import get_features_to_compute_at_molt
 
 FEATURES_TO_COMPUTE_AT_MOLT = get_features_to_compute_at_molt()
+
 
 def run_detect_molts(
     analysis_filemap,
@@ -52,6 +55,7 @@ def run_detect_molts(
         "M4": ecdysis["M4"],
     }
 
+
 def compute_features_at_molt(
     analysis_filemap, molt_dataframe, volume_column, worm_type_column, point
 ):
@@ -62,8 +66,14 @@ def compute_features_at_molt(
 
     columns_to_compute = []
     for feature in FEATURES_TO_COMPUTE_AT_MOLT:
-        columns_to_compute.extend([column for column in data_of_point.columns if (feature in column) and ("at_" not in column)])
-        
+        columns_to_compute.extend(
+            [
+                column
+                for column in data_of_point.columns
+                if (feature in column) and ("at_" not in column)
+            ]
+        )
+
     # compute the features at each molt
     features_at_molt = {"Point": point}
 
@@ -76,10 +86,13 @@ def compute_features_at_molt(
             molt_time = float(molt_data_of_point[molt].values[0])
             try:
                 if not np.isnan(molt_time):
-                    features_at_molt[f"{column}_at_{molt}"] = (
-                        compute_series_at_time_classified(
-                            column_data, worm_types, molt_time, series_time=data_of_point["Time"].values
-                        )
+                    features_at_molt[
+                        f"{column}_at_{molt}"
+                    ] = compute_series_at_time_classified(
+                        column_data,
+                        worm_types,
+                        molt_time,
+                        series_time=data_of_point["Time"].values,
                     )
                 else:
                     features_at_molt[f"{column}_at_{molt}"] = np.nan

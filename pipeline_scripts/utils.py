@@ -6,7 +6,9 @@ import subprocess
 
 import numpy as np
 import pandas as pd
-from joblib import Parallel, delayed, parallel_config
+from joblib import delayed
+from joblib import Parallel
+from joblib import parallel_config
 from towbintools.foundation import file_handling as file_handling
 from towbintools.foundation.image_handling import get_acquisition_date
 
@@ -49,33 +51,37 @@ def backup_file(file_path, destination_dir):
         shutil.copyfile(file_path, destination_file_path)
         print(f"File backed up as: {destination_file_path}")
         return True
-    except IOError as e:
+    except OSError as e:
         print(f"Failed to backup file: {e}")
         return False
+
 
 def sync_backup_folder(dir, backup_dir):
     """
     Simple synchronization of a directory to a backup directory.
     Only copies files that don't exist or are older in the temp directory.
     """
-    
+
     # Walk through backup directory
     for root, dirs, files in os.walk(dir):
         # Get the relative path
         rel_path = os.path.relpath(root, dir)
         backup_path = os.path.join(backup_dir, rel_path)
-        
+
         # Create directory in temp if it doesn't exist
         os.makedirs(backup_path, exist_ok=True)
-        
+
         # Copy each file if needed
         for file in files:
             src_file = os.path.join(root, file)
             dst_file = os.path.join(backup_path, file)
-            
+
             # Copy if destination doesn't exist or source is newer
-            if not os.path.exists(dst_file) or os.path.getmtime(src_file) > os.path.getmtime(dst_file):
+            if not os.path.exists(dst_file) or os.path.getmtime(
+                src_file
+            ) > os.path.getmtime(dst_file):
                 shutil.copy2(src_file, dst_file)
+
 
 def get_experiment_pads(config):
     experiment_dir = config["experiment_dir"]
@@ -103,7 +109,13 @@ def get_and_create_folders_pad(config, pad):
     pipeline_backup_dir = os.path.join(report_subdir, "pipeline_backup")
     os.makedirs(pipeline_backup_dir, exist_ok=True)
 
-    return experiment_dir, raw_subdir, analysis_subdir, report_subdir, pipeline_backup_dir
+    return (
+        experiment_dir,
+        raw_subdir,
+        analysis_subdir,
+        report_subdir,
+        pipeline_backup_dir,
+    )
 
 
 def get_and_create_folders(config):
@@ -121,7 +133,14 @@ def get_and_create_folders(config):
     pipeline_backup_dir = os.path.join(report_subdir, "pipeline_backup")
     os.makedirs(pipeline_backup_dir, exist_ok=True)
 
-    return experiment_dir, raw_subdir, analysis_subdir, report_subdir, pipeline_backup_dir
+    return (
+        experiment_dir,
+        raw_subdir,
+        analysis_subdir,
+        report_subdir,
+        pipeline_backup_dir,
+    )
+
 
 def get_groups(config):
     try:
@@ -129,28 +148,37 @@ def get_groups(config):
     except KeyError:
         return None
 
+
 def get_filter_rule(groups, run_on_option):
     if (groups is not None) or (run_on_option is not None):
         return groups[run_on_option]
     else:
         return None
 
+
 def filter_files_with_filter_rule(file_groups, filter_rule):
     if filter_rule is not None:
         if isinstance(file_groups[0], str):
-            return [file_group for file_group in file_groups if filter_rule.lower() in file_group.lower()]
+            return [
+                file_group
+                for file_group in file_groups
+                if filter_rule.lower() in file_group.lower()
+            ]
         else:
             return [
-                file_group for file_group in file_groups 
+                file_group
+                for file_group in file_groups
                 if all(filter_rule.lower() in file.lower() for file in file_group)
             ]
     else:
         return file_groups
 
+
 def filter_files_of_group(files, config, run_on_option):
     groups = get_groups(config)
     filter_rule = get_filter_rule(groups, run_on_option)
     return filter_files_with_filter_rule(files, filter_rule)
+
 
 def get_output_name(
     config,
@@ -168,7 +196,7 @@ def get_output_name(
 
     output_name = ""
     if channels is not None:
-        if type(channels) == list:
+        if isinstance(channels, list):
             for channel in channels:
                 output_name += f"ch{channel+1}_"
         else:
@@ -440,6 +468,7 @@ export OPENBLAS_NUM_THREADS=1
         file.write(content)
 
     return script_path
+
 
 # ----BOILERPLATE CODE FOR COMMAND LINE INTERFACE----
 

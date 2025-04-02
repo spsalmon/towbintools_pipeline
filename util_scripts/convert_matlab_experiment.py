@@ -1,16 +1,16 @@
 import os
+import sys
+from pathlib import Path
 
-import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import scipy.io as sio
 from towbintools.foundation.file_handling import add_dir_to_experiment_filemap
 
-import sys
-from pathlib import Path
-
 sys.path.append(str(Path(__file__).parent.parent))
-from pipeline_scripts.utils import get_experiment_time_from_filemap_parallel
+from pipeline_scripts.utils import (  # noqa: E402
+    get_experiment_time_from_filemap_parallel,
+)
 
 KEY_CONVERSION_MAP = {
     "vol": "volume",
@@ -44,6 +44,7 @@ def convert_matlab_experiment(
                 new_key = KEY_CONVERSION_MAP.get(key)
                 new_matlab_report[new_key] = value
             except Exception as e:
+                print(f"Error converting key {key}: {e}")
                 continue
 
         # convert worm_type from [' ', 'w', 'o', 'e'] to ['worm', 'egg', 'error']

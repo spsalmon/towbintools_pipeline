@@ -2,6 +2,9 @@ import os
 import shutil
 from collections import defaultdict
 from itertools import combinations
+from typing import Any
+
+import cv2
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
@@ -12,29 +15,20 @@ import yaml
 from scipy.interpolate import make_interp_spline
 from scipy.signal import medfilt
 from scipy.stats import mannwhitneyu
-from towbintools.data_analysis import (
-    compute_larval_stage_duration,
-    compute_series_at_time_classified,
-    filter_series_with_classification,
-    correct_series_with_classification,
-    rescale_and_aggregate,
-    rescale_series,
+from tifffile import imwrite
+from towbintools.data_analysis import compute_larval_stage_duration
+from towbintools.data_analysis import compute_series_at_time_classified
+from towbintools.data_analysis import correct_series_with_classification
+from towbintools.data_analysis import rescale_and_aggregate
+from towbintools.data_analysis import rescale_series
+from towbintools.data_analysis.growth_rate import (
+    compute_instantaneous_growth_rate_classified,
 )
-
-from microfilm.microplot import microshow
-
-from towbintools.foundation.file_handling import get_dir_filemap
-from typing import Dict, List, Tuple, Any
+from towbintools.foundation.image_handling import pad_images_to_same_dim
+from towbintools.foundation.image_handling import pad_to_dim
+from towbintools.foundation.image_handling import pad_to_dim_equally
 from towbintools.foundation.image_handling import read_tiff_file
-from tifffile import imwrite
 from towbintools.foundation.worm_features import get_features_to_compute_at_molt
-from towbintools.data_analysis.growth_rate import compute_instantaneous_growth_rate_classified
-
-from towbintools.foundation.image_handling import pad_images_to_same_dim, pad_to_dim_equally, pad_to_dim
-
-from tifffile import imwrite
-import cv2
-from skimage import measure
 
 
 FEATURES_TO_COMPUTE_AT_MOLT = get_features_to_compute_at_molt()
@@ -52,7 +46,7 @@ def build_conditions(config):
             for key, val in condition.items()
         }
 
-        lengths = set(len(val) for val in condition.values())
+        lengths = {len(val) for val in condition.values()}
         if len(lengths) > 2 or (len(lengths) == 2 and 1 not in lengths):
             raise ValueError(
                 "All lists in the condition must have the same length or be of length 1."
@@ -177,7 +171,12 @@ def get_ecdysis_and_durations(filemap):
 
 
 def separate_column_by_point(filemap, column):
-    max_number_of_values = np.max([len(filemap[filemap["Point"] == point][column].values) for point in filemap["Point"].unique()])
+    max_number_of_values = np.max(
+        [
+            len(filemap[filemap["Point"] == point][column].values)
+            for point in filemap["Point"].unique()
+        ]
+    )
 
     all_values = []
     for i, point in enumerate(filemap["Point"].unique()):
@@ -203,45 +202,49 @@ def separate_column_by_point(filemap, column):
 
     return np.array(all_values)
 
+
 def remove_ignored_molts(filemap):
     df = filemap.copy()
-    
-    molt_columns = ['HatchTime', 'M1', 'M2', 'M3', 'M4']
-    
-    for point in df['Point'].unique():
-        point_mask = df['Point'] == point
+
+    molt_columns = ["HatchTime", "M1", "M2", "M3", "M4"]
+
+    for point in df["Point"].unique():
+        point_mask = df["Point"] == point
         point_df = df[point_mask]
-        
+
         if point_df.empty:
             continue
-            
+
         # Get molt times for this point
         molt_times = point_df[molt_columns].iloc[0]
-        
+
         # Check each molt time
         for col, molt_time in molt_times.items():
             if pd.isna(molt_time):
                 continue
-                
+
             # Find if this molt should be ignored
             try:
-                if point_df[point_df['Time'] == molt_time]['Ignore'].iloc[0]:
+                if point_df[point_df["Time"] == molt_time]["Ignore"].iloc[0]:
                     # Use .loc to avoid chained indexing warning
                     df.loc[point_mask, col] = np.nan
             except IndexError:
-                print(f'No row found for time {molt_time} in point {point}')
+                print(f"No row found for time {molt_time} in point {point}")
                 df.loc[point_mask, col] = np.nan
-        
+
     return df
 
 
 def build_plotting_struct(
-    experiment_dir, filemap_path, config_path, organ_channels={"body": 2, "pharynx": 1}, recompute_values_at_molt=False,
+    experiment_dir,
+    filemap_path,
+    config_path,
+    organ_channels={"body": 2, "pharynx": 1},
+    recompute_values_at_molt=False,
 ):
-
     experiment_filemap = pd.read_csv(filemap_path)
 
-    with open(config_path, "r") as file:
+    with open(config_path) as file:
         config = yaml.safe_load(file)
         file.close()
 
@@ -272,7 +275,7 @@ def build_plotting_struct(
     # set molts that should be ignored to NaN
     if "Ignore" in experiment_filemap.columns:
         experiment_filemap = remove_ignored_molts(experiment_filemap)
-    
+
     # remove rows where Ignore is True
     if "Ignore" in experiment_filemap.columns:
         experiment_filemap = experiment_filemap[~experiment_filemap["Ignore"]]
@@ -295,18 +298,22 @@ def build_plotting_struct(
         ) = get_ecdysis_and_durations(condition_df)
         condition_dict["condition_id"] = int(condition_dict["condition_id"])
         condition_dict["ecdysis_time_step"] = ecdysis_time_step
-        condition_dict["larval_stage_durations_time_step"] = (
-            larval_stage_durations_time_step
-        )
+        condition_dict[
+            "larval_stage_durations_time_step"
+        ] = larval_stage_durations_time_step
         condition_dict["ecdysis_experiment_time"] = ecdysis_experiment_time
-        condition_dict["larval_stage_durations_experiment_time"] = (
-            larval_stage_durations_experiment_time
-        )
+        condition_dict[
+            "larval_stage_durations_experiment_time"
+        ] = larval_stage_durations_experiment_time
         condition_dict["larval_stage_durations_experiment_time_hours"] = (
             larval_stage_durations_experiment_time / 3600
         )
-        condition_dict["experiment"] = np.array([experiment_dir]*condition_df['Point'].nunique())[:, np.newaxis]
-        condition_dict["filemap_path"] = np.array([filemap_path]*condition_df['Point'].nunique())[:, np.newaxis]
+        condition_dict["experiment"] = np.array(
+            [experiment_dir] * condition_df["Point"].nunique()
+        )[:, np.newaxis]
+        condition_dict["filemap_path"] = np.array(
+            [filemap_path] * condition_df["Point"].nunique()
+        )[:, np.newaxis]
         condition_dict["point"] = np.unique(condition_df["Point"].values)[:, np.newaxis]
 
         # TEMPORARY, ONLY WORKS WITH SINGLE CLASSIFICATION, FIND A WAY TO GENERALIZE
@@ -338,7 +345,7 @@ def build_plotting_struct(
                 organ_feature_columns.extend(
                     [col for col in organ_columns if feature in col]
                 )
-            
+
             renamed_organ_feature_columns = [
                 col.replace(organ_channel, organ) for col in organ_columns
             ]
@@ -358,14 +365,16 @@ def build_plotting_struct(
             # compute the features of the organ at each molt
             for column in renamed_organ_feature_columns:
                 column_at_molt = f"{column}_at_ecdysis"
-                if recompute_values_at_molt or (column_at_molt not in condition_df.columns):
+                if recompute_values_at_molt or (
+                    column_at_molt not in condition_df.columns
+                ):
                     condition_dict[column_at_molt] = np.stack(
                         [
                             compute_series_at_time_classified(
                                 condition_dict[column][i],
                                 worm_types[i],
                                 ecdysis_time_step[i],
-                                series_time = condition_dict["time"][i],
+                                series_time=condition_dict["time"][i],
                             )
                             for i in range(len(ecdysis_time_step))
                         ]
@@ -397,7 +406,14 @@ def remove_unwanted_info(conditions_info):
             condition.pop("condition_id")
     return conditions_info
 
-def combine_experiments(filemap_paths, config_paths, experiment_dirs=None, organ_channels=[{"body": 2, "pharynx": 1}], recompute_values_at_molt=False):
+
+def combine_experiments(
+    filemap_paths,
+    config_paths,
+    experiment_dirs=None,
+    organ_channels=[{"body": 2, "pharynx": 1}],
+    recompute_values_at_molt=False,
+):
     all_conditions_struct = []
     condition_info_merge_list = []
     conditions_info_keys = set()
@@ -405,7 +421,7 @@ def combine_experiments(filemap_paths, config_paths, experiment_dirs=None, organ
 
     if isinstance(organ_channels, dict):
         organ_channels = [organ_channels]
-        
+
     if len(organ_channels) == 1:
         organ_channels = organ_channels * len(filemap_paths)
     elif len(organ_channels) != len(filemap_paths):
@@ -414,12 +430,18 @@ def combine_experiments(filemap_paths, config_paths, experiment_dirs=None, organ
         )
 
     # Process each experiment
-    for i, (filemap_path, config_path, organ_channel) in enumerate(zip(filemap_paths, config_paths, organ_channels)):
+    for i, (filemap_path, config_path, organ_channel) in enumerate(
+        zip(filemap_paths, config_paths, organ_channels)
+    ):
         experiment_dir = (
             experiment_dirs[i] if experiment_dirs else os.path.dirname(filemap_path)
         )
         conditions_struct, conditions_info = build_plotting_struct(
-            experiment_dir, filemap_path, config_path, organ_channels=organ_channel, recompute_values_at_molt=recompute_values_at_molt
+            experiment_dir,
+            filemap_path,
+            config_path,
+            organ_channels=organ_channel,
+            recompute_values_at_molt=recompute_values_at_molt,
         )
 
         # Process conditions for this experiment
@@ -484,12 +506,14 @@ def combine_experiments(filemap_paths, config_paths, experiment_dirs=None, organ
 
     return merged_conditions_struct
 
+
 # PLOTTING FUNCTIONS
 
-def save_figure(fig, name, directory, format='svg', dpi=300, transparent=False):
+
+def save_figure(fig, name, directory, format="svg", dpi=300, transparent=False):
     """
     Save the current matplotlib figure to the specified directory with the given name.
-    
+
     Parameters:
     fig (matplotlib.figure.Figure) : Figure to save
     name (str) : Name of the file (without extension)
@@ -497,25 +521,21 @@ def save_figure(fig, name, directory, format='svg', dpi=300, transparent=False):
     format (str) : File format to save the figure in
     dpi (int) : Resolution of the saved figure
     transparent (bool) : Whether to save the figure with a transparent background
-    
+
     Returns:
     str : Full path to the saved file
     """
-    
+
     # Create directory if it doesn't exist
     os.makedirs(directory, exist_ok=True)
 
     # Construct full file path
     filename = f"{name}.{format}"
     filepath = os.path.join(directory, filename)
-    
+
     # Save the figure
     fig.savefig(
-        filepath,
-        format=format,
-        dpi=dpi,
-        bbox_inches='tight',
-        transparent=transparent
+        filepath, format=format, dpi=dpi, bbox_inches="tight", transparent=transparent
     )
 
 
@@ -578,7 +598,9 @@ def plot_aggregated_series(
                 ]
 
             # TEMPORARY, ONLY WORKS WITH SINGLE CLASSIFICATION, FIND A WAY TO GENERALIZE
-            worm_type_key = [key for key in condition_dict.keys() if "worm_type" in key][0]
+            worm_type_key = [
+                key for key in condition_dict.keys() if "worm_type" in key
+            ][0]
 
             rescaled_time, aggregated_series, _, ste_series = rescale_and_aggregate(
                 condition_dict[column],
@@ -629,6 +651,7 @@ def plot_aggregated_series(
     plt.show()
 
     return fig
+
 
 def plot_correlation(
     conditions_struct,
@@ -721,7 +744,6 @@ def plot_correlation_at_ecdysis(
         color_palette = colors
 
     for i, condition_id in enumerate(conditions_to_plot):
-
         condition_dict = conditions_struct[condition_id]
 
         if remove_hatch:
@@ -733,11 +755,11 @@ def plot_correlation_at_ecdysis(
 
         x = np.nanmean(column_one_values, axis=0)
         x_std = np.nanstd(column_one_values, axis=0)
-        x_ste = x_std / np.sqrt(np.sum(np.isfinite(column_one_values), axis=0))
+        # x_ste = x_std / np.sqrt(np.sum(np.isfinite(column_one_values), axis=0))
 
         y = np.nanmean(column_two_values, axis=0)
         y_std = np.nanstd(column_two_values, axis=0)
-        y_ste = y_std / np.sqrt(np.sum(np.isfinite(column_two_values), axis=0))
+        # y_ste = y_std / np.sqrt(np.sum(np.isfinite(column_two_values), axis=0))
 
         label = build_legend(condition_dict, legend)
         plt.errorbar(
@@ -770,6 +792,7 @@ def plot_correlation_at_ecdysis(
     plt.show()
 
     return fig
+
 
 def boxplot_at_molt(
     conditions_struct,
@@ -806,34 +829,44 @@ def boxplot_at_molt(
                     }
                 )
     df = pd.DataFrame(data_list)
-    
+
     # Determine figure size
     if figsize is None:
         figsize = (6 * df["Molt"].nunique(), 10)
     if titles is not None and len(titles) != df["Molt"].nunique():
         print("Number of titles does not match the number of ecdysis events.")
         titles = None
-    
+
     # Create figure with extra space on the right for legend
-    fig, ax = plt.subplots(1, df["Molt"].nunique(), figsize=(figsize[0] + 3, figsize[1]), sharey=share_y_axis)
-    
+    fig, ax = plt.subplots(
+        1,
+        df["Molt"].nunique(),
+        figsize=(figsize[0] + 3, figsize[1]),
+        sharey=share_y_axis,
+    )
+
     # Create a dummy plot to get proper legend handles
     dummy_ax = fig.add_axes([0, 0, 0, 0])
     for i, condition in enumerate(conditions_to_plot):
-        dummy_ax.boxplot([], [], patch_artist = True, label=build_legend(conditions_struct[condition], legend))
+        dummy_ax.boxplot(
+            [],
+            [],
+            patch_artist=True,
+            label=build_legend(conditions_struct[condition], legend),
+        )
         for j, patch in enumerate(dummy_ax.patches):
             patch.set_facecolor(color_palette[j])
     dummy_ax.set_visible(False)
-    
+
     # Find global min and max values for y-axis
     min_val = df[column].min()
     max_val = df[column].max()
-    
+
     # Add some padding to the min and max values
     range_padding = (max_val - min_val) * 0.1  # 10% padding
     global_min = min_val - range_padding
     global_max = max_val + range_padding
-    
+
     for i in range(df["Molt"].nunique()):
         sns.boxplot(
             data=df[df["Molt"] == i],
@@ -847,7 +880,7 @@ def boxplot_at_molt(
             linewidth=2,
             legend=False,
         )
-        
+
         sns.stripplot(
             data=df[df["Molt"] == i],
             x="Order",
@@ -857,26 +890,26 @@ def boxplot_at_molt(
             color="black",
             dodge=True,
         )
-        
+
         ax[i].set_xlabel("")
         # Hide y-axis labels and ticks for all subplots except the first one
         if i > 0:
             ax[i].set_ylabel("")
-        
+
         if share_y_axis:
             # Set all plots to use the same y-axis limits
-            ax[i].set_ylim(global_min, global_max)         
+            ax[i].set_ylim(global_min, global_max)
             if i > 0:
-                ax[i].tick_params(axis='y', which='both', left=False, labelleft=False)
-        
+                ax[i].tick_params(axis="y", which="both", left=False, labelleft=False)
+
         if titles is not None:
             ax[i].set_title(titles[i])
-        
+
         # remove ticks
         ax[i].tick_params(
             axis="x", which="both", bottom=False, top=False, labelbottom=False
         )
-        
+
         if plot_significance:
             pairs = list(combinations(df["Order"].unique(), 2))
             bars = []
@@ -897,46 +930,52 @@ def boxplot_at_molt(
                 ]
                 bars.append(bar)
             starbars.draw_annotation(bars, ax=ax[i])
-    
+
     # Set y label for the first plot
     if y_axis_label is not None:
         ax[0].set_ylabel(y_axis_label)
     else:
         ax[0].set_ylabel(column)
-    
+
     # Add legend to the right of the subplots
-    legend_labels = [build_legend(conditions_struct[condition_id], legend)
-                    for condition_id in conditions_to_plot]
+    legend_labels = [
+        build_legend(conditions_struct[condition_id], legend)
+        for condition_id in conditions_to_plot
+    ]
     legend_handles = dummy_ax.get_legend_handles_labels()[0]
-    
+
     # Place legend to the right of the subplots
-    fig.legend(legend_handles, legend_labels,
-              bbox_to_anchor=(0.9, 0.5),
-              loc='center left',
-              title=None,
-              frameon=True)
-    
+    fig.legend(
+        legend_handles,
+        legend_labels,
+        bbox_to_anchor=(0.9, 0.5),
+        loc="center left",
+        title=None,
+        frameon=True,
+    )
+
     # Ensure all subplots share the same scale
     # This is needed in addition to sharey=True to handle edge cases
     fig.canvas.draw()  # This ensures that the plots are drawn before we adjust them
-    
+
     if share_y_axis:
         # Get the global y-axis limits
         all_ylims = [ax[i].get_ylim() for i in range(len(ax))]
         y_min = min([lim[0] for lim in all_ylims])
         y_max = max([lim[1] for lim in all_ylims])
-        
+
         # Apply the global limits to all axes
         for i in range(len(ax)):
             ax[i].set_ylim(y_min, y_max)
 
     # Make subplots closer together while leaving space for legend
     plt.tight_layout(rect=[0, 0, 0.9, 1])
-    
+
     fig = plt.gcf()
     plt.show()
 
     return fig
+
 
 def boxplot_larval_stage(
     conditions_struct,
@@ -954,9 +993,10 @@ def boxplot_larval_stage(
     titles=None,
     share_y_axis: bool = False,
 ):
-
     new_column = column + "_rescaled"
-    struct = rescale_without_flattening(conditions_struct, column, new_column, aggregation, n_points)
+    struct = rescale_without_flattening(
+        conditions_struct, column, new_column, aggregation, n_points
+    )
     if colors is None:
         color_palette = sns.color_palette("colorblind", len(conditions_to_plot))
     else:
@@ -968,12 +1008,12 @@ def boxplot_larval_stage(
         data = condition_dict[new_column]
         for i in range(data.shape[1]):
             data_of_stage = data[:, i]
-            data_of_stage = data_of_stage[:, 0:int(fraction * data_of_stage.shape[1])]
+            data_of_stage = data_of_stage[:, 0 : int(fraction * data_of_stage.shape[1])]
 
             data_of_stage = np.log(data_of_stage) if log_scale else data_of_stage
-            if aggregation == 'mean':
+            if aggregation == "mean":
                 aggregated_data_of_stage = np.nanmean(data_of_stage, axis=1)
-            elif aggregation == 'median':
+            elif aggregation == "median":
                 aggregated_data_of_stage = np.nanmedian(data_of_stage, axis=1)
 
             for j in range(aggregated_data_of_stage.shape[0]):
@@ -981,40 +1021,47 @@ def boxplot_larval_stage(
                     {
                         "Condition": condition_id,
                         "LarvalStage": i,
-                        column: aggregated_data_of_stage[j], 
+                        column: aggregated_data_of_stage[j],
                         "Order": conditions_to_plot.index(condition_id),
                     }
                 )
 
     df = pd.DataFrame(data_list)
-    
+
     # Determine figure size
     if figsize is None:
         figsize = (6 * df["LarvalStage"].nunique(), 10)
     if titles is not None and len(titles) != df["LarvalStage"].nunique():
         print("Number of titles does not match the number of ecdysis events.")
         titles = None
-    
+
     # Create figure with extra space on the right for legend
-    fig, ax = plt.subplots(1, df["LarvalStage"].nunique(), figsize=(figsize[0] + 3, figsize[1]), sharey=share_y_axis)
-    
+    fig, ax = plt.subplots(
+        1,
+        df["LarvalStage"].nunique(),
+        figsize=(figsize[0] + 3, figsize[1]),
+        sharey=share_y_axis,
+    )
+
     # Create a dummy plot to get proper legend handles
     dummy_ax = fig.add_axes([0, 0, 0, 0])
     for i, condition in enumerate(conditions_to_plot):
-        dummy_ax.boxplot([], [], patch_artist = True, label=build_legend(struct[condition], legend))
+        dummy_ax.boxplot(
+            [], [], patch_artist=True, label=build_legend(struct[condition], legend)
+        )
         for j, patch in enumerate(dummy_ax.patches):
             patch.set_facecolor(color_palette[j])
     dummy_ax.set_visible(False)
-    
+
     # Find global min and max values for y-axis
     min_val = df[column].min()
     max_val = df[column].max()
-    
+
     # Add some padding to the min and max values
     range_padding = (max_val - min_val) * 0.1  # 10% padding
     global_min = min_val - range_padding
     global_max = max_val + range_padding
-    
+
     for i in range(df["LarvalStage"].nunique()):
         sns.boxplot(
             data=df[df["LarvalStage"] == i],
@@ -1028,7 +1075,7 @@ def boxplot_larval_stage(
             linewidth=2,
             legend=False,
         )
-        
+
         sns.stripplot(
             data=df[df["LarvalStage"] == i],
             x="Order",
@@ -1038,26 +1085,26 @@ def boxplot_larval_stage(
             color="black",
             dodge=True,
         )
-        
+
         ax[i].set_xlabel("")
         # Hide y-axis labels and ticks for all subplots except the first one
         if i > 0:
             ax[i].set_ylabel("")
-        
+
         if share_y_axis:
             # Set all plots to use the same y-axis limits
-            ax[i].set_ylim(global_min, global_max)         
+            ax[i].set_ylim(global_min, global_max)
             if i > 0:
-                ax[i].tick_params(axis='y', which='both', left=False, labelleft=False)
-        
+                ax[i].tick_params(axis="y", which="both", left=False, labelleft=False)
+
         if titles is not None:
             ax[i].set_title(titles[i])
-        
+
         # remove ticks
         ax[i].tick_params(
             axis="x", which="both", bottom=False, top=False, labelbottom=False
         )
-        
+
         if plot_significance:
             pairs = list(combinations(df["Order"].unique(), 2))
             bars = []
@@ -1078,46 +1125,52 @@ def boxplot_larval_stage(
                 ]
                 bars.append(bar)
             starbars.draw_annotation(bars, ax=ax[i])
-    
+
     # Set y label for the first plot
     if y_axis_label is not None:
         ax[0].set_ylabel(y_axis_label)
     else:
         ax[0].set_ylabel(column)
-    
+
     # Add legend to the right of the subplots
-    legend_labels = [build_legend(struct[condition_id], legend)
-                    for condition_id in conditions_to_plot]
+    legend_labels = [
+        build_legend(struct[condition_id], legend)
+        for condition_id in conditions_to_plot
+    ]
     legend_handles = dummy_ax.get_legend_handles_labels()[0]
-    
+
     # Place legend to the right of the subplots
-    fig.legend(legend_handles, legend_labels,
-              bbox_to_anchor=(0.9, 0.5),
-              loc='center left',
-              title=None,
-              frameon=True)
-    
+    fig.legend(
+        legend_handles,
+        legend_labels,
+        bbox_to_anchor=(0.9, 0.5),
+        loc="center left",
+        title=None,
+        frameon=True,
+    )
+
     # Ensure all subplots share the same scale
     # This is needed in addition to sharey=True to handle edge cases
     fig.canvas.draw()  # This ensures that the plots are drawn before we adjust them
-    
+
     if share_y_axis:
         # Get the global y-axis limits
         all_ylims = [ax[i].get_ylim() for i in range(len(ax))]
         y_min = min([lim[0] for lim in all_ylims])
         y_max = max([lim[1] for lim in all_ylims])
-        
+
         # Apply the global limits to all axes
         for i in range(len(ax)):
             ax[i].set_ylim(y_min, y_max)
 
     # Make subplots closer together while leaving space for legend
     plt.tight_layout(rect=[0, 0, 0.9, 1])
-    
+
     fig = plt.gcf()
     plt.show()
 
     return fig
+
 
 def plot_developmental_success(
     conditions_struct,
@@ -1132,7 +1185,7 @@ def plot_developmental_success(
         color_palette = colors
 
     if figsize is None:
-        figsize = (5*4, 6)
+        figsize = (5 * 4, 6)
 
     fig, ax = plt.subplots(1, 4, figsize=figsize)
 
@@ -1141,10 +1194,16 @@ def plot_developmental_success(
 
         ecdysis = condition_dict["ecdysis_time_step"]
 
-        m1_completion = ~np.isnan(ecdysis[:, 1])    
-        m2_completion = np.logical_and(~np.isnan(ecdysis[:, 2]), ~np.isnan(ecdysis[:, 1]))
-        m3_completion = np.logical_and(~np.isnan(ecdysis[:, 3]), ~np.isnan(ecdysis[:, 2]))
-        m4_completion = np.logical_and(~np.isnan(ecdysis[:, 4]), ~np.isnan(ecdysis[:, 3]))
+        m1_completion = ~np.isnan(ecdysis[:, 1])
+        m2_completion = np.logical_and(
+            ~np.isnan(ecdysis[:, 2]), ~np.isnan(ecdysis[:, 1])
+        )
+        m3_completion = np.logical_and(
+            ~np.isnan(ecdysis[:, 3]), ~np.isnan(ecdysis[:, 2])
+        )
+        m4_completion = np.logical_and(
+            ~np.isnan(ecdysis[:, 4]), ~np.isnan(ecdysis[:, 3])
+        )
 
         m1_completion_rate = np.sum(m1_completion) / len(ecdysis)
         m2_completion_rate = np.sum(m2_completion) / len(ecdysis)
@@ -1152,10 +1211,38 @@ def plot_developmental_success(
         m4_completion_rate = np.sum(m4_completion) / len(ecdysis)
 
         label = build_legend(condition_dict, legend)
-        ax[0].bar(i, m1_completion_rate, color=color_palette[i], label=label, edgecolor='black', linewidth=2)
-        ax[1].bar(i, m2_completion_rate, color=color_palette[i], label=label, edgecolor='black', linewidth=2)
-        ax[2].bar(i, m3_completion_rate, color=color_palette[i], label=label, edgecolor='black', linewidth=2)
-        ax[3].bar(i, m4_completion_rate, color=color_palette[i], label=label, edgecolor='black', linewidth=2)
+        ax[0].bar(
+            i,
+            m1_completion_rate,
+            color=color_palette[i],
+            label=label,
+            edgecolor="black",
+            linewidth=2,
+        )
+        ax[1].bar(
+            i,
+            m2_completion_rate,
+            color=color_palette[i],
+            label=label,
+            edgecolor="black",
+            linewidth=2,
+        )
+        ax[2].bar(
+            i,
+            m3_completion_rate,
+            color=color_palette[i],
+            label=label,
+            edgecolor="black",
+            linewidth=2,
+        )
+        ax[3].bar(
+            i,
+            m4_completion_rate,
+            color=color_palette[i],
+            label=label,
+            edgecolor="black",
+            linewidth=2,
+        )
 
     ax[0].set_title("M1")
     ax[1].set_title("M2")
@@ -1177,6 +1264,7 @@ def plot_developmental_success(
 
     return fig
 
+
 def plot_arrests(
     conditions_struct,
     conditions_to_plot,
@@ -1190,7 +1278,7 @@ def plot_arrests(
         color_palette = colors
 
     if figsize is None:
-        figsize = (5*4, 6)
+        figsize = (5 * 4, 6)
 
     fig, ax = plt.subplots(1, 4, figsize=figsize)
 
@@ -1204,33 +1292,73 @@ def plot_arrests(
         # m3_arrest = np.logical_and(np.isnan(ecdysis[:, 3]), ~m2_arrest)
         # m4_arrest = np.logical_and(np.isnan(ecdysis[:, 4]), ~m3_arrest)
 
-
         # l1_arrest_rate = np.sum(m1_arrest) / len(ecdysis)
         # l2_arrest_rate = np.sum(m2_arrest) / np.sum(~m1_arrest)
         # l3_arrest_rate = np.sum(m3_arrest) / np.sum(~m2_arrest)
         # l4_arrest_rate = np.sum(m4_arrest) / np.sum(~m3_arrest)
 
         m1_arrest = np.isnan(ecdysis[:, 1])  # arrested in L1
-        m2_arrest = np.logical_and(np.isnan(ecdysis[:, 2]), ~np.isnan(ecdysis[:, 1]))  # passed L1 but arrested in L2
-        m3_arrest = np.logical_and(np.isnan(ecdysis[:, 3]), ~np.isnan(ecdysis[:, 2]))  # passed L2 but arrested in L3
-        m4_arrest = np.logical_and(np.isnan(ecdysis[:, 4]), ~np.isnan(ecdysis[:, 3]))  # passed L3 but arrested in L4
+        m2_arrest = np.logical_and(
+            np.isnan(ecdysis[:, 2]), ~np.isnan(ecdysis[:, 1])
+        )  # passed L1 but arrested in L2
+        m3_arrest = np.logical_and(
+            np.isnan(ecdysis[:, 3]), ~np.isnan(ecdysis[:, 2])
+        )  # passed L2 but arrested in L3
+        m4_arrest = np.logical_and(
+            np.isnan(ecdysis[:, 4]), ~np.isnan(ecdysis[:, 3])
+        )  # passed L3 but arrested in L4
 
         # Calculate rates - each rate is: number arrested in stage / number that entered that stage
         l1_arrest_rate = np.sum(m1_arrest) / len(ecdysis)  # all animals enter L1
-        l2_arrest_rate = np.sum(m2_arrest) / np.sum(~np.isnan(ecdysis[:, 1]))  # only L1 completers enter L2
-        l3_arrest_rate = np.sum(m3_arrest) / np.sum(~np.isnan(ecdysis[:, 2]))  # only L2 completers enter L3
-        l4_arrest_rate = np.sum(m4_arrest) / np.sum(~np.isnan(ecdysis[:, 3]))  # only L3 completers enter L4
+        l2_arrest_rate = np.sum(m2_arrest) / np.sum(
+            ~np.isnan(ecdysis[:, 1])
+        )  # only L1 completers enter L2
+        l3_arrest_rate = np.sum(m3_arrest) / np.sum(
+            ~np.isnan(ecdysis[:, 2])
+        )  # only L2 completers enter L3
+        l4_arrest_rate = np.sum(m4_arrest) / np.sum(
+            ~np.isnan(ecdysis[:, 3])
+        )  # only L3 completers enter L4
 
-        print(np.sum(m1_arrest), np.sum(m2_arrest), np.sum(m3_arrest), np.sum(m4_arrest))
+        print(
+            np.sum(m1_arrest), np.sum(m2_arrest), np.sum(m3_arrest), np.sum(m4_arrest)
+        )
         print(len(ecdysis), np.sum(~m1_arrest), np.sum(~m2_arrest), np.sum(~m3_arrest))
 
         label = build_legend(condition_dict, legend)
 
-        ax[0].bar(i, l1_arrest_rate, color=color_palette[i], label=label, edgecolor='black', linewidth=2)
-        ax[1].bar(i, l2_arrest_rate, color=color_palette[i], label=label, edgecolor='black', linewidth=2)
-        ax[2].bar(i, l3_arrest_rate, color=color_palette[i], label=label, edgecolor='black', linewidth=2)
-        ax[3].bar(i, l4_arrest_rate, color=color_palette[i], label=label, edgecolor='black', linewidth=2)
-
+        ax[0].bar(
+            i,
+            l1_arrest_rate,
+            color=color_palette[i],
+            label=label,
+            edgecolor="black",
+            linewidth=2,
+        )
+        ax[1].bar(
+            i,
+            l2_arrest_rate,
+            color=color_palette[i],
+            label=label,
+            edgecolor="black",
+            linewidth=2,
+        )
+        ax[2].bar(
+            i,
+            l3_arrest_rate,
+            color=color_palette[i],
+            label=label,
+            edgecolor="black",
+            linewidth=2,
+        )
+        ax[3].bar(
+            i,
+            l4_arrest_rate,
+            color=color_palette[i],
+            label=label,
+            edgecolor="black",
+            linewidth=2,
+        )
 
     ax[0].set_title("L1")
     ax[1].set_title("L2")
@@ -1252,6 +1380,7 @@ def plot_arrests(
 
     return fig
 
+
 def plot_growth_curves_individuals(
     conditions_struct,
     column,
@@ -1263,25 +1392,26 @@ def plot_growth_curves_individuals(
     y_axis_label=None,
     smoothing_window=21,
 ):
-
     color_palette = sns.color_palette(color_palette, len(conditions_to_plot))
     if figsize is None:
         figsize = (len(conditions_to_plot) * 8, 10)
-    
+
     fig, ax = plt.subplots(1, len(conditions_to_plot), figsize=figsize)
-    
+
     for i, condition_id in enumerate(conditions_to_plot):
         condition_dict = conditions_struct[condition_id]
         # TEMPORARY, ONLY WORKS WITH SINGLE CLASSIFICATION, FIND A WAY TO GENERALIZE
         worm_type_key = [key for key in condition_dict.keys() if "worm_type" in key][0]
-        
+
         for j in range(len(condition_dict[column])):
-            time = condition_dict["experiment_time"][j]/3600
+            time = condition_dict["experiment_time"][j] / 3600
             data = condition_dict[column][j]
             worm_type = condition_dict[worm_type_key][j]
-            hatch = condition_dict['ecdysis_time_step'][j][0]
-            hatch_experiment_time = condition_dict['ecdysis_experiment_time'][j][0]/3600
-            
+            hatch = condition_dict["ecdysis_time_step"][j][0]
+            hatch_experiment_time = (
+                condition_dict["ecdysis_experiment_time"][j][0] / 3600
+            )
+
             if not np.isnan(hatch):
                 hatch = int(hatch)
                 time = time[hatch:]
@@ -1292,7 +1422,7 @@ def plot_growth_curves_individuals(
                 # smooth the data
                 filtered_data = medfilt(filtered_data, smoothing_window)
                 label = build_legend(condition_dict, legend)
-                
+
                 try:
                     ax[i].plot(time, filtered_data)
                     set_scale(ax[i], log_scale)
@@ -1304,7 +1434,7 @@ def plot_growth_curves_individuals(
             ax[i].title.set_text(label)
         except TypeError:
             ax.title.set_text(label)
-    
+
     # Set labels
     if y_axis_label is not None:
         try:
@@ -1367,7 +1497,6 @@ def get_proportion_model(
     else:
         plt.ylabel("column two")
 
-
     # lowess will return our "smoothed" data with a y value for at every x-value
     lowess = sm.nonparametric.lowess(series_two, series_one, frac=0.1)
 
@@ -1387,9 +1516,7 @@ def get_proportion_model(
     return model
 
 
-def get_deviation_from_model(
-    rescaled_series_one, rescaled_series_two, model
-):
+def get_deviation_from_model(rescaled_series_one, rescaled_series_two, model):
     # log transform the data
 
     expected_series_two = np.exp(model(np.log(rescaled_series_one)))
@@ -1407,7 +1534,9 @@ def get_deviation_from_model(
 
     mean_residuals = np.nanmean(percentage_deviation, axis=0)
     std_residuals = np.nanstd(percentage_deviation, axis=0)
-    ste_residuals = std_residuals / np.sqrt(np.sum(np.isfinite(percentage_deviation), axis=0))
+    ste_residuals = std_residuals / np.sqrt(
+        np.sum(np.isfinite(percentage_deviation), axis=0)
+    )
 
     return mean_series_one, mean_residuals, std_residuals, ste_residuals
 
@@ -1418,13 +1547,12 @@ def plot_deviation_from_model(
     column_two,
     control_condition_id,
     conditions_to_plot,
-    colors = None,
+    colors=None,
     log_scale=(True, False),
     legend=None,
     x_axis_label=None,
     y_axis_label=None,
 ):
-
     if colors is None:
         color_palette = sns.color_palette("colorblind", len(conditions_to_plot))
     else:
@@ -1441,7 +1569,6 @@ def plot_deviation_from_model(
     )
 
     control_condition = conditions_struct[control_condition_id]
-
 
     control_model = get_proportion_model(
         control_condition[column_one],
@@ -1486,6 +1613,7 @@ def plot_deviation_from_model(
 
     return fig
 
+
 def exclude_arrests_from_series_at_ecdysis(series_at_ecdysis):
     filtered_series = np.full(series_at_ecdysis.shape, np.nan)
     # keep only a value at one ecdys event if the next one is not nan
@@ -1523,8 +1651,12 @@ def get_proportion_model_ecdysis(
         series_two_at_ecdysis = series_two_at_ecdysis[:, 1:]
 
     if exclude_arrests:
-        series_one_at_ecdysis = exclude_arrests_from_series_at_ecdysis(series_one_at_ecdysis)
-        series_two_at_ecdysis = exclude_arrests_from_series_at_ecdysis(series_two_at_ecdysis)
+        series_one_at_ecdysis = exclude_arrests_from_series_at_ecdysis(
+            series_one_at_ecdysis
+        )
+        series_two_at_ecdysis = exclude_arrests_from_series_at_ecdysis(
+            series_two_at_ecdysis
+        )
 
     series_one_at_ecdysis = np.array(series_one_at_ecdysis).flatten()
     series_two_at_ecdysis = np.array(series_two_at_ecdysis).flatten()
@@ -1576,12 +1708,18 @@ def get_deviation_from_model_at_ecdysis(
         series_two_at_ecdysis = series_two_at_ecdysis[:, 1:]
 
     if exclude_arrests:
-        series_one_at_ecdysis = exclude_arrests_from_series_at_ecdysis(series_one_at_ecdysis)
-        series_two_at_ecdysis = exclude_arrests_from_series_at_ecdysis(series_two_at_ecdysis)
+        series_one_at_ecdysis = exclude_arrests_from_series_at_ecdysis(
+            series_one_at_ecdysis
+        )
+        series_two_at_ecdysis = exclude_arrests_from_series_at_ecdysis(
+            series_two_at_ecdysis
+        )
 
     # remove elements that are nan in one of the two arrays
     for i in range(series_one_at_ecdysis.shape[1]):
-        nan_mask = np.isnan(series_one_at_ecdysis[:, i]) | np.isnan(series_two_at_ecdysis[:, i])
+        nan_mask = np.isnan(series_one_at_ecdysis[:, i]) | np.isnan(
+            series_two_at_ecdysis[:, i]
+        )
         series_one_at_ecdysis[:, i][nan_mask] = np.nan
         series_two_at_ecdysis[:, i][nan_mask] = np.nan
 
@@ -1613,12 +1751,18 @@ def get_deviation_percentage_from_model_at_ecdysis(
         series_two_at_ecdysis = series_two_at_ecdysis[:, 1:]
 
     if exclude_arrests:
-        series_one_at_ecdysis = exclude_arrests_from_series_at_ecdysis(series_one_at_ecdysis)
-        series_two_at_ecdysis = exclude_arrests_from_series_at_ecdysis(series_two_at_ecdysis)
+        series_one_at_ecdysis = exclude_arrests_from_series_at_ecdysis(
+            series_one_at_ecdysis
+        )
+        series_two_at_ecdysis = exclude_arrests_from_series_at_ecdysis(
+            series_two_at_ecdysis
+        )
 
     # remove elements that are nan in one of the two arrays
     for i in range(series_one_at_ecdysis.shape[1]):
-        nan_mask = np.isnan(series_one_at_ecdysis[:, i]) | np.isnan(series_two_at_ecdysis[:, i])
+        nan_mask = np.isnan(series_one_at_ecdysis[:, i]) | np.isnan(
+            series_two_at_ecdysis[:, i]
+        )
         series_one_at_ecdysis[:, i][nan_mask] = np.nan
         series_two_at_ecdysis[:, i][nan_mask] = np.nan
 
@@ -1654,7 +1798,6 @@ def plot_deviation_from_model_at_ecdysis(
     percentage=True,
     exclude_arrests=False,
 ):
-
     if colors is None:
         color_palette = sns.color_palette("colorblind", len(conditions_to_plot))
     else:
@@ -1705,9 +1848,10 @@ def plot_deviation_from_model_at_ecdysis(
     plt.legend()
 
     fig = plt.gcf()
-    plt.show()    
+    plt.show()
 
     return fig
+
 
 def plot_normalized_proportions(
     conditions_struct,
@@ -1777,8 +1921,8 @@ def process_series_at_ecdysis(
     series: np.ndarray,
     ecdysis: np.ndarray,
     remove_hatch: bool = True,
-    exclude_arrests: bool = False
-) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
+    exclude_arrests: bool = False,
+) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
     """
     Process and clean the input single series data.
     """
@@ -1795,10 +1939,9 @@ def process_series_at_ecdysis(
 
     return series, ecdysis
 
+
 def filter_non_worm_data(
-    data: np.ndarray,
-    worm_type: np.ndarray,
-    ecdysis: np.ndarray
+    data: np.ndarray, worm_type: np.ndarray, ecdysis: np.ndarray
 ) -> np.ndarray:
     """
     Filter out non-worm data points.
@@ -1807,55 +1950,65 @@ def filter_non_worm_data(
     for i in range(data.shape[0]):
         for j in range(data.shape[1]):
             try:
-                if ~(np.isnan(data[i][j])) and worm_type[i][int(ecdysis[i][j])] != 'worm':
+                if (
+                    ~(np.isnan(data[i][j]))
+                    and worm_type[i][int(ecdysis[i][j])] != "worm"
+                ):
                     filtered_data[i][j] = np.nan
             except ValueError:
                 filtered_data[i][j] = np.nan
     return filtered_data
 
+
 def get_condition_filemaps(
-    condition_dict: Dict,
-) -> Dict[str, Any]:
+    condition_dict: dict,
+) -> dict[str, Any]:
     """
     Set up file mappings for image directories.
     """
-    filemap_paths = condition_dict['filemap_path']
+    filemap_paths = condition_dict["filemap_path"]
     unique_filemap_paths = np.unique(filemap_paths)
     filemaps = {}
-    
+
     for filemap_path in unique_filemap_paths:
         filemap = pd.read_csv(filemap_path)
         filemaps[filemap_path] = filemap
     return filemaps
 
-def keep_selected_columns(filemap_dict: Dict[str, Any], columns_to_keep) -> Dict[str, Any]:
 
+def keep_selected_columns(
+    filemap_dict: dict[str, Any], columns_to_keep
+) -> dict[str, Any]:
     columns = columns_to_keep.copy()
-    if 'Point' not in columns:
-        columns.append('Point')
-    if 'Time' not in columns:
-        columns.append('Time')
+    if "Point" not in columns:
+        columns.append("Point")
+    if "Time" not in columns:
+        columns.append("Time")
 
     for key, filemap in filemap_dict.items():
         filemap = filemap[columns]
         filemap_dict[key] = filemap
-    
+
     return filemap_dict
 
-def get_image_paths_of_time_point(point, time, filemap_path_of_point, filemaps, image_columns):
+
+def get_image_paths_of_time_point(
+    point, time, filemap_path_of_point, filemaps, image_columns
+):
     filemap_of_point = filemaps[filemap_path_of_point]
-    filemap_of_point = filemap_of_point[filemap_of_point['Point'] == point]
-    filemap_of_point = filemap_of_point[filemap_of_point['Time'] == time]
+    filemap_of_point = filemap_of_point[filemap_of_point["Point"] == point]
+    filemap_of_point = filemap_of_point[filemap_of_point["Time"] == time]
 
     image_paths = filemap_of_point[image_columns].values.flatten().tolist()
 
     return image_paths
 
+
 def display_image(
     img_path,
     dpi: int = 300,
     scale: float = 1.0,
-    cmap: str = 'viridis',
+    cmap: str = "viridis",
     backup_dir: str = None,
     backup_file_name: str = None,
 ) -> None:
@@ -1866,28 +2019,33 @@ def display_image(
         img = read_tiff_file(img_path)
 
     if backup_dir is not None:
-        if backup_file_name is not None :
+        if backup_file_name is not None:
             shutil.copy(img_path, os.path.join(backup_dir, backup_file_name))
         else:
             if isinstance(img_path, str):
                 shutil.copy(img_path, backup_dir)
             else:
-                imwrite(os.path.join(backup_dir, 'backup_image.tif'), img)
+                imwrite(os.path.join(backup_dir, "backup_image.tif"), img)
     height, width = img.shape[-2:]
-    
-    fig = plt.figure(figsize=((width/dpi) * scale, (height/dpi)* scale), dpi=dpi, facecolor='black')
-    plt.gca().set_facecolor('black')
-    plt.imshow(img, interpolation='none', aspect='equal', cmap=cmap)
+
+    plt.figure(
+        figsize=((width / dpi) * scale, (height / dpi) * scale),
+        dpi=dpi,
+        facecolor="black",
+    )
+    plt.gca().set_facecolor("black")
+    plt.imshow(img, interpolation="none", aspect="equal", cmap=cmap)
     plt.subplots_adjust(left=0, right=1, top=1, bottom=0)
-    plt.axis('off')
+    plt.axis("off")
     plt.show()
 
+
 def get_most_average_proportions_at_ecdysis(
-    conditions_struct: Dict,
+    conditions_struct: dict,
     column_one: str,
     column_two: str,
-    img_dir_list: List[str],
-    conditions_to_plot: List[int],
+    img_dir_list: list[str],
+    conditions_to_plot: list[int],
     remove_hatch: bool = True,
     exclude_arrests: bool = False,
     nb_per_condition: int = 1,
@@ -1901,13 +2059,21 @@ def get_most_average_proportions_at_ecdysis(
         # TEMPORARY, ONLY WORKS WITH SINGLE CLASSIFICATION, FIND A WAY TO GENERALIZE
         worm_type_key = [key for key in condition.keys() if "worm_type" in key][0]
 
-        series_one, series_two, point, experiment, ecdysis, worm_type = [
-            condition[key] for key in [column_one, column_two, 'point', 'experiment', 'ecdysis_time_step', worm_type_key]
-        ]
+        series_one, series_two, point, experiment, ecdysis, worm_type = (
+            condition[key]
+            for key in [
+                column_one,
+                column_two,
+                "point",
+                "experiment",
+                "ecdysis_time_step",
+                worm_type_key,
+            ]
+        )
 
         filemaps = get_condition_filemaps(condition)
         filemaps = keep_selected_columns(filemaps, img_dir_list)
-        
+
         series_one, ecdysis = process_series_at_ecdysis(
             series_one, ecdysis, remove_hatch, exclude_arrests
         )
@@ -1928,7 +2094,7 @@ def get_most_average_proportions_at_ecdysis(
             ratio_mean_molt = ratio_mean[i]
 
             distance_score = np.abs(ratio_molt - ratio_mean_molt)
-    
+
             sorted_idx = np.argsort(distance_score)
             selected_idx = sorted_idx[:nb_per_condition]
 
@@ -1940,20 +2106,25 @@ def get_most_average_proportions_at_ecdysis(
                 point_of_indices = [point_of_indices]
                 ecdysis_of_indices = [ecdysis_of_indices]
 
-            filemap_paths_of_indices = condition['filemap_path'][selected_idx].squeeze()
+            filemap_paths_of_indices = condition["filemap_path"][selected_idx].squeeze()
 
             if filemap_paths_of_indices.shape == ():
                 filemap_paths_of_indices = [filemap_paths_of_indices]
 
             image_paths_ecdysis = []
-            for j, (p, t, filemap_path) in enumerate(zip(point_of_indices, ecdysis_of_indices, filemap_paths_of_indices)):
-                paths = get_image_paths_of_time_point(p, t, str(filemap_path), filemaps, img_dir_list)
+            for j, (p, t, filemap_path) in enumerate(
+                zip(point_of_indices, ecdysis_of_indices, filemap_paths_of_indices)
+            ):
+                paths = get_image_paths_of_time_point(
+                    p, t, str(filemap_path), filemaps, img_dir_list
+                )
                 image_paths_ecdysis.append(paths)
 
             image_paths.append(image_paths_ecdysis)
         paths_dict[condition_id] = image_paths
     return paths_dict
-        
+
+
 # def get_most_average_deviations_at_ecdysis(
 #     conditions_struct: Dict,
 #     column_one: str,
@@ -1993,7 +2164,7 @@ def get_most_average_proportions_at_ecdysis(
 #         ]
 
 #         filemaps = setup_image_filemaps(experiment, img_dir_list)
-        
+
 #         series_one, series_two, point, ecdysis = process_series_data(
 #             series_one, series_two, point, ecdysis, remove_hatch, exclude_arrests
 #         )
@@ -2002,7 +2173,7 @@ def get_most_average_proportions_at_ecdysis(
 #         expected_series_two = np.exp(control_model(np.log(series_one)))
 #         percentage_deviation = ((series_two - expected_series_two) / expected_series_two * 100)
 #         percentage_deviation = filter_non_worm_data(percentage_deviation, worm_type, ecdysis)
-        
+
 #         y = np.nanmean(percentage_deviation, axis=0)
 
 #         for i in range(percentage_deviation.shape[1]):
@@ -2010,26 +2181,25 @@ def get_most_average_proportions_at_ecdysis(
 #             mean_deviation = y[i]
 #             sorted_idx = np.argsort(np.abs(deviation_molt - mean_deviation))
 #             valid_idx = sorted_idx[~np.isnan(deviation_molt[sorted_idx])][:nb_per_condition]
-            
+
 #             for idx in valid_idx:
-#                 display_sample_images(experiment[idx][0], int(point[idx][i]), 
+#                 display_sample_images(experiment[idx][0], int(point[idx][i]),
 #                                    int(ecdysis[idx][i]), img_dir_list, filemaps, dpi, overlay=overlay, cmap=cmap, backup_dir=backup_dir)
 
 
-
 def get_most_average_size_at_ecdysis(
-    conditions_struct: Dict,
-    column : str,
-    img_dir_list: List[str],
-    conditions_to_plot: List[int],
+    conditions_struct: dict,
+    column: str,
+    img_dir_list: list[str],
+    conditions_to_plot: list[int],
     remove_hatch: bool = True,
     exclude_arrests: bool = False,
     dpi: int = 200,
     nb_per_condition: int = 1,
     overlay: bool = True,
-    cmap: List[str] = ['viridis'],
+    cmap: list[str] = ["viridis"],
     backup_dir: str = None,
-    backup_name = None,
+    backup_name=None,
 ) -> None:
     """
     Calculate and display the most average sizes at ecdysis.
@@ -2040,9 +2210,16 @@ def get_most_average_size_at_ecdysis(
         # TEMPORARY, ONLY WORKS WITH SINGLE CLASSIFICATION, FIND A WAY TO GENERALIZE
         worm_type_key = [key for key in condition.keys() if "worm_type" in key][0]
 
-        series, point, experiment, ecdysis, worm_type = [
-            condition[key] for key in [column, 'point', 'experiment', 'ecdysis_time_step', worm_type_key]
-        ]
+        series, point, experiment, ecdysis, worm_type = (
+            condition[key]
+            for key in [
+                column,
+                "point",
+                "experiment",
+                "ecdysis_time_step",
+                worm_type_key,
+            ]
+        )
 
         filemaps = get_condition_filemaps(condition)
         filemaps = keep_selected_columns(filemaps, img_dir_list)
@@ -2062,7 +2239,7 @@ def get_most_average_size_at_ecdysis(
             size_mean_molt = size_mean[i]
 
             distance_score = np.abs(size_molt - size_mean_molt)
-    
+
             sorted_idx = np.argsort(distance_score)
             selected_idx = sorted_idx[:nb_per_condition]
 
@@ -2074,21 +2251,34 @@ def get_most_average_size_at_ecdysis(
                 point_of_indices = [point_of_indices]
                 ecdysis_of_indices = [ecdysis_of_indices]
 
-            filemap_paths_of_indices = condition['filemap_path'][selected_idx].squeeze()
+            filemap_paths_of_indices = condition["filemap_path"][selected_idx].squeeze()
 
             if filemap_paths_of_indices.shape == ():
                 filemap_paths_of_indices = [filemap_paths_of_indices]
 
             image_paths_ecdysis = []
-            for j, (p, t, filemap_path) in enumerate(zip(point_of_indices, ecdysis_of_indices, filemap_paths_of_indices)):
-                paths = get_image_paths_of_time_point(p, t, str(filemap_path), filemaps, img_dir_list)
+            for j, (p, t, filemap_path) in enumerate(
+                zip(point_of_indices, ecdysis_of_indices, filemap_paths_of_indices)
+            ):
+                paths = get_image_paths_of_time_point(
+                    p, t, str(filemap_path), filemaps, img_dir_list
+                )
                 image_paths_ecdysis.append(paths)
 
             image_paths.append(image_paths_ecdysis)
         paths_dict[condition_id] = image_paths
     return paths_dict
 
-def overlay_contours(mask_one_path, mask_two_path, dpi: int = 300, scale: float = 1.0, center=False, allign = 'left', thickness = 2) -> None:
+
+def overlay_contours(
+    mask_one_path,
+    mask_two_path,
+    dpi: int = 300,
+    scale: float = 1.0,
+    center=False,
+    allign="left",
+    thickness=2,
+) -> None:
     """
     Overlay two masks on top of each other.
     """
@@ -2098,7 +2288,6 @@ def overlay_contours(mask_one_path, mask_two_path, dpi: int = 300, scale: float 
     max_height = max(mask_one.shape[0], mask_two.shape[0])
     max_width = max(mask_one.shape[1], mask_two.shape[1])
 
-
     m1, m2 = pad_images_to_same_dim(mask_one, mask_two)
     diff = np.linalg.norm(m1 - m2)
     flipped_m2 = np.flip(m2, axis=1)
@@ -2106,21 +2295,31 @@ def overlay_contours(mask_one_path, mask_two_path, dpi: int = 300, scale: float 
     if diff_flipped < diff:
         mask_two = np.flip(mask_two, axis=1)
 
-    if allign == 'left':
+    if allign == "left":
         mask_one = pad_to_dim_equally(mask_one, max_height, mask_one.shape[1])
         mask_two = pad_to_dim_equally(mask_two, max_height, mask_two.shape[1])
 
         mask_one = pad_to_dim(mask_one, mask_one.shape[0], max_width)
         mask_two = pad_to_dim(mask_two, mask_two.shape[0], max_width)
 
-    elif allign == 'right':
+    elif allign == "right":
         mask_one = pad_to_dim_equally(mask_one, max_height, mask_one.shape[1])
         mask_two = pad_to_dim_equally(mask_two, max_height, mask_two.shape[1])
 
-        mask_one = np.pad(mask_one, ((0, 0), (max_width - mask_one.shape[1], 0)), mode='constant', constant_values=0)
-        mask_two = np.pad(mask_two, ((0, 0), (max_width - mask_two.shape[1], 0)), mode='constant', constant_values=0)
+        mask_one = np.pad(
+            mask_one,
+            ((0, 0), (max_width - mask_one.shape[1], 0)),
+            mode="constant",
+            constant_values=0,
+        )
+        mask_two = np.pad(
+            mask_two,
+            ((0, 0), (max_width - mask_two.shape[1], 0)),
+            mode="constant",
+            constant_values=0,
+        )
 
-    elif allign == 'center':
+    elif allign == "center":
         mask_one, mask_two = pad_images_to_same_dim(mask_one, mask_two)
 
     # pad 5 pixels on each side
@@ -2141,25 +2340,42 @@ def overlay_contours(mask_one_path, mask_two_path, dpi: int = 300, scale: float 
 
     masked_contour_img_one = np.ma.masked_where(contour_img_one == 0, contour_img_one)
     masked_contour_img_two = np.ma.masked_where(contour_img_two == 0, contour_img_two)
-    plt.figure(figsize=((max_width/dpi) * scale, (max_height/dpi) * scale), dpi=dpi, facecolor='black')
-    plt.gca().set_facecolor('black')
-    plt.imshow(masked_contour_img_one, cmap=plt.cm.colors.LinearSegmentedColormap.from_list('', ['black', 'yellow']), alpha=0.7, vmin=0, vmax=255)
-    plt.imshow(masked_contour_img_two, cmap=plt.cm.colors.LinearSegmentedColormap.from_list('', ['black', 'red']), alpha=0.7, vmin=0, vmax=255)
-    plt.axis('off')
+    plt.figure(
+        figsize=((max_width / dpi) * scale, (max_height / dpi) * scale),
+        dpi=dpi,
+        facecolor="black",
+    )
+    plt.gca().set_facecolor("black")
+    plt.imshow(
+        masked_contour_img_one,
+        cmap=plt.cm.colors.LinearSegmentedColormap.from_list("", ["black", "yellow"]),
+        alpha=0.7,
+        vmin=0,
+        vmax=255,
+    )
+    plt.imshow(
+        masked_contour_img_two,
+        cmap=plt.cm.colors.LinearSegmentedColormap.from_list("", ["black", "red"]),
+        alpha=0.7,
+        vmin=0,
+        vmax=255,
+    )
+    plt.axis("off")
     plt.tight_layout()
     plt.show()
 
-def plot_heterogeneity_at_ecdysis(
-    conditions_struct: Dict,
-    column: str,
-    conditions_to_plot: List[int], 
-    remove_hatch = True, 
-    legend = None, 
-    colors = None,
-    x_axis_label = None, 
-    y_axis_label = None, 
-    exclude_arrests: bool = False,):
 
+def plot_heterogeneity_at_ecdysis(
+    conditions_struct: dict,
+    column: str,
+    conditions_to_plot: list[int],
+    remove_hatch=True,
+    legend=None,
+    colors=None,
+    x_axis_label=None,
+    y_axis_label=None,
+    exclude_arrests: bool = False,
+):
     if colors is None:
         color_palette = sns.color_palette("colorblind", len(conditions_to_plot))
     else:
@@ -2184,13 +2400,13 @@ def plot_heterogeneity_at_ecdysis(
 
         label = build_legend(condition_dict, legend)
 
-        plt.plot(cvs, label = label, marker = 'o', color = color_palette[i])
+        plt.plot(cvs, label=label, marker="o", color=color_palette[i])
 
     # replace the ticks by [L1, L2, L3, L4]
     if remove_hatch:
-        plt.xticks(range(4), ['M1', 'M2', 'M3', 'M4'])
+        plt.xticks(range(4), ["M1", "M2", "M3", "M4"])
     else:
-        plt.xticks(range(5), ['Hatch', 'M1', 'M2', 'M3', 'M4'])
+        plt.xticks(range(5), ["Hatch", "M1", "M2", "M3", "M4"])
 
     plt.xlabel(x_axis_label)
     plt.ylabel(y_axis_label)
@@ -2202,18 +2418,19 @@ def plot_heterogeneity_at_ecdysis(
 
     return fig
 
-def plot_heterogeneity_rescaled_data(
-    conditions_struct: Dict,
-    column: str,
-    conditions_to_plot: List[int], 
-    smooth: bool = False,
-    remove_hatch = True, 
-    legend = None, 
-    colors = None,
-    x_axis_label = None, 
-    y_axis_label = None, 
-    exclude_arrests: bool = False,):
 
+def plot_heterogeneity_rescaled_data(
+    conditions_struct: dict,
+    column: str,
+    conditions_to_plot: list[int],
+    smooth: bool = False,
+    remove_hatch=True,
+    legend=None,
+    colors=None,
+    x_axis_label=None,
+    y_axis_label=None,
+    exclude_arrests: bool = False,
+):
     if colors is None:
         color_palette = sns.color_palette("husl", len(conditions_to_plot))
     else:
@@ -2230,7 +2447,7 @@ def plot_heterogeneity_rescaled_data(
             cvs = medfilt(cvs, 7)
             # cvs = savgol_filter(cvs, 15, 3)
 
-        plt.plot(cvs, label = label, color = color_palette[i])
+        plt.plot(cvs, label=label, color=color_palette[i])
 
     plt.xlabel(x_axis_label)
     plt.ylabel(y_axis_label)
@@ -2242,37 +2459,44 @@ def plot_heterogeneity_rescaled_data(
 
     return fig
 
-def combine_series(conditions_struct, series_one, series_two, operation, new_series_name):
+
+def combine_series(
+    conditions_struct, series_one, series_two, operation, new_series_name
+):
     for condition in conditions_struct:
         series_one_values = condition[series_one]
         series_two_values = condition[series_two]
 
-        if operation == 'add':
+        if operation == "add":
             new_series_values = np.add(series_one_values, series_two_values)
-        elif operation == 'subtract':
+        elif operation == "subtract":
             new_series_values = series_one_values - series_two_values
-        elif operation == 'multiply':
+        elif operation == "multiply":
             new_series_values = series_one_values * series_two_values
-        elif operation == 'divide':
+        elif operation == "divide":
             new_series_values = np.divide(series_one_values, series_two_values)
         condition[new_series_name] = new_series_values
     return conditions_struct
+
 
 def transform_series(conditions_struct, series, operation, new_series_name):
     for conditions in conditions_struct:
         series_values = conditions[series]
 
-        if operation == 'log':
+        if operation == "log":
             new_series_values = np.log(series_values)
-        elif operation == 'exp':
+        elif operation == "exp":
             new_series_values = np.exp(series_values)
-        elif operation == 'sqrt':
+        elif operation == "sqrt":
             new_series_values = np.sqrt(series_values)
         conditions[new_series_name] = new_series_values
 
     return conditions_struct
 
-def compute_growth_rate(conditions_struct, series_name, gr_series_name, experiment_time=True):
+
+def compute_growth_rate(
+    conditions_struct, series_name, gr_series_name, experiment_time=True
+):
     for condition in conditions_struct:
         series_values = condition[series_name]
         # TEMPORARY, ONLY WORKS WITH SINGLE CLASSIFICATION, FIND A WAY TO GENERALIZE
@@ -2280,15 +2504,20 @@ def compute_growth_rate(conditions_struct, series_name, gr_series_name, experime
         worm_type = condition[worm_type_key]
 
         if experiment_time:
-            time = condition['experiment_time']
+            time = condition["experiment_time"]
         else:
-            time = condition['time']
-
+            time = condition["time"]
 
         growth_rate = []
         for i in range(series_values.shape[0]):
             # gr = compute_instantaneous_growth_rate_classified(series_values[i], time[i], worm_type[i], smoothing_method = 'savgol', savgol_filter_window = 7)
-            gr = compute_instantaneous_growth_rate_classified(series_values[i], time[i], worm_type[i], smoothing_method = 'savgol', savgol_filter_window = 5)
+            gr = compute_instantaneous_growth_rate_classified(
+                series_values[i],
+                time[i],
+                worm_type[i],
+                smoothing_method="savgol",
+                savgol_filter_window=5,
+            )
             growth_rate.append(gr)
 
         growth_rate = np.array(growth_rate)
@@ -2297,7 +2526,14 @@ def compute_growth_rate(conditions_struct, series_name, gr_series_name, experime
 
     return conditions_struct
 
-def rescale(conditions_struct, series_name, rescaled_series_name, experiment_time=True, n_points=100):
+
+def rescale(
+    conditions_struct,
+    series_name,
+    rescaled_series_name,
+    experiment_time=True,
+    n_points=100,
+):
     for condition in conditions_struct:
         series_values = condition[series_name]
         # TEMPORARY, ONLY WORKS WITH SINGLE CLASSIFICATION, FIND A WAY TO GENERALIZE
@@ -2306,12 +2542,13 @@ def rescale(conditions_struct, series_name, rescaled_series_name, experiment_tim
         ecdysis = condition["ecdysis_time_step"]
 
         if experiment_time:
-            time = condition['experiment_time']
+            time = condition["experiment_time"]
         else:
-            time = condition['time']
+            time = condition["time"]
 
         _, rescaled_series = rescale_series(
-        series_values, time, ecdysis, worm_type, n_points=n_points) # shape (n_worms, 4, n_points)
+            series_values, time, ecdysis, worm_type, n_points=n_points
+        )  # shape (n_worms, 4, n_points)
 
         # reshape into (n_worms, 4*n_points)
 
@@ -2321,7 +2558,14 @@ def rescale(conditions_struct, series_name, rescaled_series_name, experiment_tim
 
     return conditions_struct
 
-def rescale_without_flattening(conditions_struct, series_name, rescaled_series_name, experiment_time=True, n_points=100):
+
+def rescale_without_flattening(
+    conditions_struct,
+    series_name,
+    rescaled_series_name,
+    experiment_time=True,
+    n_points=100,
+):
     for condition in conditions_struct:
         series_values = condition[series_name]
         # TEMPORARY, ONLY WORKS WITH SINGLE CLASSIFICATION, FIND A WAY TO GENERALIZE
@@ -2330,12 +2574,13 @@ def rescale_without_flattening(conditions_struct, series_name, rescaled_series_n
         ecdysis = condition["ecdysis_time_step"]
 
         if experiment_time:
-            time = condition['experiment_time']
+            time = condition["experiment_time"]
         else:
-            time = condition['time']
+            time = condition["time"]
 
         _, rescaled_series = rescale_series(
-        series_values, time, ecdysis, worm_type, n_points=n_points) # shape (n_worms, 4, n_points)
+            series_values, time, ecdysis, worm_type, n_points=n_points
+        )  # shape (n_worms, 4, n_points)
 
         condition[rescaled_series_name] = rescaled_series
 

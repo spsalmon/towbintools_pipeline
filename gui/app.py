@@ -1,17 +1,20 @@
 import os
 import re
 
-import aicsimageio
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import plotly.graph_objs as go
-from shiny import App, reactive, render, ui
-from shinywidgets import output_widget, render_widget
+import scipy.io as sio
+from shiny import App
+from shiny import reactive
+from shiny import render
+from shiny import ui
+from shinywidgets import output_widget
+from shinywidgets import render_widget
 from towbintools.data_analysis import compute_series_at_time_classified
 from towbintools.foundation import image_handling
 from towbintools.foundation.worm_features import get_features_to_compute_at_molt
-import scipy.io as sio
 
 FEATURES_TO_COMPUTE_AT_MOLT = get_features_to_compute_at_molt()
 
@@ -29,6 +32,7 @@ filemap = pd.read_csv(filemap_path)
 filemap_folder = os.path.dirname(filemap_path)
 filemap_name = os.path.basename(filemap_path)
 filemap_name = filemap_name.split(".")[0]
+
 
 def get_backup_path(filemap_folder, filemap_name):
     # check if the filemap is already annotated
@@ -159,6 +163,7 @@ if "M4" not in filemap.columns.tolist():
 
 # create columns for features at molts if they do not exist
 
+
 def create_feature_at_molt_columns(filemap, recompute_features=False):
     columns = filemap.columns.tolist()
     feature_columns = []
@@ -167,7 +172,7 @@ def create_feature_at_molt_columns(filemap, recompute_features=False):
             [col for col in columns if feature in col and "_at_" not in col]
         )
 
-    ecdys_event_list = ['HatchTime', 'M1', 'M2', 'M3', 'M4']
+    ecdys_event_list = ["HatchTime", "M1", "M2", "M3", "M4"]
     for feature_column in feature_columns:
         for ecdys_event in ecdys_event_list:
             feature_at_ecdysis_column = f"{feature_column}_at_{ecdys_event}"
@@ -175,10 +180,16 @@ def create_feature_at_molt_columns(filemap, recompute_features=False):
                 # filemap[feature_at_ecdysis_column] = np.nan
                 for point in points:
                     data_of_point = filemap.loc[filemap["Point"] == point]
-                    filemap.loc[filemap["Point"] == point, [feature_at_ecdysis_column]] = compute_series_at_time_classified(
-                        data_of_point[feature_column].values, data_of_point[worm_type_column].values, data_of_point[ecdys_event].values[0], series_time=data_of_point["Time"].values
+                    filemap.loc[
+                        filemap["Point"] == point, [feature_at_ecdysis_column]
+                    ] = compute_series_at_time_classified(
+                        data_of_point[feature_column].values,
+                        data_of_point[worm_type_column].values,
+                        data_of_point[ecdys_event].values[0],
+                        series_time=data_of_point["Time"].values,
                     )
     return filemap, feature_columns
+
 
 filemap, feature_columns = create_feature_at_molt_columns(filemap)
 
@@ -262,7 +273,9 @@ molt_annotator = ui.column(
                 value=700,
             ),
             ui.input_checkbox("log_scale", "Log scale", value=True),
-            ui.input_file("import_file", "Import Molts", accept=[".csv", ".mat"], multiple=False),
+            ui.input_file(
+                "import_file", "Import Molts", accept=[".csv", ".mat"], multiple=False
+            ),
         ),
         align="center",
     ),
@@ -316,10 +329,20 @@ app_ui = ui.page_fluid(ui.row(molt_annotator, timepoint_selector))
 
 
 def set_marker_shape(
-    times_of_point, selected_time_index, worm_types, hatch_time, m1, m2, m3, m4, custom_annotations: list = []
+    times_of_point,
+    selected_time_index,
+    worm_types,
+    hatch_time,
+    m1,
+    m2,
+    m3,
+    m4,
+    custom_annotations: list = [],
 ):
     # fill the gaps in the times_of_point list
-    times_of_point_filled = np.arange(np.min(times_of_point), np.max(times_of_point) + 1)
+    times_of_point_filled = np.arange(
+        np.min(times_of_point), np.max(times_of_point) + 1
+    )
 
     worm_types_filled = [""] * len(times_of_point_filled)
     for time, worm_type in zip(times_of_point, worm_types):
@@ -387,9 +410,27 @@ def set_marker_shape(
     markers = dict(symbol=symbols, size=sizes, color=colors, line=dict(width=widths))
     return markers
 
-def get_points_for_value_at_molts(hatch, m1, m2, m3, m4, value_at_hatch, value_at_m1, value_at_m2, value_at_m3, value_at_m4):
+
+def get_points_for_value_at_molts(
+    hatch,
+    m1,
+    m2,
+    m3,
+    m4,
+    value_at_hatch,
+    value_at_m1,
+    value_at_m2,
+    value_at_m3,
+    value_at_m4,
+):
     ecdys_list = [hatch, m1, m2, m3, m4]
-    value_at_ecdys_list = [value_at_hatch, value_at_m1, value_at_m2, value_at_m3, value_at_m4]
+    value_at_ecdys_list = [
+        value_at_hatch,
+        value_at_m1,
+        value_at_m2,
+        value_at_m3,
+        value_at_m4,
+    ]
     symbols = ["cross", "cross", "cross", "cross", "cross"]
     colors = ["red", "orange", "yellow", "green", "blue"]
     sizes = [8, 8, 8, 8, 8]
@@ -417,6 +458,7 @@ def get_points_for_value_at_molts(hatch, m1, m2, m3, m4, value_at_hatch, value_a
         widths_filtered,
     )
 
+
 def update_molt_and_ecdysis_columns(ecdys_event, time, point, selected_column):
     data_of_point = filemap.loc[filemap["Point"] == point]
     filemap.loc[filemap["Point"] == point, [ecdys_event]] = time
@@ -436,8 +478,7 @@ def update_molt_and_ecdysis_columns(ecdys_event, time, point, selected_column):
         ]
 
     value_columns = [
-        column.replace(f"_at_{ecdys_event}", "")
-        for column in value_at_ecdys_columns
+        column.replace(f"_at_{ecdys_event}", "") for column in value_at_ecdys_columns
     ]
 
     for value_column, value_at_ecdys_column in zip(
@@ -457,13 +498,14 @@ def update_molt_and_ecdysis_columns(ecdys_event, time, point, selected_column):
             f'Old value {value_at_ecdys_column}: {filemap.loc[(filemap["Point"] == point), value_at_ecdys_column].values[0]}'
         )
 
-        filemap.loc[(filemap["Point"] == point), [value_at_ecdys_column]] = (
-            new_column_value
-        )
+        filemap.loc[
+            (filemap["Point"] == point), [value_at_ecdys_column]
+        ] = new_column_value
 
         print(
             f'New value {value_at_ecdys_column}: {filemap.loc[(filemap["Point"] == point), value_at_ecdys_column].values[0]}'
         )
+
 
 def correct_ecdysis_columns(ecdys_event, time, point, selected_column):
     data_of_point = filemap.loc[filemap["Point"] == point]
@@ -483,25 +525,28 @@ def correct_ecdysis_columns(ecdys_event, time, point, selected_column):
         ]
 
     value_columns = [
-        column.replace(f"_at_{ecdys_event}", "")
-        for column in value_at_ecdys_columns
+        column.replace(f"_at_{ecdys_event}", "") for column in value_at_ecdys_columns
     ]
 
     for value_column, value_at_ecdys_column in zip(
         value_columns, value_at_ecdys_columns
     ):
-        new_column_value = data_of_point[data_of_point["Time"] == time][value_column].values[0]
+        new_column_value = data_of_point[data_of_point["Time"] == time][
+            value_column
+        ].values[0]
 
         print(
             f'Old value {value_at_ecdys_column}: {filemap.loc[(filemap["Point"] == point), value_at_ecdys_column].values[0]}'
         )
 
-        filemap.loc[(filemap["Point"] == point), [value_at_ecdys_column]] = (
-            new_column_value
-        )
+        filemap.loc[
+            (filemap["Point"] == point), [value_at_ecdys_column]
+        ] = new_column_value
 
         print(
-            f'New value {value_at_ecdys_column}: {filemap.loc[(filemap["Point"] == point), value_at_ecdys_column].values[0]}')
+            f'New value {value_at_ecdys_column}: {filemap.loc[(filemap["Point"] == point), value_at_ecdys_column].values[0]}'
+        )
+
 
 def set_ignore_start(point):
     try:
@@ -513,6 +558,7 @@ def set_ignore_start(point):
         return ignore_start
     except KeyError:
         return ""
+
 
 def server(input, output, session):
     print("Initializing the server ...")
@@ -531,7 +577,7 @@ def server(input, output, session):
     ignore_start = reactive.Value("")
     death = reactive.Value("")
     arrest = reactive.Value("")
-    
+
     @reactive.calc
     def import_molts():
         file = input.import_file()
@@ -540,7 +586,7 @@ def server(input, output, session):
         if file[0]["datapath"].endswith(".csv"):
             print(f"Importing molts from {file[0]['datapath']} ...")
             molts_df = pd.read_csv(file[0]["datapath"])
-            
+
             # keep only the relevant columns
             molts_df = molts_df[["Point", "Time", "HatchTime", "M1", "M2", "M3", "M4"]]
             return molts_df
@@ -556,8 +602,9 @@ def server(input, output, session):
                     new_key = KEY_CONVERSION_MAP.get(key)
                     new_matlab_report[new_key] = value
                 except Exception as e:
+                    print(f"Error converting key {key}: {e}")
                     continue
-            
+
             point = np.arange(0, new_matlab_report["volume"].shape[0])
             time = np.arange(0, new_matlab_report["volume"].shape[1])
 
@@ -623,7 +670,9 @@ def server(input, output, session):
                 except KeyError:
                     print(f"Column {molt_column} not found in the imported file")
 
-            filemap, _ = create_feature_at_molt_columns(filemap, recompute_features=True)
+            filemap, _ = create_feature_at_molt_columns(
+                filemap, recompute_features=True
+            )
 
     @reactive.calc
     def get_images_of_point():
@@ -718,16 +767,20 @@ def server(input, output, session):
     @reactive.Effect
     def get_death():
         try:
-            death.set(filemap.loc[filemap["Point"] == int(input.point()), "Death"].values[0])
+            death.set(
+                filemap.loc[filemap["Point"] == int(input.point()), "Death"].values[0]
+            )
         except KeyError:
             death.set("")
 
-        print(f'Death: {death()}')
+        print(f"Death: {death()}")
 
     @reactive.Effect
     def get_arrest():
         try:
-            arrest.set(filemap.loc[filemap["Point"] == int(input.point()), "Arrest"].values[0])
+            arrest.set(
+                filemap.loc[filemap["Point"] == int(input.point()), "Arrest"].values[0]
+            )
         except KeyError:
             arrest.set(False)
 
@@ -736,7 +789,9 @@ def server(input, output, session):
     def previous_time():
         print("previous_time")
         # new_time = max(int(input.time()) - 1, np.min(times))
-        new_time_index = max(np.where(np.array(times) == int(input.time()))[0][0] - 1, 0)
+        new_time_index = max(
+            np.where(np.array(times) == int(input.time()))[0][0] - 1, 0
+        )
         new_time = times[new_time_index]
         ui.update_selectize("time", selected=str(int(new_time)))
 
@@ -745,7 +800,9 @@ def server(input, output, session):
     def next_time():
         print("next_time")
         # new_time = min(int(input.time()) + 1, np.max(times))
-        new_time_index = min(np.where(np.array(times) == int(input.time()))[0][0] + 1, len(times) - 1)
+        new_time_index = min(
+            np.where(np.array(times) == int(input.time()))[0][0] + 1, len(times) - 1
+        )
         new_time = times[new_time_index]
         ui.update_selectize("time", selected=str(int(new_time)))
 
@@ -754,7 +811,9 @@ def server(input, output, session):
     def previous_point():
         print("previous_point")
         # new_point = max(int(input.point()) - 1, np.min(points))
-        new_point_index = max(np.where(np.array(points) == int(input.point()))[0][0] - 1, 0)
+        new_point_index = max(
+            np.where(np.array(points) == int(input.point()))[0][0] - 1, 0
+        )
         new_point = points[new_point_index]
         ui.update_selectize("point", selected=str(int(new_point)))
 
@@ -763,7 +822,9 @@ def server(input, output, session):
     def next_point():
         print("next_point")
         # new_point = min(int(input.point()) + 1, np.max(points))
-        new_point_index = min(np.where(np.array(points) == int(input.point()))[0][0] + 1, len(points) - 1)
+        new_point_index = min(
+            np.where(np.array(points) == int(input.point()))[0][0] + 1, len(points) - 1
+        )
         new_point = points[new_point_index]
         ui.update_selectize("point", selected=str(int(new_point)))
 
@@ -773,17 +834,17 @@ def server(input, output, session):
         global filemap
         print("set ignore point")
         current_point = int(input.point())
-        
+
         mask = filemap["Point"] == current_point
 
         try:
-            if np.all(filemap.loc[mask, 'Ignore']):
-                filemap.loc[mask, 'Ignore'] = False
+            if np.all(filemap.loc[mask, "Ignore"]):
+                filemap.loc[mask, "Ignore"] = False
             else:
-                filemap.loc[mask, 'Ignore'] = True
+                filemap.loc[mask, "Ignore"] = True
         except KeyError:
-            filemap['Ignore'] = False
-            filemap.loc[mask, 'Ignore'] = True
+            filemap["Ignore"] = False
+            filemap.loc[mask, "Ignore"] = True
 
         ignore_start.set(set_ignore_start(current_point))
 
@@ -794,22 +855,24 @@ def server(input, output, session):
         print("set ignore after")
         current_point = int(input.point())
         current_time = int(input.time())
-        
+
         mask_point = filemap["Point"] == current_point
-        mask_after = (filemap["Point"] == current_point) & (filemap["Time"] >= current_time)
+        mask_after = (filemap["Point"] == current_point) & (
+            filemap["Time"] >= current_time
+        )
 
         try:
-            if np.all(filemap.loc[mask_point, 'Ignore']):
-                filemap.loc[mask_point, 'Ignore'] = False
-                filemap.loc[mask_after, 'Ignore'] = True
-            elif np.all(filemap.loc[mask_after, 'Ignore']):
-                filemap.loc[mask_point, 'Ignore'] = False
+            if np.all(filemap.loc[mask_point, "Ignore"]):
+                filemap.loc[mask_point, "Ignore"] = False
+                filemap.loc[mask_after, "Ignore"] = True
+            elif np.all(filemap.loc[mask_after, "Ignore"]):
+                filemap.loc[mask_point, "Ignore"] = False
             else:
-                filemap.loc[mask_point, 'Ignore'] = False
-                filemap.loc[mask_after, 'Ignore'] = True
+                filemap.loc[mask_point, "Ignore"] = False
+                filemap.loc[mask_after, "Ignore"] = True
         except KeyError:
-            filemap['Ignore'] = False
-            filemap.loc[mask_after, 'Ignore'] = True
+            filemap["Ignore"] = False
+            filemap.loc[mask_after, "Ignore"] = True
 
         ignore_start.set(set_ignore_start(current_point))
 
@@ -820,7 +883,7 @@ def server(input, output, session):
         print("set death")
         current_point = int(input.point())
         current_time = int(input.time())
-        
+
         mask = filemap["Point"] == current_point
 
         try:
@@ -840,7 +903,7 @@ def server(input, output, session):
         global filemap
         print("set arrest")
         current_point = int(input.point())
-        
+
         mask = filemap["Point"] == current_point
 
         try:
@@ -872,7 +935,7 @@ def server(input, output, session):
         ]
 
         times_of_point = data_of_point["Time"].values
-        
+
         markers = set_marker_shape(
             times_of_point,
             int(input.time()),
@@ -894,8 +957,24 @@ def server(input, output, session):
             )
         )
 
-        ecdys_list, value_at_ecdys_list, symbols, colors, sizes, widths = (
-            get_points_for_value_at_molts(hatch(), m1(), m2(), m3(), m4(), value_at_hatch(), value_at_m1(), value_at_m2(), value_at_m3(), value_at_m4())
+        (
+            ecdys_list,
+            value_at_ecdys_list,
+            symbols,
+            colors,
+            sizes,
+            widths,
+        ) = get_points_for_value_at_molts(
+            hatch(),
+            m1(),
+            m2(),
+            m3(),
+            m4(),
+            value_at_hatch(),
+            value_at_m1(),
+            value_at_m2(),
+            value_at_m3(),
+            value_at_m4(),
         )
 
         fig.add_trace(
@@ -941,15 +1020,16 @@ def server(input, output, session):
                             xref="x",
                             yref="paper",
                             x0=float(ignore_start()),
-                            x1=max(data_of_point["Time"])+1,  
+                            x1=max(data_of_point["Time"]) + 1,
                             y0=0,
                             y1=1,
                             fillcolor="gray",
                             opacity=0.5,
                             layer="above",
-                            line_width=0
+                            line_width=0,
                         )
-                    ])
+                    ]
+                )
 
         if death() != "":
             if not np.isnan(float(death())):
@@ -973,13 +1053,13 @@ def server(input, output, session):
                     xref="paper",
                     yref="paper",
                     x0=0,
-                    x1=1,  
+                    x1=1,
                     y0=0,
                     y1=1,
                     fillcolor="red",
                     opacity=0.5,
                     layer="above",
-                    line_width=0
+                    line_width=0,
                 )
             )
 
@@ -1031,7 +1111,9 @@ def server(input, output, session):
     def set_m1():
         print("set_m1")
         new_m1 = float(input.time())
-        update_molt_and_ecdysis_columns("M1", new_m1, int(input.point()), input.column_to_plot())
+        update_molt_and_ecdysis_columns(
+            "M1", new_m1, int(input.point()), input.column_to_plot()
+        )
         m1.set(new_m1)
         value_at_m1.set(
             filemap.loc[
@@ -1045,7 +1127,9 @@ def server(input, output, session):
     def set_m2():
         print("set_m2")
         new_m2 = float(input.time())
-        update_molt_and_ecdysis_columns("M2", new_m2, int(input.point()), input.column_to_plot())
+        update_molt_and_ecdysis_columns(
+            "M2", new_m2, int(input.point()), input.column_to_plot()
+        )
         m2.set(new_m2)
         value_at_m2.set(
             filemap.loc[
@@ -1059,7 +1143,9 @@ def server(input, output, session):
     def set_m3():
         print("set_m3")
         new_m3 = float(input.time())
-        update_molt_and_ecdysis_columns("M3", new_m3, int(input.point()), input.column_to_plot())
+        update_molt_and_ecdysis_columns(
+            "M3", new_m3, int(input.point()), input.column_to_plot()
+        )
         m3.set(new_m3)
         value_at_m3.set(
             filemap.loc[
@@ -1073,7 +1159,9 @@ def server(input, output, session):
     def set_m4():
         print("set_m4")
         new_m4 = float(input.time())
-        update_molt_and_ecdysis_columns("M4", new_m4, int(input.point()), input.column_to_plot())
+        update_molt_and_ecdysis_columns(
+            "M4", new_m4, int(input.point()), input.column_to_plot()
+        )
         m4.set(new_m4)
         value_at_m4.set(
             filemap.loc[
@@ -1096,7 +1184,9 @@ def server(input, output, session):
     @reactive.event(input.reset_m1)
     def reset_m1():
         print("reset_m1")
-        update_molt_and_ecdysis_columns("M1", np.nan, int(input.point()), input.column_to_plot())
+        update_molt_and_ecdysis_columns(
+            "M1", np.nan, int(input.point()), input.column_to_plot()
+        )
         m1.set(np.nan)
         value_at_m1.set(np.nan)
 
@@ -1104,7 +1194,9 @@ def server(input, output, session):
     @reactive.event(input.reset_m2)
     def reset_m2():
         print("reset_m2")
-        update_molt_and_ecdysis_columns("M2", np.nan, int(input.point()), input.column_to_plot())
+        update_molt_and_ecdysis_columns(
+            "M2", np.nan, int(input.point()), input.column_to_plot()
+        )
         m2.set(np.nan)
         value_at_m2.set(np.nan)
 
@@ -1112,7 +1204,9 @@ def server(input, output, session):
     @reactive.event(input.reset_m3)
     def reset_m3():
         print("reset_m3")
-        update_molt_and_ecdysis_columns("M3", np.nan, int(input.point()), input.column_to_plot())
+        update_molt_and_ecdysis_columns(
+            "M3", np.nan, int(input.point()), input.column_to_plot()
+        )
         m3.set(np.nan)
         value_at_m3.set(np.nan)
 
@@ -1120,7 +1214,9 @@ def server(input, output, session):
     @reactive.event(input.reset_m4)
     def reset_m4():
         print("reset_m4")
-        update_molt_and_ecdysis_columns("M4", np.nan, int(input.point()), input.column_to_plot())
+        update_molt_and_ecdysis_columns(
+            "M4", np.nan, int(input.point()), input.column_to_plot()
+        )
         m4.set(np.nan)
         value_at_m4.set(np.nan)
 
@@ -1128,51 +1224,71 @@ def server(input, output, session):
     @reactive.event(input.set_value_at_hatch)
     def set_value_at_hatch():
         print("set_value_at_hatch")
-        correct_ecdysis_columns("HatchTime", int(input.time()), int(input.point()), input.column_to_plot())
-        value_at_hatch.set(filemap.loc[
+        correct_ecdysis_columns(
+            "HatchTime", int(input.time()), int(input.point()), input.column_to_plot()
+        )
+        value_at_hatch.set(
+            filemap.loc[
                 (filemap["Point"] == int(input.point())),
                 f"{input.column_to_plot()}_at_HatchTime",
-            ].values[0])
+            ].values[0]
+        )
 
     @reactive.Effect
     @reactive.event(input.set_value_at_m1)
     def set_value_at_m1():
         print("set_value_at_m1")
-        correct_ecdysis_columns("M1", int(input.time()), int(input.point()), input.column_to_plot())
-        value_at_m1.set(filemap.loc[
+        correct_ecdysis_columns(
+            "M1", int(input.time()), int(input.point()), input.column_to_plot()
+        )
+        value_at_m1.set(
+            filemap.loc[
                 (filemap["Point"] == int(input.point())),
                 f"{input.column_to_plot()}_at_M1",
-            ].values[0])
+            ].values[0]
+        )
 
     @reactive.Effect
     @reactive.event(input.set_value_at_m2)
     def set_value_at_m2():
         print("set_value_at_m2")
-        correct_ecdysis_columns("M2", int(input.time()), int(input.point()), input.column_to_plot())
-        value_at_m2.set(filemap.loc[
+        correct_ecdysis_columns(
+            "M2", int(input.time()), int(input.point()), input.column_to_plot()
+        )
+        value_at_m2.set(
+            filemap.loc[
                 (filemap["Point"] == int(input.point())),
                 f"{input.column_to_plot()}_at_M2",
-            ].values[0])
+            ].values[0]
+        )
 
     @reactive.Effect
     @reactive.event(input.set_value_at_m3)
     def set_value_at_m3():
         print("set_value_at_m3")
-        correct_ecdysis_columns("M3", int(input.time()), int(input.point()), input.column_to_plot())
-        value_at_m3.set(filemap.loc[
+        correct_ecdysis_columns(
+            "M3", int(input.time()), int(input.point()), input.column_to_plot()
+        )
+        value_at_m3.set(
+            filemap.loc[
                 (filemap["Point"] == int(input.point())),
                 f"{input.column_to_plot()}_at_M3",
-            ].values[0])
+            ].values[0]
+        )
 
     @reactive.Effect
     @reactive.event(input.set_value_at_m4)
     def set_value_at_m4():
         print("set_value_at_m4")
-        correct_ecdysis_columns("M4", int(input.time()), int(input.point()), input.column_to_plot())
-        value_at_m4.set(filemap.loc[
+        correct_ecdysis_columns(
+            "M4", int(input.time()), int(input.point()), input.column_to_plot()
+        )
+        value_at_m4.set(
+            filemap.loc[
                 (filemap["Point"] == int(input.point())),
                 f"{input.column_to_plot()}_at_M4",
-            ].values[0]) 
+            ].values[0]
+        )
 
     @reactive.Effect
     @reactive.event(input.custom_annotation)
@@ -1280,7 +1396,9 @@ def server(input, output, session):
         img_to_plot = image_handling.normalize_image(img_to_plot, dest_dtype=np.float64)
 
         if len(segmentation_of_point) > 0:
-            segmentation = segmentation_of_point[np.where(np.array(times) == int(input.time()))[0][0]]
+            segmentation = segmentation_of_point[
+                np.where(np.array(times) == int(input.time()))[0][0]
+            ]
             segmentation = image_handling.read_tiff_file(segmentation)
             fig, ax = plt.subplots()
             ax.imshow(img_to_plot, cmap="viridis")
