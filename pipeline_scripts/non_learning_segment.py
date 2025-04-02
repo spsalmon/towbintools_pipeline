@@ -3,9 +3,12 @@ import os
 
 import numpy as np
 import utils
-from joblib import Parallel, delayed, parallel_config
+from joblib import delayed
+from joblib import Parallel
+from joblib import parallel_config
 from tifffile import imwrite
-from towbintools.foundation.image_handling import read_tiff_file, check_if_zstack
+from towbintools.foundation.image_handling import check_if_zstack
+from towbintools.foundation.image_handling import read_tiff_file
 from towbintools.segmentation.segmentation_tools import segment_image
 
 logging.basicConfig(level=logging.INFO)
@@ -22,9 +25,7 @@ def segment_and_save(
 ):
     """Segment image and save to output_path."""
     try:
-        image = read_tiff_file(
-            image_path, channels_to_keep=channels
-        ).squeeze()
+        image = read_tiff_file(image_path, channels_to_keep=channels).squeeze()
 
         mask = segment_image(
             image,
@@ -38,6 +39,7 @@ def segment_and_save(
     except Exception as e:
         logging.error(f"Caught exception while segmenting {image_path}: {e}")
         return False
+
 
 def main(input_pickle, output_pickle, config, n_jobs):
     """Main function."""
@@ -60,6 +62,7 @@ def main(input_pickle, output_pickle, config, n_jobs):
             )
             for input_file, output_path in zip(input_files, output_files)
         )
+
 
 if __name__ == "__main__":
     args = utils.basic_get_args()

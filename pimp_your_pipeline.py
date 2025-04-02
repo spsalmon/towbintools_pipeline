@@ -7,25 +7,27 @@ import yaml
 from towbintools.foundation import file_handling as file_handling
 
 from pipeline_scripts.building_blocks import parse_and_create_building_blocks
-from pipeline_scripts.utils import (
-    add_dir_to_experiment_filemap,
-    backup_file,
-    create_temp_folders,
-    get_and_create_folders,
-    get_experiment_pads,
-    get_experiment_time_from_filemap_parallel,
-    merge_and_save_csv,
-    rename_merge_and_save_csv,
-    sync_backup_folder
-)
+from pipeline_scripts.utils import add_dir_to_experiment_filemap
+from pipeline_scripts.utils import create_temp_folders
+from pipeline_scripts.utils import get_and_create_folders
+from pipeline_scripts.utils import get_experiment_pads
+from pipeline_scripts.utils import get_experiment_time_from_filemap_parallel
+from pipeline_scripts.utils import merge_and_save_csv
+from pipeline_scripts.utils import sync_backup_folder
 
 
 def get_args():
     parser = argparse.ArgumentParser()
     parser.add_argument("-c", "--config", help="Path to the config file", required=True)
-    parser.add_argument("-t", "--temp_dir", help="Path to the directory storing temporary files", required=False)
+    parser.add_argument(
+        "-t",
+        "--temp_dir",
+        help="Path to the directory storing temporary files",
+        required=False,
+    )
     args = parser.parse_args()
     return args
+
 
 config_file = get_args().config
 temp_dir = get_args().temp_dir
@@ -43,13 +45,18 @@ else:
 temp_dir_basename = os.path.basename(temp_dir)
 create_temp_folders(temp_dir)
 
+
 def main(config, pad=None):
     global temp_dir_basename
     global temp_dir
 
-    experiment_dir, raw_subdir, analysis_subdir, report_subdir, pipeline_backup_dir = (
-        get_and_create_folders(config)
-    )
+    (
+        experiment_dir,
+        raw_subdir,
+        analysis_subdir,
+        report_subdir,
+        pipeline_backup_dir,
+    ) = get_and_create_folders(config)
 
     pipeline_backup_dir = os.path.join(pipeline_backup_dir, temp_dir_basename)
     os.makedirs(pipeline_backup_dir, exist_ok=True)
@@ -92,12 +99,12 @@ def main(config, pad=None):
         experiment_filemap = experiment_filemap.replace(np.nan, "", regex=True)
 
     # if the ExperimentTime column is not present, create it
-    if ("ExperimentTime" not in experiment_filemap.columns):
+    if "ExperimentTime" not in experiment_filemap.columns:
         if extract_experiment_time:
             print("Computing experiment time ...")
-            experiment_filemap["ExperimentTime"] = (
-                get_experiment_time_from_filemap_parallel(experiment_filemap)
-            )
+            experiment_filemap[
+                "ExperimentTime"
+            ] = get_experiment_time_from_filemap_parallel(experiment_filemap)
             experiment_filemap.to_csv(
                 os.path.join(report_subdir, "analysis_filemap.csv"), index=False
             )
@@ -110,7 +117,6 @@ def main(config, pad=None):
     print("Building the config of the building blocks ...")
 
     building_blocks = parse_and_create_building_blocks(config)
-
 
     for building_block in building_blocks:
         print(f"Running {building_block} ...")
@@ -145,6 +151,7 @@ def main(config, pad=None):
                 experiment_filemap = merge_and_save_csv(
                     experiment_filemap, report_subdir, result
                 )
+
 
 pads = get_experiment_pads(config)
 

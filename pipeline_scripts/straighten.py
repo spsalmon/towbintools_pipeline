@@ -1,20 +1,21 @@
-import os
 import logging
-import time
+import os
+
 os.environ["OPENBLAS_NUM_THREADS"] = "1"
 
-import cv2
-import numpy as np
-import utils
-from joblib import Parallel, delayed, parallel_config
-from scipy.ndimage import binary_fill_holes
-from tifffile import imwrite
-from towbintools.foundation import binary_image, image_handling
-from towbintools.straightening import Warper
+import cv2  # noqa: E402
+import numpy as np  # noqa: E402
+import utils  # noqa: E402
+from joblib import Parallel, delayed, parallel_config  # noqa: E402
+from scipy.ndimage import binary_fill_holes  # noqa: E402
+from tifffile import imwrite  # noqa: E402
+from towbintools.foundation import binary_image, image_handling  # noqa: E402
+from towbintools.straightening import Warper  # noqa: E402
 
-from threadpoolctl import threadpool_limits, threadpool_info
+# from threadpoolctl import threadpool_limits, threadpool_info
 
 cv2.setNumThreads(1)
+
 
 def start_logger_if_necessary(level=logging.DEBUG):
     logger = logging.getLogger("mylogger")
@@ -24,6 +25,7 @@ def start_logger_if_necessary(level=logging.DEBUG):
         sh.setFormatter(logging.Formatter("%(levelname)s - %(asctime)s - %(message)s"))
         logger.addHandler(sh)
     return logger
+
 
 def mask_preprocessing(mask):
     if mask.ndim == 2:
@@ -50,7 +52,8 @@ def mask_preprocessing(mask):
     mask = np.array([cv2.medianBlur(m, 7) for m in mask])
     return mask
 
-def image_preprocessing(image, keep_biggest_object = False):
+
+def image_preprocessing(image, keep_biggest_object=False):
     if image.ndim == 2:
         if (np.unique(image).size == 2) and keep_biggest_object:
             image = binary_image.get_biggest_object(image)
@@ -62,6 +65,7 @@ def image_preprocessing(image, keep_biggest_object = False):
         image = np.array([binary_fill_holes(i) for i in image])
     return image
 
+
 def straighten_and_save(
     source_image_path,
     source_image_channels,
@@ -69,7 +73,7 @@ def straighten_and_save(
     output_path,
     is_zstack=False,
     channel_to_allign=[2],
-    keep_biggest_object = False,
+    keep_biggest_object=False,
 ):
     """Straighten image and save to output_path."""
 
@@ -238,12 +242,13 @@ def main(input_pickle, output_pickle, config, n_jobs):
                 output_path,
                 is_zstack=is_zstack,
                 channel_to_allign=channel_to_allign,
-                keep_biggest_object = keep_biggest_object,
+                keep_biggest_object=keep_biggest_object,
             )
             for source_file, mask_file, output_path in zip(
                 source_files, mask_files, output_files
             )
         )
+
 
 if __name__ == "__main__":
     args = utils.basic_get_args()
