@@ -9,12 +9,11 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import seaborn as sns
-import starbars
 import statsmodels.api as sm
 import yaml
 from scipy.interpolate import make_interp_spline
 from scipy.signal import medfilt
-from scipy.stats import mannwhitneyu
+from statannotations.Annotator import Annotator
 from tifffile import imwrite
 from towbintools.data_analysis import compute_larval_stage_duration
 from towbintools.data_analysis import compute_series_at_time_classified
@@ -120,6 +119,7 @@ def add_conditions_to_filemap(experiment_filemap, conditions, config):
 
 def get_ecdysis_and_durations(filemap):
     all_ecdysis_time_step = []
+    all_ecdysis_index = []
     all_durations_time_step = []
 
     all_ecdysis_experiment_time = []
@@ -127,7 +127,17 @@ def get_ecdysis_and_durations(filemap):
 
     for point in filemap["Point"].unique():
         point_df = filemap[filemap["Point"] == point]
+        point_time = point_df["Time"].values
         point_ecdysis = point_df[["HatchTime", "M1", "M2", "M3", "M4"]].iloc[0]
+
+        point_ecdysis_index = []
+        for ecdysis in point_ecdysis:
+            matches = np.where(point_time == ecdysis)[0]
+
+            if len(matches) == 0:
+                point_ecdysis_index.append(np.nan)
+            else:
+                point_ecdysis_index.append(float(matches[0]))
 
         larval_stage_durations = list(
             compute_larval_stage_duration(point_ecdysis).values()
@@ -135,6 +145,7 @@ def get_ecdysis_and_durations(filemap):
 
         point_ecdysis = point_ecdysis.to_numpy()
         all_ecdysis_time_step.append(point_ecdysis)
+        all_ecdysis_index.append(point_ecdysis_index)
         all_durations_time_step.append(larval_stage_durations)
 
         ecdysis_experiment_time = []
@@ -163,6 +174,7 @@ def get_ecdysis_and_durations(filemap):
         all_durations_experiment_time.append(durations_experiment_time)
 
     return (
+        np.array(all_ecdysis_index),
         np.array(all_ecdysis_time_step),
         np.array(all_durations_time_step),
         np.array(all_ecdysis_experiment_time),
@@ -291,12 +303,14 @@ def build_plotting_struct(
             condition_dict[key] = condition_df[key].iloc[0]
 
         (
+            ecdysis_index,
             ecdysis_time_step,
             larval_stage_durations_time_step,
             ecdysis_experiment_time,
             larval_stage_durations_experiment_time,
         ) = get_ecdysis_and_durations(condition_df)
         condition_dict["condition_id"] = int(condition_dict["condition_id"])
+        condition_dict["ecdysis_index"] = ecdysis_index
         condition_dict["ecdysis_time_step"] = ecdysis_time_step
         condition_dict[
             "larval_stage_durations_time_step"
@@ -605,7 +619,7 @@ def plot_aggregated_series(
             rescaled_time, aggregated_series, _, ste_series = rescale_and_aggregate(
                 condition_dict[column],
                 time,
-                condition_dict["ecdysis_time_step"],
+                condition_dict["ecdysis_index"],
                 larval_stage_durations,
                 condition_dict[worm_type_key],
                 aggregation=aggregation,
@@ -677,7 +691,7 @@ def plot_correlation(
         _, aggregated_series_one, _, _ = rescale_and_aggregate(
             condition_dict[column_one],
             condition_dict["time"],
-            condition_dict["ecdysis_time_step"],
+            condition_dict["ecdysis_index"],
             condition_dict["larval_stage_durations_time_step"],
             condition_dict[worm_type_key],
             aggregation="mean",
@@ -686,7 +700,7 @@ def plot_correlation(
         _, aggregated_series_two, _, _ = rescale_and_aggregate(
             condition_dict[column_two],
             condition_dict["time"],
-            condition_dict["ecdysis_time_step"],
+            condition_dict["ecdysis_index"],
             condition_dict["larval_stage_durations_time_step"],
             condition_dict[worm_type_key],
             aggregation="mean",
@@ -803,6 +817,7 @@ def boxplot_at_molt(
     figsize: tuple = None,
     colors=None,
     plot_significance: bool = False,
+    significance_pairs=None,
     legend=None,
     y_axis_label=None,
     titles=None,
@@ -825,7 +840,6 @@ def boxplot_at_molt(
                         "Condition": condition_id,
                         "Molt": j,
                         column: np.log(value) if log_scale else value,
-                        "Order": conditions_to_plot.index(condition_id),
                     }
                 )
     df = pd.DataFrame(data_list)
@@ -858,21 +872,17 @@ def boxplot_at_molt(
             patch.set_facecolor(color_palette[j])
     dummy_ax.set_visible(False)
 
-    # Find global min and max values for y-axis
-    min_val = df[column].min()
-    max_val = df[column].max()
-
-    # Add some padding to the min and max values
-    range_padding = (max_val - min_val) * 0.1  # 10% padding
-    global_min = min_val - range_padding
-    global_max = max_val + range_padding
-
     for i in range(df["Molt"].nunique()):
-        sns.boxplot(
+        if share_y_axis:
+            if i > 0:
+                ax[i].tick_params(axis="y", which="both", left=False, labelleft=False)
+
+        boxplot = sns.boxplot(
             data=df[df["Molt"] == i],
-            x="Order",
+            x="Condition",
             y=column,
-            hue="Order",
+            order=conditions_to_plot,
+            hue="Condition",
             palette=color_palette,
             showfliers=False,
             ax=ax[i],
@@ -883,7 +893,8 @@ def boxplot_at_molt(
 
         sns.stripplot(
             data=df[df["Molt"] == i],
-            x="Order",
+            x="Condition",
+            order=conditions_to_plot,
             y=column,
             ax=ax[i],
             alpha=0.5,
@@ -896,12 +907,6 @@ def boxplot_at_molt(
         if i > 0:
             ax[i].set_ylabel("")
 
-        if share_y_axis:
-            # Set all plots to use the same y-axis limits
-            ax[i].set_ylim(global_min, global_max)
-            if i > 0:
-                ax[i].tick_params(axis="y", which="both", left=False, labelleft=False)
-
         if titles is not None:
             ax[i].set_title(titles[i])
 
@@ -911,25 +916,24 @@ def boxplot_at_molt(
         )
 
         if plot_significance:
-            pairs = list(combinations(df["Order"].unique(), 2))
-            bars = []
-            for pair in pairs:
-                data1 = df[(df["Order"] == pair[0]) & (df["Molt"] == i)][
-                    column
-                ].dropna()
-                data2 = df[(df["Order"] == pair[1]) & (df["Molt"] == i)][
-                    column
-                ].dropna()
-                if len(data1) == 0 or len(data2) == 0:
-                    continue
-                p_value = mannwhitneyu(data1, data2).pvalue
-                bar = [
-                    pair[0],
-                    pair[1],
-                    p_value,
-                ]
-                bars.append(bar)
-            starbars.draw_annotation(bars, ax=ax[i])
+            if significance_pairs is None:
+                pairs = list(combinations(df["Condition"].unique(), 2))
+            else:
+                pairs = significance_pairs
+            annotator = Annotator(
+                ax=boxplot,
+                pairs=pairs,
+                data=df[df["Molt"] == i],
+                x="Condition",
+                order=conditions_to_plot,
+                y=column,
+            )
+            annotator.configure(
+                test="Mann-Whitney", text_format="star", loc="inside", verbose=False
+            )
+            annotator.apply_and_annotate()
+
+        y_min, y_max = ax[i].get_ylim()
 
     # Set y label for the first plot
     if y_axis_label is not None:
@@ -954,19 +958,14 @@ def boxplot_at_molt(
         frameon=True,
     )
 
-    # Ensure all subplots share the same scale
-    # This is needed in addition to sharey=True to handle edge cases
-    fig.canvas.draw()  # This ensures that the plots are drawn before we adjust them
-
     if share_y_axis:
-        # Get the global y-axis limits
-        all_ylims = [ax[i].get_ylim() for i in range(len(ax))]
-        y_min = min([lim[0] for lim in all_ylims])
-        y_max = max([lim[1] for lim in all_ylims])
-
-        # Apply the global limits to all axes
-        for i in range(len(ax)):
-            ax[i].set_ylim(y_min, y_max)
+        global_min = y_min
+        global_max = y_max
+        range_padding = (global_max - global_min) * 0.05  # 5% padding
+        global_min = global_min - range_padding
+        global_max = global_max + range_padding
+        for i in range(df["Molt"].nunique()):
+            ax[i].set_ylim(global_min, global_max)
 
     # Make subplots closer together while leaving space for legend
     plt.tight_layout(rect=[0, 0, 0.9, 1])
@@ -988,6 +987,8 @@ def boxplot_larval_stage(
     figsize: tuple = None,
     colors=None,
     plot_significance: bool = False,
+    significance_pairs=None,
+    significance_position="inside",
     legend=None,
     y_axis_label=None,
     titles=None,
@@ -1022,7 +1023,6 @@ def boxplot_larval_stage(
                         "Condition": condition_id,
                         "LarvalStage": i,
                         column: aggregated_data_of_stage[j],
-                        "Order": conditions_to_plot.index(condition_id),
                     }
                 )
 
@@ -1053,21 +1053,17 @@ def boxplot_larval_stage(
             patch.set_facecolor(color_palette[j])
     dummy_ax.set_visible(False)
 
-    # Find global min and max values for y-axis
-    min_val = df[column].min()
-    max_val = df[column].max()
-
-    # Add some padding to the min and max values
-    range_padding = (max_val - min_val) * 0.1  # 10% padding
-    global_min = min_val - range_padding
-    global_max = max_val + range_padding
-
     for i in range(df["LarvalStage"].nunique()):
-        sns.boxplot(
+        if share_y_axis:
+            if i > 0:
+                ax[i].tick_params(axis="y", which="both", left=False, labelleft=False)
+
+        boxplot = sns.boxplot(
             data=df[df["LarvalStage"] == i],
-            x="Order",
+            x="Condition",
             y=column,
-            hue="Order",
+            hue="Condition",
+            order=conditions_to_plot,
             palette=color_palette,
             showfliers=False,
             ax=ax[i],
@@ -1078,7 +1074,8 @@ def boxplot_larval_stage(
 
         sns.stripplot(
             data=df[df["LarvalStage"] == i],
-            x="Order",
+            x="Condition",
+            order=conditions_to_plot,
             y=column,
             ax=ax[i],
             alpha=0.5,
@@ -1091,12 +1088,6 @@ def boxplot_larval_stage(
         if i > 0:
             ax[i].set_ylabel("")
 
-        if share_y_axis:
-            # Set all plots to use the same y-axis limits
-            ax[i].set_ylim(global_min, global_max)
-            if i > 0:
-                ax[i].tick_params(axis="y", which="both", left=False, labelleft=False)
-
         if titles is not None:
             ax[i].set_title(titles[i])
 
@@ -1106,25 +1097,27 @@ def boxplot_larval_stage(
         )
 
         if plot_significance:
-            pairs = list(combinations(df["Order"].unique(), 2))
-            bars = []
-            for pair in pairs:
-                data1 = df[(df["Order"] == pair[0]) & (df["LarvalStage"] == i)][
-                    column
-                ].dropna()
-                data2 = df[(df["Order"] == pair[1]) & (df["LarvalStage"] == i)][
-                    column
-                ].dropna()
-                if len(data1) == 0 or len(data2) == 0:
-                    continue
-                p_value = mannwhitneyu(data1, data2).pvalue
-                bar = [
-                    pair[0],
-                    pair[1],
-                    p_value,
-                ]
-                bars.append(bar)
-            starbars.draw_annotation(bars, ax=ax[i])
+            if significance_pairs is None:
+                pairs = list(combinations(df["Condition"].unique(), 2))
+            else:
+                pairs = significance_pairs
+            annotator = Annotator(
+                ax=boxplot,
+                pairs=pairs,
+                data=df[df["LarvalStage"] == i],
+                x="Condition",
+                order=conditions_to_plot,
+                y=column,
+            )
+            annotator.configure(
+                test="Mann-Whitney",
+                text_format="star",
+                loc=significance_position,
+                verbose=False,
+            )
+            annotator.apply_and_annotate()
+
+        y_min, y_max = ax[i].get_ylim()
 
     # Set y label for the first plot
     if y_axis_label is not None:
@@ -1149,19 +1142,14 @@ def boxplot_larval_stage(
         frameon=True,
     )
 
-    # Ensure all subplots share the same scale
-    # This is needed in addition to sharey=True to handle edge cases
-    fig.canvas.draw()  # This ensures that the plots are drawn before we adjust them
-
     if share_y_axis:
-        # Get the global y-axis limits
-        all_ylims = [ax[i].get_ylim() for i in range(len(ax))]
-        y_min = min([lim[0] for lim in all_ylims])
-        y_max = max([lim[1] for lim in all_ylims])
-
-        # Apply the global limits to all axes
-        for i in range(len(ax)):
-            ax[i].set_ylim(y_min, y_max)
+        global_min = y_min
+        global_max = y_max
+        range_padding = (global_max - global_min) * 0.05  # 5% padding
+        global_min = global_min - range_padding
+        global_max = global_max + range_padding
+        for i in range(df["LarvalStage"].nunique()):
+            ax[i].set_ylim(global_min, global_max)
 
     # Make subplots closer together while leaving space for legend
     plt.tight_layout(rect=[0, 0, 0.9, 1])
@@ -2539,7 +2527,7 @@ def rescale(
         # TEMPORARY, ONLY WORKS WITH SINGLE CLASSIFICATION, FIND A WAY TO GENERALIZE
         worm_type_key = [key for key in condition.keys() if "worm_type" in key][0]
         worm_type = condition[worm_type_key]
-        ecdysis = condition["ecdysis_time_step"]
+        ecdysis = condition["ecdysis_index"]
 
         if experiment_time:
             time = condition["experiment_time"]
@@ -2571,7 +2559,7 @@ def rescale_without_flattening(
         # TEMPORARY, ONLY WORKS WITH SINGLE CLASSIFICATION, FIND A WAY TO GENERALIZE
         worm_type_key = [key for key in condition.keys() if "worm_type" in key][0]
         worm_type = condition[worm_type_key]
-        ecdysis = condition["ecdysis_time_step"]
+        ecdysis = condition["ecdysis_index"]
 
         if experiment_time:
             time = condition["experiment_time"]
