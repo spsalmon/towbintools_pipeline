@@ -29,11 +29,15 @@ def quantify_fluorescence_from_file_path(
     background_fluo = compute_background_fluorescence(
         source_image, mask, aggregation=background_aggregation
     )
-    pattern = re.compile(r"Time(\d+)_Point(\d+)")
-    match = pattern.search(mask_path)
-    if match:
-        time = int(match.group(1))
-        point = int(match.group(2))
+    time_pattern = re.compile(r"Time(\d+)")
+    point_pattern = re.compile(r"Point(\d+)")
+
+    time_match = time_pattern.search(source_image_path)
+    point_match = point_pattern.search(source_image_path)
+
+    if time_match and point_match:
+        time = int(time_match.group(1))
+        point = int(point_match.group(1))
         return {
             "Time": time,
             "Point": point,
