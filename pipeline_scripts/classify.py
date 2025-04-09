@@ -19,12 +19,14 @@ def classify_worm_type_from_file_path(
     worm_type = classification_tools.classify_worm_type(
         str_mask, pixelsize, classifier, classes
     )
+    time_pattern = re.compile(r"Time(\d+)")
+    point_pattern = re.compile(r"Point(\d+)")
 
-    pattern = re.compile(r"Time(\d+)_Point(\d+)")
-    match = pattern.search(straightened_mask_path)
-    if match:
-        time = int(match.group(1))
-        point = int(match.group(2))
+    time_match = time_pattern.search(straightened_mask_path)
+    point_match = point_pattern.search(straightened_mask_path)
+    if time_match and point_match:
+        time = int(time_match.group(1))
+        point = int(point_match.group(1))
         return {"Time": time, "Point": point, "WormType": worm_type}
     else:
         raise ValueError("Could not extract time and point from file name.")
