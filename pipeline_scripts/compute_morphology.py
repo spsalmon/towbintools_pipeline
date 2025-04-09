@@ -21,11 +21,14 @@ def compute_morphological_features_from_file_path(
         str_mask, pixelsize, features
     )
 
-    pattern = re.compile(r"Time(\d+)_Point(\d+)")
-    match = pattern.search(straightened_mask_path)
-    if match:
-        time = int(match.group(1))
-        point = int(match.group(2))
+    time_pattern = re.compile(r"Time(\d+)")
+    point_pattern = re.compile(r"Point(\d+)")
+
+    time_match = time_pattern.search(straightened_mask_path)
+    point_match = point_pattern.search(straightened_mask_path)
+    if time_match and point_match:
+        time = int(time_match.group(1))
+        point = int(point_match.group(1))
         features["Time"] = time
         features["Point"] = point
         return features
