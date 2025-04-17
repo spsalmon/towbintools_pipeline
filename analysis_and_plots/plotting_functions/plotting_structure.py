@@ -180,15 +180,15 @@ def _process_condition_id_plotting_structure(
             col.replace(organ_channel, organ) for col in organ_columns
         ]
 
-        for organ_column, renamed_organ_column in zip(
-            organ_columns, renamed_organ_feature_columns
+        for organ_feature_column, renamed_feature_organ_column in zip(
+            organ_feature_columns, renamed_organ_feature_columns
         ):
-            condition_dict[renamed_organ_column] = separate_column_by_point(
-                condition_df, organ_column
+            condition_dict[renamed_feature_organ_column] = separate_column_by_point(
+                condition_df, organ_feature_column
             )
-            condition_dict[f"{renamed_organ_column}_at_ecdysis"] = _get_values_at_molt(
-                condition_df, organ_column
-            )
+            condition_dict[
+                f"{renamed_feature_organ_column}_at_ecdysis"
+            ] = _get_values_at_molt(condition_df, organ_feature_column)
 
         # remove any column with worm_type in it
         renamed_organ_feature_columns = [
@@ -371,14 +371,21 @@ def _get_values_at_molt(filemap, column):
 
     columns_at_ecdysis = [f"{column}_at_{e}" for e in ecdysis]
 
+    print(f"Columns at ecdysis: {columns_at_ecdysis}")
+
     for point in filemap["Point"].unique():
-        point_df = filemap[filemap["Point"] == point]
+        point_df = filemap.loc[filemap["Point"] == point].copy()
 
         for col in columns_at_ecdysis:
             if col not in point_df.columns:
+                print(f"Column {col} not found in point {point}, adding it.")
                 point_df[col] = np.nan
 
-        values_at_ecdysis_point = point_df[columns_at_ecdysis].iloc[0].to_numpy()
+        values_at_ecdysis_point = point_df[columns_at_ecdysis].to_numpy()
+
+        print(
+            f"Values at ecdysis for point shape {point}: {values_at_ecdysis_point.shape}"
+        )
 
         all_values.append(values_at_ecdysis_point)
 
