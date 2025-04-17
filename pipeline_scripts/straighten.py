@@ -233,7 +233,7 @@ def main(input_pickle, output_pickle, config, n_jobs):
     keep_biggest_object = config.get("keep_biggest_object", False)
     channel_to_allign = config.get("channel_to_allign", [2])
 
-    with parallel_config(backend="loky", n_jobs=n_jobs):
+    with parallel_config(backend="loky", n_jobs=n_jobs, inner_max_num_threads=1):
         Parallel()(
             delayed(straighten_and_save)(
                 source_file,

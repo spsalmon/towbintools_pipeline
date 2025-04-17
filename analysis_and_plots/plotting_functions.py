@@ -1,7 +1,5 @@
 import os
 import shutil
-from collections import defaultdict
-from itertools import combinations
 from typing import Any
 
 import cv2
@@ -10,19 +8,13 @@ import numpy as np
 import pandas as pd
 import seaborn as sns
 import statsmodels.api as sm
-import yaml
+from plotting_functions.utils_plotting import build_legend
+from plotting_functions.utils_plotting import set_scale
 from scipy.interpolate import make_interp_spline
 from scipy.signal import medfilt
-from statannotations.Annotator import Annotator
 from tifffile import imwrite
-from towbintools.data_analysis import compute_larval_stage_duration
-from towbintools.data_analysis import compute_series_at_time_classified
 from towbintools.data_analysis import correct_series_with_classification
 from towbintools.data_analysis import rescale_and_aggregate
-from towbintools.data_analysis import rescale_series
-from towbintools.data_analysis.growth_rate import (
-    compute_instantaneous_growth_rate_classified,
-)
 from towbintools.foundation.image_handling import pad_images_to_same_dim
 from towbintools.foundation.image_handling import pad_to_dim
 from towbintools.foundation.image_handling import pad_to_dim_equally
@@ -35,548 +27,548 @@ FEATURES_TO_COMPUTE_AT_MOLT = get_features_to_compute_at_molt()
 # BUILDING THE PLOTTING STRUCTURE
 
 
-def build_conditions(config):
-    conditions = []
-    condition_id = 0
-
-    for condition in config["conditions"]:
-        condition = {
-            key: [val] if not isinstance(val, list) else val
-            for key, val in condition.items()
-        }
-
-        lengths = {len(val) for val in condition.values()}
-        if len(lengths) > 2 or (len(lengths) == 2 and 1 not in lengths):
-            raise ValueError(
-                "All lists in the condition must have the same length or be of length 1."
-            )
-
-        max_length = max(lengths)
-        for i in range(max_length):
-            condition_dict = {
-                key: val[0] if len(val) == 1 else val[i]
-                for key, val in condition.items()
-            }
-            condition_dict["condition_id"] = condition_id
-            conditions.append(condition_dict)
-            condition_id += 1
-
-    return conditions
-
-
-def add_conditions_to_filemap(experiment_filemap, conditions, config):
-    for condition in conditions:
-        if "point_range" in condition.keys():
-            point_range = condition["point_range"]
-
-            # check if point range is a list of lists
-            if isinstance(point_range[0], list):
-                for pr in point_range:
-                    # Get all the rows that are in the point range
-                    condition_rows = experiment_filemap[
-                        experiment_filemap["Point"].between(pr[0], pr[1])
-                    ]
-                    # Remove the point range from the condition
-                    conditions_to_add = {
-                        key: val
-                        for key, val in condition.items()
-                        if key != "point_range"
-                    }
-                    for key, val in conditions_to_add.items():
-                        # Directly fill the rows with the value for the new or existing column
-                        experiment_filemap.loc[condition_rows.index, key] = val
-            else:
-                # Get all the rows that are in the point range
-                condition_rows = experiment_filemap[
-                    experiment_filemap["Point"].between(point_range[0], point_range[1])
-                ]
-                # Remove the point range from the condition
-                conditions_to_add = {
-                    key: val for key, val in condition.items() if key != "point_range"
-                }
-                for key, val in conditions_to_add.items():
-                    # Directly fill the rows with the value for the new or existing column
-                    experiment_filemap.loc[condition_rows.index, key] = val
-
-        elif "pad" in condition.keys():
-            pad = condition["pad"]
-            # Get all the rows that are in the pad
-            condition_rows = experiment_filemap[experiment_filemap["Pad"] == pad]
-            # Remove the pad from the condition
-            conditions_to_add = {
-                key: val for key, val in condition.items() if key != "pad"
-            }
-            for key, val in conditions_to_add.items():
-                # Directly fill the rows with the value for the new or existing column
-                experiment_filemap.loc[condition_rows.index, key] = val
-
-        else:
-            print(
-                "Condition does not contain 'point_range' or 'pad' key, impossible to add condition to filemap, skipping."
-            )
-    return experiment_filemap
-
-
-def get_ecdysis_and_durations(filemap):
-    all_ecdysis_time_step = []
-    all_ecdysis_index = []
-    all_durations_time_step = []
-
-    all_ecdysis_experiment_time = []
-    all_durations_experiment_time = []
-
-    for point in filemap["Point"].unique():
-        point_df = filemap[filemap["Point"] == point]
-        point_time = point_df["Time"].values
-        point_ecdysis = point_df[["HatchTime", "M1", "M2", "M3", "M4"]].iloc[0]
-
-        point_ecdysis_index = []
-        for ecdysis in point_ecdysis:
-            matches = np.where(point_time == ecdysis)[0]
-
-            if len(matches) == 0:
-                point_ecdysis_index.append(np.nan)
-            else:
-                point_ecdysis_index.append(float(matches[0]))
-
-        larval_stage_durations = list(
-            compute_larval_stage_duration(point_ecdysis).values()
-        )
-
-        point_ecdysis = point_ecdysis.to_numpy()
-        all_ecdysis_time_step.append(point_ecdysis)
-        all_ecdysis_index.append(point_ecdysis_index)
-        all_durations_time_step.append(larval_stage_durations)
-
-        ecdysis_experiment_time = []
-        for ecdys in point_ecdysis:
-            if np.isnan(ecdys):
-                ecdysis_experiment_time.append(np.nan)
-            else:
-                # if ecdys is not in the time column, set it to nan
-                if ecdys not in point_df["Time"].values:
-                    ecdys_experiment_time = np.nan
-                else:
-                    ecdys_experiment_time = point_df[point_df["Time"] == ecdys][
-                        "ExperimentTime"
-                    ].iloc[0]
-                ecdysis_experiment_time.append(ecdys_experiment_time)
-
-        all_ecdysis_experiment_time.append(ecdysis_experiment_time)
-
-        durations_experiment_time = []
-        for i in range(len(ecdysis_experiment_time) - 1):
-            start = ecdysis_experiment_time[i]
-            end = ecdysis_experiment_time[i + 1]
-            duration_experiment_time = end - start
-            durations_experiment_time.append(duration_experiment_time)
-
-        all_durations_experiment_time.append(durations_experiment_time)
-
-    return (
-        np.array(all_ecdysis_index),
-        np.array(all_ecdysis_time_step),
-        np.array(all_durations_time_step),
-        np.array(all_ecdysis_experiment_time),
-        np.array(all_durations_experiment_time),
-    )
-
-
-def separate_column_by_point(filemap, column):
-    max_number_of_values = np.max(
-        [
-            len(filemap[filemap["Point"] == point][column].values)
-            for point in filemap["Point"].unique()
-        ]
-    )
-
-    all_values = []
-    for i, point in enumerate(filemap["Point"].unique()):
-        point_df = filemap[filemap["Point"] == point]
-        values_of_point = point_df[column].values
-
-        if isinstance(values_of_point[0], str):
-            dtype = str
-            pad_value = "error"
-        else:
-            dtype = float
-            pad_value = np.nan
-
-        values_of_point = np.array(values_of_point, dtype=dtype)
-        values_of_point = np.pad(
-            values_of_point,
-            (0, max_number_of_values - len(values_of_point)),
-            mode="constant",
-            constant_values=pad_value,
-        )
-
-        all_values.append(values_of_point)
-
-    return np.array(all_values)
-
-
-def remove_ignored_molts(filemap):
-    df = filemap.copy()
-
-    molt_columns = ["HatchTime", "M1", "M2", "M3", "M4"]
-
-    for point in df["Point"].unique():
-        point_mask = df["Point"] == point
-        point_df = df[point_mask]
-
-        if point_df.empty:
-            continue
-
-        # Get molt times for this point
-        molt_times = point_df[molt_columns].iloc[0]
-
-        # Check each molt time
-        for col, molt_time in molt_times.items():
-            if pd.isna(molt_time):
-                continue
-
-            # Find if this molt should be ignored
-            try:
-                if point_df[point_df["Time"] == molt_time]["Ignore"].iloc[0]:
-                    # Use .loc to avoid chained indexing warning
-                    df.loc[point_mask, col] = np.nan
-            except IndexError:
-                print(f"No row found for time {molt_time} in point {point}")
-                df.loc[point_mask, col] = np.nan
-
-    return df
-
-
-def build_plotting_struct(
-    experiment_dir,
-    filemap_path,
-    config_path,
-    organ_channels={"body": 2, "pharynx": 1},
-    recompute_values_at_molt=False,
-):
-    experiment_filemap = pd.read_csv(filemap_path)
-
-    with open(config_path) as file:
-        config = yaml.safe_load(file)
-        file.close()
-
-    conditions = build_conditions(config)
-    conditions_keys = list(conditions[0].keys())
-
-    # remove 'point_range' and 'pad' from the conditions keys if they are present
-    if "point_range" in conditions_keys:
-        conditions_keys.remove("point_range")
-    if "pad" in conditions_keys:
-        conditions_keys.remove("pad")
-
-    experiment_filemap = add_conditions_to_filemap(
-        experiment_filemap, conditions, config
-    )
-
-    experiment_filemap.columns
-
-    # if ExperimentTime is not present in the filemap, add it
-    if "ExperimentTime" not in experiment_filemap.columns:
-        experiment_filemap["ExperimentTime"] = np.nan
-
-    # remove rows where condition_id is NaN
-    experiment_filemap = experiment_filemap[
-        ~experiment_filemap["condition_id"].isnull()
-    ]
-
-    # set molts that should be ignored to NaN
-    if "Ignore" in experiment_filemap.columns:
-        experiment_filemap = remove_ignored_molts(experiment_filemap)
-
-    # remove rows where Ignore is True
-    if "Ignore" in experiment_filemap.columns:
-        experiment_filemap = experiment_filemap[~experiment_filemap["Ignore"]]
-
-    conditions_struct = []
-
-    for condition_id in experiment_filemap["condition_id"].unique():
-        condition_df = experiment_filemap[
-            experiment_filemap["condition_id"] == condition_id
-        ]
-        condition_dict = {}
-        for key in conditions_keys:
-            condition_dict[key] = condition_df[key].iloc[0]
-
-        (
-            ecdysis_index,
-            ecdysis_time_step,
-            larval_stage_durations_time_step,
-            ecdysis_experiment_time,
-            larval_stage_durations_experiment_time,
-        ) = get_ecdysis_and_durations(condition_df)
-        condition_dict["condition_id"] = int(condition_dict["condition_id"])
-        condition_dict["ecdysis_index"] = ecdysis_index
-        condition_dict["ecdysis_time_step"] = ecdysis_time_step
-        condition_dict[
-            "larval_stage_durations_time_step"
-        ] = larval_stage_durations_time_step
-        condition_dict["ecdysis_experiment_time"] = ecdysis_experiment_time
-        condition_dict[
-            "larval_stage_durations_experiment_time"
-        ] = larval_stage_durations_experiment_time
-        condition_dict["larval_stage_durations_experiment_time_hours"] = (
-            larval_stage_durations_experiment_time / 3600
-        )
-        condition_dict["experiment"] = np.array(
-            [experiment_dir] * condition_df["Point"].nunique()
-        )[:, np.newaxis]
-        condition_dict["filemap_path"] = np.array(
-            [filemap_path] * condition_df["Point"].nunique()
-        )[:, np.newaxis]
-        condition_dict["point"] = np.unique(condition_df["Point"].values)[:, np.newaxis]
-
-        # TEMPORARY, ONLY WORKS WITH SINGLE CLASSIFICATION, FIND A WAY TO GENERALIZE
-        worm_type_column = [col for col in condition_df.columns if "worm_type" in col][
-            0
-        ]
-        worm_types = separate_column_by_point(condition_df, worm_type_column)
-
-        condition_dict["time"] = separate_column_by_point(condition_df, "Time").astype(
-            float
-        )
-        condition_dict["experiment_time"] = separate_column_by_point(
-            condition_df, "ExperimentTime"
-        ).astype(float)
-
-        for organ in organ_channels.keys():
-            organ_channel = organ_channels[organ]
-            organ_channel = f"ch{organ_channel}"
-            organ_columns = [
-                col for col in condition_df.columns if col.startswith(organ_channel)
-            ]
-
-            # remove any column with _at_ in it
-            organ_columns = [col for col in organ_columns if "_at_" not in col]
-
-            # get the columns that contain the interesting features
-            organ_feature_columns = []
-            for feature in FEATURES_TO_COMPUTE_AT_MOLT:
-                organ_feature_columns.extend(
-                    [col for col in organ_columns if feature in col]
-                )
-
-            renamed_organ_feature_columns = [
-                col.replace(organ_channel, organ) for col in organ_columns
-            ]
-
-            for organ_column, renamed_organ_column in zip(
-                organ_columns, renamed_organ_feature_columns
-            ):
-                condition_dict[renamed_organ_column] = separate_column_by_point(
-                    condition_df, organ_column
-                )
-
-            # remove any column with worm_type in it
-            renamed_organ_feature_columns = [
-                col for col in renamed_organ_feature_columns if "worm_type" not in col
-            ]
-
-            # compute the features of the organ at each molt
-            for column in renamed_organ_feature_columns:
-                column_at_molt = f"{column}_at_ecdysis"
-                if recompute_values_at_molt or (
-                    column_at_molt not in condition_df.columns
-                ):
-                    condition_dict[column_at_molt] = np.stack(
-                        [
-                            compute_series_at_time_classified(
-                                condition_dict[column][i],
-                                worm_types[i],
-                                ecdysis_time_step[i],
-                                series_time=condition_dict["time"][i],
-                            )
-                            for i in range(len(ecdysis_time_step))
-                        ]
-                    )
-                else:
-                    condition_dict[column_at_molt] = separate_column_by_point(
-                        condition_df, column_at_molt
-                    )
-
-        conditions_struct.append(condition_dict)
-
-    conditions_info = [
-        {key: condition[key] for key in conditions_keys}
-        for condition in conditions_struct
-    ]
-
-    # sort the conditions and conditions_info by condition_id
-    conditions_struct = sorted(conditions_struct, key=lambda x: x["condition_id"])
-    conditions_info = sorted(conditions_info, key=lambda x: x["condition_id"])
-
-    return conditions_struct, conditions_info
-
-
-def remove_unwanted_info(conditions_info):
-    for condition in conditions_info:
-        if "description" in condition.keys():
-            condition.pop("description")
-        if "condition_id" in condition.keys():
-            condition.pop("condition_id")
-    return conditions_info
-
-
-def combine_experiments(
-    filemap_paths,
-    config_paths,
-    experiment_dirs=None,
-    organ_channels=[{"body": 2, "pharynx": 1}],
-    recompute_values_at_molt=False,
-):
-    all_conditions_struct = []
-    condition_info_merge_list = []
-    conditions_info_keys = set()
-    condition_id_counter = 0
-
-    if isinstance(organ_channels, dict):
-        organ_channels = [organ_channels]
-
-    if len(organ_channels) == 1:
-        organ_channels = organ_channels * len(filemap_paths)
-    elif len(organ_channels) != len(filemap_paths):
-        raise ValueError(
-            "Number of organ channels must be equal to the number of experiments."
-        )
-
-    # Process each experiment
-    for i, (filemap_path, config_path, organ_channel) in enumerate(
-        zip(filemap_paths, config_paths, organ_channels)
-    ):
-        experiment_dir = (
-            experiment_dirs[i] if experiment_dirs else os.path.dirname(filemap_path)
-        )
-        conditions_struct, conditions_info = build_plotting_struct(
-            experiment_dir,
-            filemap_path,
-            config_path,
-            organ_channels=organ_channel,
-            recompute_values_at_molt=recompute_values_at_molt,
-        )
-
-        # Process conditions for this experiment
-        for condition in conditions_struct:
-            condition["condition_id"] = condition_id_counter
-            condition_id_counter += 1
-            all_conditions_struct.append(condition)
-
-        # Process condition info
-        experiment_conditions_info = remove_unwanted_info(conditions_info)
-        condition_info_merge_list.extend(experiment_conditions_info)
-        conditions_info_keys.update(
-            *[condition.keys() for condition in experiment_conditions_info]
-        )
-
-    # Merge conditions based on their info
-    condition_dict = defaultdict(list)
-    for i, condition_info in enumerate(condition_info_merge_list):
-        key = frozenset(condition_info.items())
-        condition_dict[key].append(i)
-
-    merged_conditions_struct = []
-    for indices in condition_dict.values():
-        base_condition = all_conditions_struct[indices[0]]
-        for idx in indices[1:]:
-            for key, value in all_conditions_struct[idx].items():
-                if key not in conditions_info_keys:
-                    if isinstance(value, np.ndarray):
-                        if value.shape[1] > base_condition[key].shape[1]:
-                            base_condition[key] = np.pad(
-                                base_condition[key],
-                                (
-                                    (0, 0),
-                                    (0, value.shape[1] - base_condition[key].shape[1]),
-                                ),
-                                mode="constant",
-                                constant_values=np.nan,
-                            )
-                        elif value.shape[1] < base_condition[key].shape[1]:
-                            value = np.pad(
-                                value,
-                                (
-                                    (0, 0),
-                                    (0, base_condition[key].shape[1] - value.shape[1]),
-                                ),
-                                mode="constant",
-                                constant_values=np.nan,
-                            )
-                    try:
-                        base_condition[key] = np.concatenate(
-                            (base_condition[key], value), axis=0
-                        )
-                    except ValueError as e:
-                        print(f"Could not concatenate {key}: {e}")
-
-        merged_conditions_struct.append(base_condition)
-
-    # # Sort and reassign condition IDs
-    # merged_conditions_struct.sort(key=lambda x: x['condition_id'])
-    for i, condition in enumerate(merged_conditions_struct):
-        condition["condition_id"] = i
-
-    return merged_conditions_struct
+# def build_conditions(config):
+#     conditions = []
+#     condition_id = 0
+
+#     for condition in config["conditions"]:
+#         condition = {
+#             key: [val] if not isinstance(val, list) else val
+#             for key, val in condition.items()
+#         }
+
+#         lengths = {len(val) for val in condition.values()}
+#         if len(lengths) > 2 or (len(lengths) == 2 and 1 not in lengths):
+#             raise ValueError(
+#                 "All lists in the condition must have the same length or be of length 1."
+#             )
+
+#         max_length = max(lengths)
+#         for i in range(max_length):
+#             condition_dict = {
+#                 key: val[0] if len(val) == 1 else val[i]
+#                 for key, val in condition.items()
+#             }
+#             condition_dict["condition_id"] = condition_id
+#             conditions.append(condition_dict)
+#             condition_id += 1
+
+#     return conditions
+
+
+# def add_conditions_to_filemap(experiment_filemap, conditions, config):
+#     for condition in conditions:
+#         if "point_range" in condition.keys():
+#             point_range = condition["point_range"]
+
+#             # check if point range is a list of lists
+#             if isinstance(point_range[0], list):
+#                 for pr in point_range:
+#                     # Get all the rows that are in the point range
+#                     condition_rows = experiment_filemap[
+#                         experiment_filemap["Point"].between(pr[0], pr[1])
+#                     ]
+#                     # Remove the point range from the condition
+#                     conditions_to_add = {
+#                         key: val
+#                         for key, val in condition.items()
+#                         if key != "point_range"
+#                     }
+#                     for key, val in conditions_to_add.items():
+#                         # Directly fill the rows with the value for the new or existing column
+#                         experiment_filemap.loc[condition_rows.index, key] = val
+#             else:
+#                 # Get all the rows that are in the point range
+#                 condition_rows = experiment_filemap[
+#                     experiment_filemap["Point"].between(point_range[0], point_range[1])
+#                 ]
+#                 # Remove the point range from the condition
+#                 conditions_to_add = {
+#                     key: val for key, val in condition.items() if key != "point_range"
+#                 }
+#                 for key, val in conditions_to_add.items():
+#                     # Directly fill the rows with the value for the new or existing column
+#                     experiment_filemap.loc[condition_rows.index, key] = val
+
+#         elif "pad" in condition.keys():
+#             pad = condition["pad"]
+#             # Get all the rows that are in the pad
+#             condition_rows = experiment_filemap[experiment_filemap["Pad"] == pad]
+#             # Remove the pad from the condition
+#             conditions_to_add = {
+#                 key: val for key, val in condition.items() if key != "pad"
+#             }
+#             for key, val in conditions_to_add.items():
+#                 # Directly fill the rows with the value for the new or existing column
+#                 experiment_filemap.loc[condition_rows.index, key] = val
+
+#         else:
+#             print(
+#                 "Condition does not contain 'point_range' or 'pad' key, impossible to add condition to filemap, skipping."
+#             )
+#     return experiment_filemap
+
+
+# def get_ecdysis_and_durations(filemap):
+#     all_ecdysis_time_step = []
+#     all_ecdysis_index = []
+#     all_durations_time_step = []
+
+#     all_ecdysis_experiment_time = []
+#     all_durations_experiment_time = []
+
+#     for point in filemap["Point"].unique():
+#         point_df = filemap[filemap["Point"] == point]
+#         point_time = point_df["Time"].values
+#         point_ecdysis = point_df[["HatchTime", "M1", "M2", "M3", "M4"]].iloc[0]
+
+#         point_ecdysis_index = []
+#         for ecdysis in point_ecdysis:
+#             matches = np.where(point_time == ecdysis)[0]
+
+#             if len(matches) == 0:
+#                 point_ecdysis_index.append(np.nan)
+#             else:
+#                 point_ecdysis_index.append(float(matches[0]))
+
+#         larval_stage_durations = list(
+#             compute_larval_stage_duration(point_ecdysis).values()
+#         )
+
+#         point_ecdysis = point_ecdysis.to_numpy()
+#         all_ecdysis_time_step.append(point_ecdysis)
+#         all_ecdysis_index.append(point_ecdysis_index)
+#         all_durations_time_step.append(larval_stage_durations)
+
+#         ecdysis_experiment_time = []
+#         for ecdys in point_ecdysis:
+#             if np.isnan(ecdys):
+#                 ecdysis_experiment_time.append(np.nan)
+#             else:
+#                 # if ecdys is not in the time column, set it to nan
+#                 if ecdys not in point_df["Time"].values:
+#                     ecdys_experiment_time = np.nan
+#                 else:
+#                     ecdys_experiment_time = point_df[point_df["Time"] == ecdys][
+#                         "ExperimentTime"
+#                     ].iloc[0]
+#                 ecdysis_experiment_time.append(ecdys_experiment_time)
+
+#         all_ecdysis_experiment_time.append(ecdysis_experiment_time)
+
+#         durations_experiment_time = []
+#         for i in range(len(ecdysis_experiment_time) - 1):
+#             start = ecdysis_experiment_time[i]
+#             end = ecdysis_experiment_time[i + 1]
+#             duration_experiment_time = end - start
+#             durations_experiment_time.append(duration_experiment_time)
+
+#         all_durations_experiment_time.append(durations_experiment_time)
+
+#     return (
+#         np.array(all_ecdysis_index),
+#         np.array(all_ecdysis_time_step),
+#         np.array(all_durations_time_step),
+#         np.array(all_ecdysis_experiment_time),
+#         np.array(all_durations_experiment_time),
+#     )
+
+
+# def separate_column_by_point(filemap, column):
+#     max_number_of_values = np.max(
+#         [
+#             len(filemap[filemap["Point"] == point][column].values)
+#             for point in filemap["Point"].unique()
+#         ]
+#     )
+
+#     all_values = []
+#     for i, point in enumerate(filemap["Point"].unique()):
+#         point_df = filemap[filemap["Point"] == point]
+#         values_of_point = point_df[column].values
+
+#         if isinstance(values_of_point[0], str):
+#             dtype = str
+#             pad_value = "error"
+#         else:
+#             dtype = float
+#             pad_value = np.nan
+
+#         values_of_point = np.array(values_of_point, dtype=dtype)
+#         values_of_point = np.pad(
+#             values_of_point,
+#             (0, max_number_of_values - len(values_of_point)),
+#             mode="constant",
+#             constant_values=pad_value,
+#         )
+
+#         all_values.append(values_of_point)
+
+#     return np.array(all_values)
+
+
+# def remove_ignored_molts(filemap):
+#     df = filemap.copy()
+
+#     molt_columns = ["HatchTime", "M1", "M2", "M3", "M4"]
+
+#     for point in df["Point"].unique():
+#         point_mask = df["Point"] == point
+#         point_df = df[point_mask]
+
+#         if point_df.empty:
+#             continue
+
+#         # Get molt times for this point
+#         molt_times = point_df[molt_columns].iloc[0]
+
+#         # Check each molt time
+#         for col, molt_time in molt_times.items():
+#             if pd.isna(molt_time):
+#                 continue
+
+#             # Find if this molt should be ignored
+#             try:
+#                 if point_df[point_df["Time"] == molt_time]["Ignore"].iloc[0]:
+#                     # Use .loc to avoid chained indexing warning
+#                     df.loc[point_mask, col] = np.nan
+#             except IndexError:
+#                 print(f"No row found for time {molt_time} in point {point}")
+#                 df.loc[point_mask, col] = np.nan
+
+#     return df
+
+
+# def build_plotting_struct(
+#     experiment_dir,
+#     filemap_path,
+#     config_path,
+#     organ_channels={"body": 2, "pharynx": 1},
+#     recompute_values_at_molt=False,
+# ):
+#     experiment_filemap = pd.read_csv(filemap_path)
+
+#     with open(config_path) as file:
+#         config = yaml.safe_load(file)
+#         file.close()
+
+#     conditions = build_conditions(config)
+#     conditions_keys = list(conditions[0].keys())
+
+#     # remove 'point_range' and 'pad' from the conditions keys if they are present
+#     if "point_range" in conditions_keys:
+#         conditions_keys.remove("point_range")
+#     if "pad" in conditions_keys:
+#         conditions_keys.remove("pad")
+
+#     experiment_filemap = add_conditions_to_filemap(
+#         experiment_filemap, conditions, config
+#     )
+
+#     experiment_filemap.columns
+
+#     # if ExperimentTime is not present in the filemap, add it
+#     if "ExperimentTime" not in experiment_filemap.columns:
+#         experiment_filemap["ExperimentTime"] = np.nan
+
+#     # remove rows where condition_id is NaN
+#     experiment_filemap = experiment_filemap[
+#         ~experiment_filemap["condition_id"].isnull()
+#     ]
+
+#     # set molts that should be ignored to NaN
+#     if "Ignore" in experiment_filemap.columns:
+#         experiment_filemap = remove_ignored_molts(experiment_filemap)
+
+#     # remove rows where Ignore is True
+#     if "Ignore" in experiment_filemap.columns:
+#         experiment_filemap = experiment_filemap[~experiment_filemap["Ignore"]]
+
+#     conditions_struct = []
+
+#     for condition_id in experiment_filemap["condition_id"].unique():
+#         condition_df = experiment_filemap[
+#             experiment_filemap["condition_id"] == condition_id
+#         ]
+#         condition_dict = {}
+#         for key in conditions_keys:
+#             condition_dict[key] = condition_df[key].iloc[0]
+
+#         (
+#             ecdysis_index,
+#             ecdysis_time_step,
+#             larval_stage_durations_time_step,
+#             ecdysis_experiment_time,
+#             larval_stage_durations_experiment_time,
+#         ) = get_ecdysis_and_durations(condition_df)
+#         condition_dict["condition_id"] = int(condition_dict["condition_id"])
+#         condition_dict["ecdysis_index"] = ecdysis_index
+#         condition_dict["ecdysis_time_step"] = ecdysis_time_step
+#         condition_dict[
+#             "larval_stage_durations_time_step"
+#         ] = larval_stage_durations_time_step
+#         condition_dict["ecdysis_experiment_time"] = ecdysis_experiment_time
+#         condition_dict[
+#             "larval_stage_durations_experiment_time"
+#         ] = larval_stage_durations_experiment_time
+#         condition_dict["larval_stage_durations_experiment_time_hours"] = (
+#             larval_stage_durations_experiment_time / 3600
+#         )
+#         condition_dict["experiment"] = np.array(
+#             [experiment_dir] * condition_df["Point"].nunique()
+#         )[:, np.newaxis]
+#         condition_dict["filemap_path"] = np.array(
+#             [filemap_path] * condition_df["Point"].nunique()
+#         )[:, np.newaxis]
+#         condition_dict["point"] = np.unique(condition_df["Point"].values)[:, np.newaxis]
+
+#         # TEMPORARY, ONLY WORKS WITH SINGLE CLASSIFICATION, FIND A WAY TO GENERALIZE
+#         worm_type_column = [col for col in condition_df.columns if "worm_type" in col][
+#             0
+#         ]
+#         worm_types = separate_column_by_point(condition_df, worm_type_column)
+
+#         condition_dict["time"] = separate_column_by_point(condition_df, "Time").astype(
+#             float
+#         )
+#         condition_dict["experiment_time"] = separate_column_by_point(
+#             condition_df, "ExperimentTime"
+#         ).astype(float)
+
+#         for organ in organ_channels.keys():
+#             organ_channel = organ_channels[organ]
+#             organ_channel = f"ch{organ_channel}"
+#             organ_columns = [
+#                 col for col in condition_df.columns if col.startswith(organ_channel)
+#             ]
+
+#             # remove any column with _at_ in it
+#             organ_columns = [col for col in organ_columns if "_at_" not in col]
+
+#             # get the columns that contain the interesting features
+#             organ_feature_columns = []
+#             for feature in FEATURES_TO_COMPUTE_AT_MOLT:
+#                 organ_feature_columns.extend(
+#                     [col for col in organ_columns if feature in col]
+#                 )
+
+#             renamed_organ_feature_columns = [
+#                 col.replace(organ_channel, organ) for col in organ_columns
+#             ]
+
+#             for organ_column, renamed_organ_column in zip(
+#                 organ_columns, renamed_organ_feature_columns
+#             ):
+#                 condition_dict[renamed_organ_column] = separate_column_by_point(
+#                     condition_df, organ_column
+#                 )
+
+#             # remove any column with worm_type in it
+#             renamed_organ_feature_columns = [
+#                 col for col in renamed_organ_feature_columns if "worm_type" not in col
+#             ]
+
+#             # compute the features of the organ at each molt
+#             for column in renamed_organ_feature_columns:
+#                 column_at_molt = f"{column}_at_ecdysis"
+#                 if recompute_values_at_molt or (
+#                     column_at_molt not in condition_df.columns
+#                 ):
+#                     condition_dict[column_at_molt] = np.stack(
+#                         [
+#                             compute_series_at_time_classified(
+#                                 condition_dict[column][i],
+#                                 worm_types[i],
+#                                 ecdysis_time_step[i],
+#                                 series_time=condition_dict["time"][i],
+#                             )
+#                             for i in range(len(ecdysis_time_step))
+#                         ]
+#                     )
+#                 else:
+#                     condition_dict[column_at_molt] = separate_column_by_point(
+#                         condition_df, column_at_molt
+#                     )
+
+#         conditions_struct.append(condition_dict)
+
+#     conditions_info = [
+#         {key: condition[key] for key in conditions_keys}
+#         for condition in conditions_struct
+#     ]
+
+#     # sort the conditions and conditions_info by condition_id
+#     conditions_struct = sorted(conditions_struct, key=lambda x: x["condition_id"])
+#     conditions_info = sorted(conditions_info, key=lambda x: x["condition_id"])
+
+#     return conditions_struct, conditions_info
+
+
+# def remove_unwanted_info(conditions_info):
+#     for condition in conditions_info:
+#         if "description" in condition.keys():
+#             condition.pop("description")
+#         if "condition_id" in condition.keys():
+#             condition.pop("condition_id")
+#     return conditions_info
+
+
+# def combine_experiments(
+#     filemap_paths,
+#     config_paths,
+#     experiment_dirs=None,
+#     organ_channels=[{"body": 2, "pharynx": 1}],
+#     recompute_values_at_molt=False,
+# ):
+#     all_conditions_struct = []
+#     condition_info_merge_list = []
+#     conditions_info_keys = set()
+#     condition_id_counter = 0
+
+#     if isinstance(organ_channels, dict):
+#         organ_channels = [organ_channels]
+
+#     if len(organ_channels) == 1:
+#         organ_channels = organ_channels * len(filemap_paths)
+#     elif len(organ_channels) != len(filemap_paths):
+#         raise ValueError(
+#             "Number of organ channels must be equal to the number of experiments."
+#         )
+
+#     # Process each experiment
+#     for i, (filemap_path, config_path, organ_channel) in enumerate(
+#         zip(filemap_paths, config_paths, organ_channels)
+#     ):
+#         experiment_dir = (
+#             experiment_dirs[i] if experiment_dirs else os.path.dirname(filemap_path)
+#         )
+#         conditions_struct, conditions_info = build_plotting_struct(
+#             experiment_dir,
+#             filemap_path,
+#             config_path,
+#             organ_channels=organ_channel,
+#             recompute_values_at_molt=recompute_values_at_molt,
+#         )
+
+#         # Process conditions for this experiment
+#         for condition in conditions_struct:
+#             condition["condition_id"] = condition_id_counter
+#             condition_id_counter += 1
+#             all_conditions_struct.append(condition)
+
+#         # Process condition info
+#         experiment_conditions_info = remove_unwanted_info(conditions_info)
+#         condition_info_merge_list.extend(experiment_conditions_info)
+#         conditions_info_keys.update(
+#             *[condition.keys() for condition in experiment_conditions_info]
+#         )
+
+#     # Merge conditions based on their info
+#     condition_dict = defaultdict(list)
+#     for i, condition_info in enumerate(condition_info_merge_list):
+#         key = frozenset(condition_info.items())
+#         condition_dict[key].append(i)
+
+#     merged_conditions_struct = []
+#     for indices in condition_dict.values():
+#         base_condition = all_conditions_struct[indices[0]]
+#         for idx in indices[1:]:
+#             for key, value in all_conditions_struct[idx].items():
+#                 if key not in conditions_info_keys:
+#                     if isinstance(value, np.ndarray):
+#                         if value.shape[1] > base_condition[key].shape[1]:
+#                             base_condition[key] = np.pad(
+#                                 base_condition[key],
+#                                 (
+#                                     (0, 0),
+#                                     (0, value.shape[1] - base_condition[key].shape[1]),
+#                                 ),
+#                                 mode="constant",
+#                                 constant_values=np.nan,
+#                             )
+#                         elif value.shape[1] < base_condition[key].shape[1]:
+#                             value = np.pad(
+#                                 value,
+#                                 (
+#                                     (0, 0),
+#                                     (0, base_condition[key].shape[1] - value.shape[1]),
+#                                 ),
+#                                 mode="constant",
+#                                 constant_values=np.nan,
+#                             )
+#                     try:
+#                         base_condition[key] = np.concatenate(
+#                             (base_condition[key], value), axis=0
+#                         )
+#                     except ValueError as e:
+#                         print(f"Could not concatenate {key}: {e}")
+
+#         merged_conditions_struct.append(base_condition)
+
+#     # # Sort and reassign condition IDs
+#     # merged_conditions_struct.sort(key=lambda x: x['condition_id'])
+#     for i, condition in enumerate(merged_conditions_struct):
+#         condition["condition_id"] = i
+
+#     return merged_conditions_struct
 
 
 # PLOTTING FUNCTIONS
 
 
-def save_figure(fig, name, directory, format="svg", dpi=300, transparent=False):
-    """
-    Save the current matplotlib figure to the specified directory with the given name.
+# def save_figure(fig, name, directory, format="svg", dpi=300, transparent=False):
+#     """
+#     Save the current matplotlib figure to the specified directory with the given name.
 
-    Parameters:
-    fig (matplotlib.figure.Figure) : Figure to save
-    name (str) : Name of the file (without extension)
-    directory (str) : Directory to save the file in
-    format (str) : File format to save the figure in
-    dpi (int) : Resolution of the saved figure
-    transparent (bool) : Whether to save the figure with a transparent background
+#     Parameters:
+#     fig (matplotlib.figure.Figure) : Figure to save
+#     name (str) : Name of the file (without extension)
+#     directory (str) : Directory to save the file in
+#     format (str) : File format to save the figure in
+#     dpi (int) : Resolution of the saved figure
+#     transparent (bool) : Whether to save the figure with a transparent background
 
-    Returns:
-    str : Full path to the saved file
-    """
+#     Returns:
+#     str : Full path to the saved file
+#     """
 
-    # Create directory if it doesn't exist
-    os.makedirs(directory, exist_ok=True)
+#     # Create directory if it doesn't exist
+#     os.makedirs(directory, exist_ok=True)
 
-    # Construct full file path
-    filename = f"{name}.{format}"
-    filepath = os.path.join(directory, filename)
+#     # Construct full file path
+#     filename = f"{name}.{format}"
+#     filepath = os.path.join(directory, filename)
 
-    # Save the figure
-    fig.savefig(
-        filepath, format=format, dpi=dpi, bbox_inches="tight", transparent=transparent
-    )
-
-
-def build_legend(single_condition_dict, legend):
-    if legend is None:
-        return f'Condition {int(single_condition_dict["condition_id"])}'
-    else:
-        legend_string = ""
-        for i, (key, value) in enumerate(legend.items()):
-            if value:
-                legend_string += f"{single_condition_dict[key]} {value}"
-            else:
-                legend_string += f"{single_condition_dict[key]}"
-            if i < len(legend) - 1:
-                legend_string += ", "
-        return legend_string
+#     # Save the figure
+#     fig.savefig(
+#         filepath, format=format, dpi=dpi, bbox_inches="tight", transparent=transparent
+#     )
 
 
-def set_scale(ax, log_scale):
-    if isinstance(log_scale, bool):
-        ax.set_yscale("log" if log_scale else "linear")
-    elif isinstance(log_scale, tuple):
-        ax.set_yscale("log" if log_scale[1] else "linear")
-        ax.set_xscale("log" if log_scale[0] else "linear")
-    elif isinstance(log_scale, list):
-        ax.set_yscale("log" if log_scale[1] else "linear")
-        ax.set_xscale("log" if log_scale[0] else "linear")
+# def build_legend(single_condition_dict, legend):
+#     if legend is None:
+#         return f'Condition {int(single_condition_dict["condition_id"])}'
+#     else:
+#         legend_string = ""
+#         for i, (key, value) in enumerate(legend.items()):
+#             if value:
+#                 legend_string += f"{single_condition_dict[key]} {value}"
+#             else:
+#                 legend_string += f"{single_condition_dict[key]}"
+#             if i < len(legend) - 1:
+#                 legend_string += ", "
+#         return legend_string
+
+
+# def set_scale(ax, log_scale):
+#     if isinstance(log_scale, bool):
+#         ax.set_yscale("log" if log_scale else "linear")
+#     elif isinstance(log_scale, tuple):
+#         ax.set_yscale("log" if log_scale[1] else "linear")
+#         ax.set_xscale("log" if log_scale[0] else "linear")
+#     elif isinstance(log_scale, list):
+#         ax.set_yscale("log" if log_scale[1] else "linear")
+#         ax.set_xscale("log" if log_scale[0] else "linear")
 
 
 def plot_aggregated_series(
@@ -808,356 +800,356 @@ def plot_correlation_at_ecdysis(
     return fig
 
 
-def boxplot_at_molt(
-    conditions_struct,
-    column,
-    conditions_to_plot,
-    remove_hatch=False,
-    log_scale: bool = True,
-    figsize: tuple = None,
-    colors=None,
-    plot_significance: bool = False,
-    significance_pairs=None,
-    legend=None,
-    y_axis_label=None,
-    titles=None,
-    share_y_axis: bool = False,
-):
-    if colors is None:
-        color_palette = sns.color_palette("colorblind", len(conditions_to_plot))
-    else:
-        color_palette = colors
-    # Prepare data
-    data_list = []
-    for condition_id in conditions_to_plot:
-        condition_dict = conditions_struct[condition_id]
-        data = condition_dict[column]
-        range_start = 1 if remove_hatch else 0
-        for j in range(range_start, data.shape[1]):
-            for value in data[:, j]:
-                data_list.append(
-                    {
-                        "Condition": condition_id,
-                        "Molt": j,
-                        column: np.log(value) if log_scale else value,
-                    }
-                )
-    df = pd.DataFrame(data_list)
+# def boxplot_at_molt(
+#     conditions_struct,
+#     column,
+#     conditions_to_plot,
+#     remove_hatch=False,
+#     log_scale: bool = True,
+#     figsize: tuple = None,
+#     colors=None,
+#     plot_significance: bool = False,
+#     significance_pairs=None,
+#     legend=None,
+#     y_axis_label=None,
+#     titles=None,
+#     share_y_axis: bool = False,
+# ):
+#     if colors is None:
+#         color_palette = sns.color_palette("colorblind", len(conditions_to_plot))
+#     else:
+#         color_palette = colors
+#     # Prepare data
+#     data_list = []
+#     for condition_id in conditions_to_plot:
+#         condition_dict = conditions_struct[condition_id]
+#         data = condition_dict[column]
+#         range_start = 1 if remove_hatch else 0
+#         for j in range(range_start, data.shape[1]):
+#             for value in data[:, j]:
+#                 data_list.append(
+#                     {
+#                         "Condition": condition_id,
+#                         "Molt": j,
+#                         column: np.log(value) if log_scale else value,
+#                     }
+#                 )
+#     df = pd.DataFrame(data_list)
 
-    # Determine figure size
-    if figsize is None:
-        figsize = (6 * df["Molt"].nunique(), 10)
-    if titles is not None and len(titles) != df["Molt"].nunique():
-        print("Number of titles does not match the number of ecdysis events.")
-        titles = None
+#     # Determine figure size
+#     if figsize is None:
+#         figsize = (6 * df["Molt"].nunique(), 10)
+#     if titles is not None and len(titles) != df["Molt"].nunique():
+#         print("Number of titles does not match the number of ecdysis events.")
+#         titles = None
 
-    # Create figure with extra space on the right for legend
-    fig, ax = plt.subplots(
-        1,
-        df["Molt"].nunique(),
-        figsize=(figsize[0] + 3, figsize[1]),
-        sharey=share_y_axis,
-    )
+#     # Create figure with extra space on the right for legend
+#     fig, ax = plt.subplots(
+#         1,
+#         df["Molt"].nunique(),
+#         figsize=(figsize[0] + 3, figsize[1]),
+#         sharey=share_y_axis,
+#     )
 
-    # Create a dummy plot to get proper legend handles
-    dummy_ax = fig.add_axes([0, 0, 0, 0])
-    for i, condition in enumerate(conditions_to_plot):
-        dummy_ax.boxplot(
-            [],
-            [],
-            patch_artist=True,
-            label=build_legend(conditions_struct[condition], legend),
-        )
-        for j, patch in enumerate(dummy_ax.patches):
-            patch.set_facecolor(color_palette[j])
-    dummy_ax.set_visible(False)
+#     # Create a dummy plot to get proper legend handles
+#     dummy_ax = fig.add_axes([0, 0, 0, 0])
+#     for i, condition in enumerate(conditions_to_plot):
+#         dummy_ax.boxplot(
+#             [],
+#             [],
+#             patch_artist=True,
+#             label=build_legend(conditions_struct[condition], legend),
+#         )
+#         for j, patch in enumerate(dummy_ax.patches):
+#             patch.set_facecolor(color_palette[j])
+#     dummy_ax.set_visible(False)
 
-    for i in range(df["Molt"].nunique()):
-        if share_y_axis:
-            if i > 0:
-                ax[i].tick_params(axis="y", which="both", left=False, labelleft=False)
+#     for i in range(df["Molt"].nunique()):
+#         if share_y_axis:
+#             if i > 0:
+#                 ax[i].tick_params(axis="y", which="both", left=False, labelleft=False)
 
-        boxplot = sns.boxplot(
-            data=df[df["Molt"] == i],
-            x="Condition",
-            y=column,
-            order=conditions_to_plot,
-            hue="Condition",
-            palette=color_palette,
-            showfliers=False,
-            ax=ax[i],
-            dodge=False,
-            linewidth=2,
-            legend=False,
-        )
+#         boxplot = sns.boxplot(
+#             data=df[df["Molt"] == i],
+#             x="Condition",
+#             y=column,
+#             order=conditions_to_plot,
+#             hue="Condition",
+#             palette=color_palette,
+#             showfliers=False,
+#             ax=ax[i],
+#             dodge=False,
+#             linewidth=2,
+#             legend=False,
+#         )
 
-        sns.stripplot(
-            data=df[df["Molt"] == i],
-            x="Condition",
-            order=conditions_to_plot,
-            y=column,
-            ax=ax[i],
-            alpha=0.5,
-            color="black",
-            dodge=True,
-        )
+#         sns.stripplot(
+#             data=df[df["Molt"] == i],
+#             x="Condition",
+#             order=conditions_to_plot,
+#             y=column,
+#             ax=ax[i],
+#             alpha=0.5,
+#             color="black",
+#             dodge=True,
+#         )
 
-        ax[i].set_xlabel("")
-        # Hide y-axis labels and ticks for all subplots except the first one
-        if i > 0:
-            ax[i].set_ylabel("")
+#         ax[i].set_xlabel("")
+#         # Hide y-axis labels and ticks for all subplots except the first one
+#         if i > 0:
+#             ax[i].set_ylabel("")
 
-        if titles is not None:
-            ax[i].set_title(titles[i])
+#         if titles is not None:
+#             ax[i].set_title(titles[i])
 
-        # remove ticks
-        ax[i].tick_params(
-            axis="x", which="both", bottom=False, top=False, labelbottom=False
-        )
+#         # remove ticks
+#         ax[i].tick_params(
+#             axis="x", which="both", bottom=False, top=False, labelbottom=False
+#         )
 
-        if plot_significance:
-            if significance_pairs is None:
-                pairs = list(combinations(df["Condition"].unique(), 2))
-            else:
-                pairs = significance_pairs
-            annotator = Annotator(
-                ax=boxplot,
-                pairs=pairs,
-                data=df[df["Molt"] == i],
-                x="Condition",
-                order=conditions_to_plot,
-                y=column,
-            )
-            annotator.configure(
-                test="Mann-Whitney", text_format="star", loc="inside", verbose=False
-            )
-            annotator.apply_and_annotate()
+#         if plot_significance:
+#             if significance_pairs is None:
+#                 pairs = list(combinations(df["Condition"].unique(), 2))
+#             else:
+#                 pairs = significance_pairs
+#             annotator = Annotator(
+#                 ax=boxplot,
+#                 pairs=pairs,
+#                 data=df[df["Molt"] == i],
+#                 x="Condition",
+#                 order=conditions_to_plot,
+#                 y=column,
+#             )
+#             annotator.configure(
+#                 test="Mann-Whitney", text_format="star", loc="inside", verbose=False
+#             )
+#             annotator.apply_and_annotate()
 
-        y_min, y_max = ax[i].get_ylim()
+#         y_min, y_max = ax[i].get_ylim()
 
-    # Set y label for the first plot
-    if y_axis_label is not None:
-        ax[0].set_ylabel(y_axis_label)
-    else:
-        ax[0].set_ylabel(column)
+#     # Set y label for the first plot
+#     if y_axis_label is not None:
+#         ax[0].set_ylabel(y_axis_label)
+#     else:
+#         ax[0].set_ylabel(column)
 
-    # Add legend to the right of the subplots
-    legend_labels = [
-        build_legend(conditions_struct[condition_id], legend)
-        for condition_id in conditions_to_plot
-    ]
-    legend_handles = dummy_ax.get_legend_handles_labels()[0]
+#     # Add legend to the right of the subplots
+#     legend_labels = [
+#         build_legend(conditions_struct[condition_id], legend)
+#         for condition_id in conditions_to_plot
+#     ]
+#     legend_handles = dummy_ax.get_legend_handles_labels()[0]
 
-    # Place legend to the right of the subplots
-    fig.legend(
-        legend_handles,
-        legend_labels,
-        bbox_to_anchor=(0.9, 0.5),
-        loc="center left",
-        title=None,
-        frameon=True,
-    )
+#     # Place legend to the right of the subplots
+#     fig.legend(
+#         legend_handles,
+#         legend_labels,
+#         bbox_to_anchor=(0.9, 0.5),
+#         loc="center left",
+#         title=None,
+#         frameon=True,
+#     )
 
-    if share_y_axis:
-        global_min = y_min
-        global_max = y_max
-        range_padding = (global_max - global_min) * 0.05  # 5% padding
-        global_min = global_min - range_padding
-        global_max = global_max + range_padding
-        for i in range(df["Molt"].nunique()):
-            ax[i].set_ylim(global_min, global_max)
+#     if share_y_axis:
+#         global_min = y_min
+#         global_max = y_max
+#         range_padding = (global_max - global_min) * 0.05  # 5% padding
+#         global_min = global_min - range_padding
+#         global_max = global_max + range_padding
+#         for i in range(df["Molt"].nunique()):
+#             ax[i].set_ylim(global_min, global_max)
 
-    # Make subplots closer together while leaving space for legend
-    plt.tight_layout(rect=[0, 0, 0.9, 1])
+#     # Make subplots closer together while leaving space for legend
+#     plt.tight_layout(rect=[0, 0, 0.9, 1])
 
-    fig = plt.gcf()
-    plt.show()
+#     fig = plt.gcf()
+#     plt.show()
 
-    return fig
+#     return fig
 
 
-def boxplot_larval_stage(
-    conditions_struct,
-    column,
-    conditions_to_plot,
-    aggregation: str = "mean",
-    n_points: int = 100,
-    fraction: float = 0.8,
-    log_scale: bool = True,
-    figsize: tuple = None,
-    colors=None,
-    plot_significance: bool = False,
-    significance_pairs=None,
-    significance_position="inside",
-    legend=None,
-    y_axis_label=None,
-    titles=None,
-    share_y_axis: bool = False,
-):
-    new_column = column + "_rescaled"
-    struct = rescale_without_flattening(
-        conditions_struct, column, new_column, aggregation, n_points
-    )
-    if colors is None:
-        color_palette = sns.color_palette("colorblind", len(conditions_to_plot))
-    else:
-        color_palette = colors
-    # Prepare data
-    data_list = []
-    for condition_id in conditions_to_plot:
-        condition_dict = struct[condition_id]
-        data = condition_dict[new_column]
-        for i in range(data.shape[1]):
-            data_of_stage = data[:, i]
-            data_of_stage = data_of_stage[:, 0 : int(fraction * data_of_stage.shape[1])]
+# def boxplot_larval_stage(
+#     conditions_struct,
+#     column,
+#     conditions_to_plot,
+#     aggregation: str = "mean",
+#     n_points: int = 100,
+#     fraction: float = 0.8,
+#     log_scale: bool = True,
+#     figsize: tuple = None,
+#     colors=None,
+#     plot_significance: bool = False,
+#     significance_pairs=None,
+#     significance_position="inside",
+#     legend=None,
+#     y_axis_label=None,
+#     titles=None,
+#     share_y_axis: bool = False,
+# ):
+#     new_column = column + "_rescaled"
+#     struct = rescale_without_flattening(
+#         conditions_struct, column, new_column, aggregation, n_points
+#     )
+#     if colors is None:
+#         color_palette = sns.color_palette("colorblind", len(conditions_to_plot))
+#     else:
+#         color_palette = colors
+#     # Prepare data
+#     data_list = []
+#     for condition_id in conditions_to_plot:
+#         condition_dict = struct[condition_id]
+#         data = condition_dict[new_column]
+#         for i in range(data.shape[1]):
+#             data_of_stage = data[:, i]
+#             data_of_stage = data_of_stage[:, 0 : int(fraction * data_of_stage.shape[1])]
 
-            data_of_stage = np.log(data_of_stage) if log_scale else data_of_stage
-            if aggregation == "mean":
-                aggregated_data_of_stage = np.nanmean(data_of_stage, axis=1)
-            elif aggregation == "median":
-                aggregated_data_of_stage = np.nanmedian(data_of_stage, axis=1)
+#             data_of_stage = np.log(data_of_stage) if log_scale else data_of_stage
+#             if aggregation == "mean":
+#                 aggregated_data_of_stage = np.nanmean(data_of_stage, axis=1)
+#             elif aggregation == "median":
+#                 aggregated_data_of_stage = np.nanmedian(data_of_stage, axis=1)
 
-            for j in range(aggregated_data_of_stage.shape[0]):
-                data_list.append(
-                    {
-                        "Condition": condition_id,
-                        "LarvalStage": i,
-                        column: aggregated_data_of_stage[j],
-                    }
-                )
+#             for j in range(aggregated_data_of_stage.shape[0]):
+#                 data_list.append(
+#                     {
+#                         "Condition": condition_id,
+#                         "LarvalStage": i,
+#                         column: aggregated_data_of_stage[j],
+#                     }
+#                 )
 
-    df = pd.DataFrame(data_list)
+#     df = pd.DataFrame(data_list)
 
-    # Determine figure size
-    if figsize is None:
-        figsize = (6 * df["LarvalStage"].nunique(), 10)
-    if titles is not None and len(titles) != df["LarvalStage"].nunique():
-        print("Number of titles does not match the number of ecdysis events.")
-        titles = None
+#     # Determine figure size
+#     if figsize is None:
+#         figsize = (6 * df["LarvalStage"].nunique(), 10)
+#     if titles is not None and len(titles) != df["LarvalStage"].nunique():
+#         print("Number of titles does not match the number of ecdysis events.")
+#         titles = None
 
-    # Create figure with extra space on the right for legend
-    fig, ax = plt.subplots(
-        1,
-        df["LarvalStage"].nunique(),
-        figsize=(figsize[0] + 3, figsize[1]),
-        sharey=share_y_axis,
-    )
+#     # Create figure with extra space on the right for legend
+#     fig, ax = plt.subplots(
+#         1,
+#         df["LarvalStage"].nunique(),
+#         figsize=(figsize[0] + 3, figsize[1]),
+#         sharey=share_y_axis,
+#     )
 
-    # Create a dummy plot to get proper legend handles
-    dummy_ax = fig.add_axes([0, 0, 0, 0])
-    for i, condition in enumerate(conditions_to_plot):
-        dummy_ax.boxplot(
-            [], [], patch_artist=True, label=build_legend(struct[condition], legend)
-        )
-        for j, patch in enumerate(dummy_ax.patches):
-            patch.set_facecolor(color_palette[j])
-    dummy_ax.set_visible(False)
+#     # Create a dummy plot to get proper legend handles
+#     dummy_ax = fig.add_axes([0, 0, 0, 0])
+#     for i, condition in enumerate(conditions_to_plot):
+#         dummy_ax.boxplot(
+#             [], [], patch_artist=True, label=build_legend(struct[condition], legend)
+#         )
+#         for j, patch in enumerate(dummy_ax.patches):
+#             patch.set_facecolor(color_palette[j])
+#     dummy_ax.set_visible(False)
 
-    for i in range(df["LarvalStage"].nunique()):
-        if share_y_axis:
-            if i > 0:
-                ax[i].tick_params(axis="y", which="both", left=False, labelleft=False)
+#     for i in range(df["LarvalStage"].nunique()):
+#         if share_y_axis:
+#             if i > 0:
+#                 ax[i].tick_params(axis="y", which="both", left=False, labelleft=False)
 
-        boxplot = sns.boxplot(
-            data=df[df["LarvalStage"] == i],
-            x="Condition",
-            y=column,
-            hue="Condition",
-            order=conditions_to_plot,
-            palette=color_palette,
-            showfliers=False,
-            ax=ax[i],
-            dodge=False,
-            linewidth=2,
-            legend=False,
-        )
+#         boxplot = sns.boxplot(
+#             data=df[df["LarvalStage"] == i],
+#             x="Condition",
+#             y=column,
+#             hue="Condition",
+#             order=conditions_to_plot,
+#             palette=color_palette,
+#             showfliers=False,
+#             ax=ax[i],
+#             dodge=False,
+#             linewidth=2,
+#             legend=False,
+#         )
 
-        sns.stripplot(
-            data=df[df["LarvalStage"] == i],
-            x="Condition",
-            order=conditions_to_plot,
-            y=column,
-            ax=ax[i],
-            alpha=0.5,
-            color="black",
-            dodge=True,
-        )
+#         sns.stripplot(
+#             data=df[df["LarvalStage"] == i],
+#             x="Condition",
+#             order=conditions_to_plot,
+#             y=column,
+#             ax=ax[i],
+#             alpha=0.5,
+#             color="black",
+#             dodge=True,
+#         )
 
-        ax[i].set_xlabel("")
-        # Hide y-axis labels and ticks for all subplots except the first one
-        if i > 0:
-            ax[i].set_ylabel("")
+#         ax[i].set_xlabel("")
+#         # Hide y-axis labels and ticks for all subplots except the first one
+#         if i > 0:
+#             ax[i].set_ylabel("")
 
-        if titles is not None:
-            ax[i].set_title(titles[i])
+#         if titles is not None:
+#             ax[i].set_title(titles[i])
 
-        # remove ticks
-        ax[i].tick_params(
-            axis="x", which="both", bottom=False, top=False, labelbottom=False
-        )
+#         # remove ticks
+#         ax[i].tick_params(
+#             axis="x", which="both", bottom=False, top=False, labelbottom=False
+#         )
 
-        if plot_significance:
-            if significance_pairs is None:
-                pairs = list(combinations(df["Condition"].unique(), 2))
-            else:
-                pairs = significance_pairs
-            annotator = Annotator(
-                ax=boxplot,
-                pairs=pairs,
-                data=df[df["LarvalStage"] == i],
-                x="Condition",
-                order=conditions_to_plot,
-                y=column,
-            )
-            annotator.configure(
-                test="Mann-Whitney",
-                text_format="star",
-                loc=significance_position,
-                verbose=False,
-            )
-            annotator.apply_and_annotate()
+#         if plot_significance:
+#             if significance_pairs is None:
+#                 pairs = list(combinations(df["Condition"].unique(), 2))
+#             else:
+#                 pairs = significance_pairs
+#             annotator = Annotator(
+#                 ax=boxplot,
+#                 pairs=pairs,
+#                 data=df[df["LarvalStage"] == i],
+#                 x="Condition",
+#                 order=conditions_to_plot,
+#                 y=column,
+#             )
+#             annotator.configure(
+#                 test="Mann-Whitney",
+#                 text_format="star",
+#                 loc=significance_position,
+#                 verbose=False,
+#             )
+#             annotator.apply_and_annotate()
 
-        y_min, y_max = ax[i].get_ylim()
+#         y_min, y_max = ax[i].get_ylim()
 
-    # Set y label for the first plot
-    if y_axis_label is not None:
-        ax[0].set_ylabel(y_axis_label)
-    else:
-        ax[0].set_ylabel(column)
+#     # Set y label for the first plot
+#     if y_axis_label is not None:
+#         ax[0].set_ylabel(y_axis_label)
+#     else:
+#         ax[0].set_ylabel(column)
 
-    # Add legend to the right of the subplots
-    legend_labels = [
-        build_legend(struct[condition_id], legend)
-        for condition_id in conditions_to_plot
-    ]
-    legend_handles = dummy_ax.get_legend_handles_labels()[0]
+#     # Add legend to the right of the subplots
+#     legend_labels = [
+#         build_legend(struct[condition_id], legend)
+#         for condition_id in conditions_to_plot
+#     ]
+#     legend_handles = dummy_ax.get_legend_handles_labels()[0]
 
-    # Place legend to the right of the subplots
-    fig.legend(
-        legend_handles,
-        legend_labels,
-        bbox_to_anchor=(0.9, 0.5),
-        loc="center left",
-        title=None,
-        frameon=True,
-    )
+#     # Place legend to the right of the subplots
+#     fig.legend(
+#         legend_handles,
+#         legend_labels,
+#         bbox_to_anchor=(0.9, 0.5),
+#         loc="center left",
+#         title=None,
+#         frameon=True,
+#     )
 
-    if share_y_axis:
-        global_min = y_min
-        global_max = y_max
-        range_padding = (global_max - global_min) * 0.05  # 5% padding
-        global_min = global_min - range_padding
-        global_max = global_max + range_padding
-        for i in range(df["LarvalStage"].nunique()):
-            ax[i].set_ylim(global_min, global_max)
+#     if share_y_axis:
+#         global_min = y_min
+#         global_max = y_max
+#         range_padding = (global_max - global_min) * 0.05  # 5% padding
+#         global_min = global_min - range_padding
+#         global_max = global_max + range_padding
+#         for i in range(df["LarvalStage"].nunique()):
+#             ax[i].set_ylim(global_min, global_max)
 
-    # Make subplots closer together while leaving space for legend
-    plt.tight_layout(rect=[0, 0, 0.9, 1])
+#     # Make subplots closer together while leaving space for legend
+#     plt.tight_layout(rect=[0, 0, 0.9, 1])
 
-    fig = plt.gcf()
-    plt.show()
+#     fig = plt.gcf()
+#     plt.show()
 
-    return fig
+#     return fig
 
 
 def plot_developmental_success(
@@ -2448,128 +2440,128 @@ def plot_heterogeneity_rescaled_data(
     return fig
 
 
-def combine_series(
-    conditions_struct, series_one, series_two, operation, new_series_name
-):
-    for condition in conditions_struct:
-        series_one_values = condition[series_one]
-        series_two_values = condition[series_two]
+# def combine_series(
+#     conditions_struct, series_one, series_two, operation, new_series_name
+# ):
+#     for condition in conditions_struct:
+#         series_one_values = condition[series_one]
+#         series_two_values = condition[series_two]
 
-        if operation == "add":
-            new_series_values = np.add(series_one_values, series_two_values)
-        elif operation == "subtract":
-            new_series_values = series_one_values - series_two_values
-        elif operation == "multiply":
-            new_series_values = series_one_values * series_two_values
-        elif operation == "divide":
-            new_series_values = np.divide(series_one_values, series_two_values)
-        condition[new_series_name] = new_series_values
-    return conditions_struct
-
-
-def transform_series(conditions_struct, series, operation, new_series_name):
-    for conditions in conditions_struct:
-        series_values = conditions[series]
-
-        if operation == "log":
-            new_series_values = np.log(series_values)
-        elif operation == "exp":
-            new_series_values = np.exp(series_values)
-        elif operation == "sqrt":
-            new_series_values = np.sqrt(series_values)
-        conditions[new_series_name] = new_series_values
-
-    return conditions_struct
+#         if operation == "add":
+#             new_series_values = np.add(series_one_values, series_two_values)
+#         elif operation == "subtract":
+#             new_series_values = series_one_values - series_two_values
+#         elif operation == "multiply":
+#             new_series_values = series_one_values * series_two_values
+#         elif operation == "divide":
+#             new_series_values = np.divide(series_one_values, series_two_values)
+#         condition[new_series_name] = new_series_values
+#     return conditions_struct
 
 
-def compute_growth_rate(
-    conditions_struct, series_name, gr_series_name, experiment_time=True
-):
-    for condition in conditions_struct:
-        series_values = condition[series_name]
-        # TEMPORARY, ONLY WORKS WITH SINGLE CLASSIFICATION, FIND A WAY TO GENERALIZE
-        worm_type_key = [key for key in condition.keys() if "worm_type" in key][0]
-        worm_type = condition[worm_type_key]
+# def transform_series(conditions_struct, series, operation, new_series_name):
+#     for conditions in conditions_struct:
+#         series_values = conditions[series]
 
-        if experiment_time:
-            time = condition["experiment_time"]
-        else:
-            time = condition["time"]
+#         if operation == "log":
+#             new_series_values = np.log(series_values)
+#         elif operation == "exp":
+#             new_series_values = np.exp(series_values)
+#         elif operation == "sqrt":
+#             new_series_values = np.sqrt(series_values)
+#         conditions[new_series_name] = new_series_values
 
-        growth_rate = []
-        for i in range(series_values.shape[0]):
-            # gr = compute_instantaneous_growth_rate_classified(series_values[i], time[i], worm_type[i], smoothing_method = 'savgol', savgol_filter_window = 7)
-            gr = compute_instantaneous_growth_rate_classified(
-                series_values[i],
-                time[i],
-                worm_type[i],
-                smoothing_method="savgol",
-                savgol_filter_window=5,
-            )
-            growth_rate.append(gr)
-
-        growth_rate = np.array(growth_rate)
-
-        condition[gr_series_name] = growth_rate
-
-    return conditions_struct
+#     return conditions_struct
 
 
-def rescale(
-    conditions_struct,
-    series_name,
-    rescaled_series_name,
-    experiment_time=True,
-    n_points=100,
-):
-    for condition in conditions_struct:
-        series_values = condition[series_name]
-        # TEMPORARY, ONLY WORKS WITH SINGLE CLASSIFICATION, FIND A WAY TO GENERALIZE
-        worm_type_key = [key for key in condition.keys() if "worm_type" in key][0]
-        worm_type = condition[worm_type_key]
-        ecdysis = condition["ecdysis_index"]
+# def compute_growth_rate(
+#     conditions_struct, series_name, gr_series_name, experiment_time=True
+# ):
+#     for condition in conditions_struct:
+#         series_values = condition[series_name]
+#         # TEMPORARY, ONLY WORKS WITH SINGLE CLASSIFICATION, FIND A WAY TO GENERALIZE
+#         worm_type_key = [key for key in condition.keys() if "worm_type" in key][0]
+#         worm_type = condition[worm_type_key]
 
-        if experiment_time:
-            time = condition["experiment_time"]
-        else:
-            time = condition["time"]
+#         if experiment_time:
+#             time = condition["experiment_time"]
+#         else:
+#             time = condition["time"]
 
-        _, rescaled_series = rescale_series(
-            series_values, time, ecdysis, worm_type, n_points=n_points
-        )  # shape (n_worms, 4, n_points)
+#         growth_rate = []
+#         for i in range(series_values.shape[0]):
+#             # gr = compute_instantaneous_growth_rate_classified(series_values[i], time[i], worm_type[i], smoothing_method = 'savgol', savgol_filter_window = 7)
+#             gr = compute_instantaneous_growth_rate_classified(
+#                 series_values[i],
+#                 time[i],
+#                 worm_type[i],
+#                 smoothing_method="savgol",
+#                 savgol_filter_window=5,
+#             )
+#             growth_rate.append(gr)
 
-        # reshape into (n_worms, 4*n_points)
+#         growth_rate = np.array(growth_rate)
 
-        rescaled_series = rescaled_series.reshape(rescaled_series.shape[0], -1)
+#         condition[gr_series_name] = growth_rate
 
-        condition[rescaled_series_name] = rescaled_series
-
-    return conditions_struct
+#     return conditions_struct
 
 
-def rescale_without_flattening(
-    conditions_struct,
-    series_name,
-    rescaled_series_name,
-    experiment_time=True,
-    n_points=100,
-):
-    for condition in conditions_struct:
-        series_values = condition[series_name]
-        # TEMPORARY, ONLY WORKS WITH SINGLE CLASSIFICATION, FIND A WAY TO GENERALIZE
-        worm_type_key = [key for key in condition.keys() if "worm_type" in key][0]
-        worm_type = condition[worm_type_key]
-        ecdysis = condition["ecdysis_index"]
+# def rescale(
+#     conditions_struct,
+#     series_name,
+#     rescaled_series_name,
+#     experiment_time=True,
+#     n_points=100,
+# ):
+#     for condition in conditions_struct:
+#         series_values = condition[series_name]
+#         # TEMPORARY, ONLY WORKS WITH SINGLE CLASSIFICATION, FIND A WAY TO GENERALIZE
+#         worm_type_key = [key for key in condition.keys() if "worm_type" in key][0]
+#         worm_type = condition[worm_type_key]
+#         ecdysis = condition["ecdysis_index"]
 
-        if experiment_time:
-            time = condition["experiment_time"]
-        else:
-            time = condition["time"]
+#         if experiment_time:
+#             time = condition["experiment_time"]
+#         else:
+#             time = condition["time"]
 
-        _, rescaled_series = rescale_series(
-            series_values, time, ecdysis, worm_type, n_points=n_points
-        )  # shape (n_worms, 4, n_points)
+#         _, rescaled_series = rescale_series(
+#             series_values, time, ecdysis, worm_type, n_points=n_points
+#         )  # shape (n_worms, 4, n_points)
 
-        condition[rescaled_series_name] = rescaled_series
+#         # reshape into (n_worms, 4*n_points)
 
-    return conditions_struct
+#         rescaled_series = rescaled_series.reshape(rescaled_series.shape[0], -1)
+
+#         condition[rescaled_series_name] = rescaled_series
+
+#     return conditions_struct
+
+
+# def rescale_without_flattening(
+#     conditions_struct,
+#     series_name,
+#     rescaled_series_name,
+#     experiment_time=True,
+#     n_points=100,
+# ):
+#     for condition in conditions_struct:
+#         series_values = condition[series_name]
+#         # TEMPORARY, ONLY WORKS WITH SINGLE CLASSIFICATION, FIND A WAY TO GENERALIZE
+#         worm_type_key = [key for key in condition.keys() if "worm_type" in key][0]
+#         worm_type = condition[worm_type_key]
+#         ecdysis = condition["ecdysis_index"]
+
+#         if experiment_time:
+#             time = condition["experiment_time"]
+#         else:
+#             time = condition["time"]
+
+#         _, rescaled_series = rescale_series(
+#             series_values, time, ecdysis, worm_type, n_points=n_points
+#         )  # shape (n_worms, 4, n_points)
+
+#         condition[rescaled_series_name] = rescaled_series
+
+#     return conditions_struct
