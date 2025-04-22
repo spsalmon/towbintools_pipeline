@@ -8,7 +8,6 @@ from towbintools.data_analysis import compute_larval_stage_duration
 from towbintools.data_analysis import compute_series_at_time_classified
 from towbintools.foundation.worm_features import get_features_to_compute_at_molt
 
-
 FEATURES_TO_COMPUTE_AT_MOLT = get_features_to_compute_at_molt()
 
 # THIS PART HANDLES THE PROCESSING OF THE EXPERIMENT FILEMAP AND THE CREATION OF THE PLOTTING STRUCTURE
@@ -195,39 +194,13 @@ def _process_condition_id_plotting_structure(
             col for col in renamed_organ_feature_columns if "worm_type" not in col
         ]
 
-        # compute the features of the organ at each molt
         for column in renamed_organ_feature_columns:
-            column_at_molt = f"{column}_at_ecdysis"
-
-            values_at_molt = condition_dict[column_at_molt]
-
-            nan_indexes_values = np.where(np.isnan(values_at_molt))[0]
-            experiment_time = condition_dict["experiment_time"]
-            ecdysis = condition_dict["ecdysis_index"]
-
-            if not np.any(np.isnan(experiment_time)):
-                time = condition_dict["experiment_time"]
-            else:
-                time = condition_dict["time"]
-
-            non_nan_indexes_ecdysis = np.where(~np.isnan(ecdysis))[0]
-
-            if recompute_values_at_molt:
-                idx_values_to_recompute = non_nan_indexes_ecdysis
-            else:
-                idx_values_to_recompute = [
-                    idx for idx in nan_indexes_values if idx in non_nan_indexes_ecdysis
-                ]
-
-            for idx in idx_values_to_recompute:
-                values_at_molt[idx] = compute_series_at_time_classified(
-                    condition_dict[column][idx],
-                    worm_types[idx],
-                    ecdysis_index[idx],
-                    series_time=time[idx],
-                )
-            condition_dict[column_at_molt] = values_at_molt
-
+            condition_dict = _compute_values_at_molt(
+                condition_dict,
+                column,
+                worm_types,
+                recompute_values_at_molt=recompute_values_at_molt,
+            )
     return condition_dict
 
 
@@ -371,8 +344,6 @@ def _get_values_at_molt(filemap, column):
 
     columns_at_ecdysis = [f"{column}_at_{e}" for e in ecdysis]
 
-    print(f"Columns at ecdysis: {columns_at_ecdysis}")
-
     for point in filemap["Point"].unique():
         point_df = filemap.loc[filemap["Point"] == point].copy()
 
@@ -381,15 +352,62 @@ def _get_values_at_molt(filemap, column):
                 print(f"Column {col} not found in point {point}, adding it.")
                 point_df[col] = np.nan
 
-        values_at_ecdysis_point = point_df[columns_at_ecdysis].to_numpy()
-
-        print(
-            f"Values at ecdysis for point shape {point}: {values_at_ecdysis_point.shape}"
-        )
+        values_at_ecdysis_point = point_df[columns_at_ecdysis].to_numpy()[0]
 
         all_values.append(values_at_ecdysis_point)
 
     return np.array(all_values)
+
+
+def _compute_values_at_molt(
+    condition_dict,
+    column,
+    worm_types,
+    recompute_values_at_molt=False,
+):
+    column_at_molt = f"{column}_at_ecdysis"
+
+    values_at_molt = condition_dict[column_at_molt]
+
+    nan_indexes_values_mask = np.isnan(values_at_molt)
+    experiment_time = condition_dict["experiment_time"]
+
+    if not np.any(np.isnan(experiment_time)):
+        time = condition_dict["experiment_time"]
+        ecdysis = condition_dict["ecdysis_experiment_time"]
+    else:
+        time = condition_dict["time"]
+        ecdysis = condition_dict["ecdysis_index"]
+
+    non_nan_indexes_ecdysis_mask = np.invert(np.isnan(ecdysis))
+
+    if recompute_values_at_molt:
+        values_to_recompute_mask = non_nan_indexes_ecdysis_mask
+    else:
+        values_to_recompute_mask = (
+            nan_indexes_values_mask & non_nan_indexes_ecdysis_mask
+        )
+
+    for i in range(len(values_to_recompute_mask)):
+        mask = values_to_recompute_mask[i]
+        idx_values_to_recompute = np.where(mask)[0]
+
+        if len(idx_values_to_recompute) == 0:
+            continue
+
+        ecdys = ecdysis[i][idx_values_to_recompute]
+
+        recomputed_values = compute_series_at_time_classified(
+            condition_dict[column][i],
+            worm_types[i],
+            ecdys,
+            series_time=time[i],
+        )
+
+        values_at_molt[i][idx_values_to_recompute] = recomputed_values
+
+    condition_dict[column_at_molt] = values_at_molt
+    return condition_dict
 
 
 def separate_column_by_point(filemap, column):
