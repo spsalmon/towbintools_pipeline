@@ -158,9 +158,10 @@ def _process_condition_id_plotting_structure(
         condition_df, "ExperimentTime"
     ).astype(float)
 
+    condition_dict["worm_type"] = worm_types
+
     for organ in organ_channels.keys():
         organ_channel = organ_channels[organ]
-        organ_channel = f"ch{organ_channel}"
         organ_columns = [
             col for col in condition_df.columns if col.startswith(organ_channel)
         ]

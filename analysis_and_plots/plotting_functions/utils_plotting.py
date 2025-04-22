@@ -1,5 +1,8 @@
 import os
 
+import numpy as np
+import seaborn as sns
+
 # THIS PART IS MOSTLY ABOUT HANDLING LEGENDS, SAVING FIGURES, ETC.
 
 
@@ -56,3 +59,21 @@ def set_scale(ax, log_scale):
     elif isinstance(log_scale, list):
         ax.set_yscale("log" if log_scale[1] else "linear")
         ax.set_xscale("log" if log_scale[0] else "linear")
+
+
+def get_colors(conditions_to_plot, colors, base_palette="colorblind"):
+    if colors is None:
+        colors = sns.color_palette("colorblind", len(conditions_to_plot))
+    else:
+        if isinstance(colors, list):
+            assert len(colors) == len(
+                conditions_to_plot
+            ), f"Length of colors list ({len(colors)}) does not match number of conditions to plot ({len(conditions_to_plot)})"
+            colors = colors
+        elif isinstance(colors, dict):
+            assert np.all(
+                [key in colors.keys() for key in conditions_to_plot]
+            ), "Some conditions to plot are not in the colors dictionary"
+            colors = [colors[condition] for condition in conditions_to_plot]
+
+    return colors
