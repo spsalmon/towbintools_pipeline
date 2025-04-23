@@ -143,9 +143,8 @@ def _process_condition_id_plotting_structure(
     condition_dict = {}
 
     for key in conditions_keys:
-        condition_dict[key] = condition_df.select(pl.col(key))[0].to_numpy().squeeze()
+        condition_dict[key] = condition_df.select(pl.col(key))[0].item()
 
-    start_time = perf_counter()
     (
         ecdysis_index,
         ecdysis_time_step,
@@ -154,8 +153,6 @@ def _process_condition_id_plotting_structure(
         larval_stage_durations_experiment_time,
     ) = _get_ecdysis_and_durations(condition_df)
 
-    print(f"Processing ecdysis took {perf_counter() - start_time:.2f} seconds")
-    start_time = perf_counter()
     n_points = condition_df.select(pl.col("Point")).n_unique()
 
     condition_dict["condition_id"] = int(condition_dict["condition_id"])
@@ -174,10 +171,6 @@ def _process_condition_id_plotting_structure(
     condition_dict["experiment"] = np.array([experiment_dir] * n_points)[:, np.newaxis]
     condition_dict["filemap_path"] = np.array([filemap_path] * n_points)[:, np.newaxis]
     condition_dict["point"] = condition_df.select(pl.col("Point").unique()).to_numpy()
-
-    print(f"Adding simple fields took {perf_counter() - start_time:.2f} seconds")
-
-    start_time = perf_counter()
     # TEMPORARY, ONLY WORKS WITH SINGLE CLASSIFICATION, FIND A WAY TO GENERALIZE
     worm_type_column = [col for col in condition_df.columns if "worm_type" in col][0]
     worm_types = separate_column_by_point(condition_df, worm_type_column)
@@ -185,7 +178,6 @@ def _process_condition_id_plotting_structure(
     condition_dict["time"] = separate_column_by_point(condition_df, "Time").astype(
         float
     )
-    print(f"Adding worm type took {perf_counter() - start_time:.2f} seconds")
     condition_dict["experiment_time"] = separate_column_by_point(
         condition_df, "ExperimentTime"
     ).astype(float)
@@ -212,7 +204,6 @@ def _process_condition_id_plotting_structure(
             col.replace(organ_channel, organ) for col in organ_columns
         ]
 
-        start_time = perf_counter()
         for organ_feature_column, renamed_feature_organ_column in zip(
             organ_feature_columns, renamed_organ_feature_columns
         ):
@@ -222,7 +213,6 @@ def _process_condition_id_plotting_structure(
             condition_dict[
                 f"{renamed_feature_organ_column}_at_ecdysis"
             ] = _get_values_at_molt(condition_df, organ_feature_column)
-
         # remove any column with worm_type in it
         renamed_organ_feature_columns = [
             col for col in renamed_organ_feature_columns if "worm_type" not in col
@@ -383,29 +373,23 @@ def _get_ecdysis_and_durations(filemap):
 
 
 def _get_values_at_molt(filemap, column):
-    all_values = []
     ecdysis = ["HatchTime", "M1", "M2", "M3", "M4"]
-
     columns_at_ecdysis = [f"{column}_at_{e}" for e in ecdysis]
-    unique_points = filemap.select(pl.col("Point")).unique().to_numpy().squeeze()
+    column_list = ["Point"] + columns_at_ecdysis
+    filemap = filemap.select(pl.col(column_list))
 
-    for point in unique_points:
-        point_df = filemap.filter(pl.col("Point") == point)
-
-        for col in columns_at_ecdysis:
-            if col not in point_df.columns:
-                point_df = point_df.with_columns(pl.lit(np.nan).alias(col))
-
-        values_at_ecdysis_point = (
-            point_df.select(pl.col(columns_at_ecdysis))[0]
-            .cast(float)
-            .to_numpy()
-            .squeeze()
+    values_at_ecdysis = (
+        (
+            filemap.group_by("Point", maintain_order=True)
+            .agg(pl.col(columns_at_ecdysis).first())
+            .drop("Point")
+            .cast(pl.Float64)
         )
+        .to_numpy()
+        .squeeze()
+    )
 
-        all_values.append(values_at_ecdysis_point)
-
-    return np.array(all_values)
+    return values_at_ecdysis
 
 
 def _compute_values_at_molt(
