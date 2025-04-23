@@ -36,20 +36,7 @@ def _setup_figure(
         sharey=share_y_axis,
     )
 
-    # Create a dummy plot to get proper legend handles
-    dummy_ax = fig.add_axes([0, 0, 0, 0])
-    for i, condition in enumerate(conditions_to_plot):
-        dummy_ax.boxplot(
-            [],
-            [],
-            patch_artist=True,
-            label=build_legend(conditions_struct[condition], legend),
-        )
-        for j, patch in enumerate(dummy_ax.patches):
-            patch.set_facecolor(color_palette[j])
-    dummy_ax.set_visible(False)
-
-    return fig, ax, dummy_ax
+    return fig, ax
 
 
 def _annotate_significance(
@@ -97,13 +84,14 @@ def _plot_boxplot(
             x="Condition",
             y=column,
             order=conditions_to_plot,
+            hue_order=conditions_to_plot,
             hue="Condition",
             palette=color_palette,
             showfliers=False,
             ax=ax[event_index],
             dodge=False,
             linewidth=2,
-            legend=False,
+            legend="full",
         )
 
         sns.stripplot(
@@ -160,7 +148,6 @@ def _set_labels_and_legend(
     column,
     y_axis_label,
     legend,
-    dummy_ax,
 ):
     # Set y label for the first plot
     if y_axis_label is not None:
@@ -173,7 +160,12 @@ def _set_labels_and_legend(
         build_legend(conditions_struct[condition_id], legend)
         for condition_id in conditions_to_plot
     ]
-    legend_handles = dummy_ax.get_legend_handles_labels()[0]
+
+    legend_handles = ax[0].get_legend_handles_labels()[0]
+
+    # Remove the legend from all subplots
+    for i in range(len(ax)):
+        ax[i].legend_.remove()
 
     # Place legend to the right of the subplots
     fig.legend(
@@ -206,8 +198,6 @@ def boxplot_at_molt(
         colors,
     )
 
-    print(f"Color palette: {color_palette}")
-
     # Prepare data
     data_list = []
     for condition_id in conditions_to_plot:
@@ -225,7 +215,7 @@ def boxplot_at_molt(
                 )
     df = pd.DataFrame(data_list)
 
-    fig, ax, dummy_ax = _setup_figure(
+    fig, ax = _setup_figure(
         df,
         conditions_struct,
         conditions_to_plot,
@@ -256,7 +246,6 @@ def boxplot_at_molt(
         column,
         y_axis_label,
         legend,
-        dummy_ax,
     )
 
     if share_y_axis:
@@ -332,7 +321,7 @@ def boxplot_larval_stage(
 
     df = pd.DataFrame(data_list)
 
-    fig, ax, dummy_ax = _setup_figure(
+    fig, ax = _setup_figure(
         df,
         conditions_struct,
         conditions_to_plot,
@@ -363,7 +352,6 @@ def boxplot_larval_stage(
         column,
         y_axis_label,
         legend,
-        dummy_ax,
     )
 
     if share_y_axis:
