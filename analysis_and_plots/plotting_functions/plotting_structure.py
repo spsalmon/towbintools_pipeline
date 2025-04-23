@@ -1,10 +1,10 @@
 import os
 from collections import defaultdict
+from time import perf_counter
 
 import numpy as np
-import pandas as pd
+import polars as pl
 import yaml
-from towbintools.data_analysis import compute_larval_stage_duration
 from towbintools.data_analysis import compute_series_at_time_classified
 from towbintools.foundation.worm_features import get_features_to_compute_at_molt
 
@@ -60,32 +60,37 @@ def build_conditions(conditions_yaml):
     return conditions
 
 
-def add_conditions_to_filemap(experiment_filemap, conditions):
+def _add_conditions_to_filemap(experiment_filemap, conditions):
     """Add conditions to experiment filemap based on point ranges or pad values."""
+    if "Pad" in experiment_filemap.columns:
+        new_columns = experiment_filemap.select(pl.col("Point"), pl.col("Pad"))
+    else:
+        new_columns = experiment_filemap.select(pl.col("Point"))
     for condition in conditions:
+        # Get condition rows mask
         if "point_range" in condition:
             point_range = condition["point_range"]
-
             # handle both single range and list of ranges
             if isinstance(point_range[0], list):
-                # multiple point ranges
-                mask = False
-                for pr in point_range:
-                    mask = mask | experiment_filemap["Point"].between(pr[0], pr[1])
-                condition_rows = mask
+                # multiple point ranges - build expressions list
+                mask_exprs = [
+                    (pl.col("Point") >= pr[0]) & (pl.col("Point") <= pr[1])
+                    for pr in point_range
+                ]
+                # Combine with or operator
+                condition_mask = mask_exprs[0]
+                for expr in mask_exprs[1:]:
+                    condition_mask = condition_mask | expr
             else:
                 # single point range
-                condition_rows = experiment_filemap["Point"].between(
-                    point_range[0], point_range[1]
+                condition_mask = (pl.col("Point") >= point_range[0]) & (
+                    pl.col("Point") <= point_range[1]
                 )
-
             filter_key = "point_range"
-
         elif "pad" in condition:
             pad = condition["pad"]
-            condition_rows = experiment_filemap["Pad"] == pad
+            condition_mask = pl.col("Pad") == pad
             filter_key = "pad"
-
         else:
             print(
                 "Condition does not contain 'point_range' or 'pad' key, impossible to add condition to filemap, skipping."
@@ -95,9 +100,32 @@ def add_conditions_to_filemap(experiment_filemap, conditions):
         # Extract the condition attributes to add (excluding the filter key)
         conditions_to_add = {k: v for k, v in condition.items() if k != filter_key}
 
-        # Apply all conditions at once using loc
+        column_ops = []
         for key, val in conditions_to_add.items():
-            experiment_filemap.loc[condition_rows, key] = val
+            # For new columns, add with null values first if needed
+            if key not in new_columns.columns:
+                new_columns = new_columns.with_columns(pl.lit(None).alias(key))
+
+            # Build the column operation but don't apply it yet
+            column_ops.append(
+                pl.when(condition_mask)
+                .then(pl.lit(val))
+                .otherwise(pl.col(key))
+                .alias(key)
+            )
+
+        # Add the new columns to the DataFrame
+        if column_ops:
+            new_columns = new_columns.with_columns(column_ops)
+
+    if "Pad" in new_columns.columns:
+        new_columns = new_columns.drop(["Point", "Pad"])
+    else:
+        new_columns = new_columns.drop(["Point"])
+
+    # Apply the new columns to the experiment filemap
+    if not new_columns.is_empty():
+        experiment_filemap = experiment_filemap.with_columns(new_columns)
 
     return experiment_filemap
 
@@ -111,13 +139,13 @@ def _process_condition_id_plotting_structure(
     condition_id,
     recompute_values_at_molt=False,
 ):
-    condition_df = experiment_filemap[
-        experiment_filemap["condition_id"] == condition_id
-    ]
+    condition_df = experiment_filemap.filter(pl.col("condition_id") == condition_id)
     condition_dict = {}
-    for key in conditions_keys:
-        condition_dict[key] = condition_df[key].iloc[0]
 
+    for key in conditions_keys:
+        condition_dict[key] = condition_df.select(pl.col(key))[0].to_numpy().squeeze()
+
+    start_time = perf_counter()
     (
         ecdysis_index,
         ecdysis_time_step,
@@ -125,6 +153,10 @@ def _process_condition_id_plotting_structure(
         larval_stage_durations_time_step,
         larval_stage_durations_experiment_time,
     ) = _get_ecdysis_and_durations(condition_df)
+
+    print(f"Processing ecdysis took {perf_counter() - start_time:.2f} seconds")
+    start_time = perf_counter()
+    n_points = condition_df.select(pl.col("Point")).n_unique()
 
     condition_dict["condition_id"] = int(condition_dict["condition_id"])
     condition_dict["ecdysis_index"] = ecdysis_index
@@ -139,14 +171,13 @@ def _process_condition_id_plotting_structure(
     condition_dict["larval_stage_durations_experiment_time_hours"] = (
         larval_stage_durations_experiment_time / 3600
     )
-    condition_dict["experiment"] = np.array(
-        [experiment_dir] * condition_df["Point"].nunique()
-    )[:, np.newaxis]
-    condition_dict["filemap_path"] = np.array(
-        [filemap_path] * condition_df["Point"].nunique()
-    )[:, np.newaxis]
-    condition_dict["point"] = np.unique(condition_df["Point"].values)[:, np.newaxis]
+    condition_dict["experiment"] = np.array([experiment_dir] * n_points)[:, np.newaxis]
+    condition_dict["filemap_path"] = np.array([filemap_path] * n_points)[:, np.newaxis]
+    condition_dict["point"] = condition_df.select(pl.col("Point").unique()).to_numpy()
 
+    print(f"Adding simple fields took {perf_counter() - start_time:.2f} seconds")
+
+    start_time = perf_counter()
     # TEMPORARY, ONLY WORKS WITH SINGLE CLASSIFICATION, FIND A WAY TO GENERALIZE
     worm_type_column = [col for col in condition_df.columns if "worm_type" in col][0]
     worm_types = separate_column_by_point(condition_df, worm_type_column)
@@ -154,6 +185,7 @@ def _process_condition_id_plotting_structure(
     condition_dict["time"] = separate_column_by_point(condition_df, "Time").astype(
         float
     )
+    print(f"Adding worm type took {perf_counter() - start_time:.2f} seconds")
     condition_dict["experiment_time"] = separate_column_by_point(
         condition_df, "ExperimentTime"
     ).astype(float)
@@ -180,6 +212,7 @@ def _process_condition_id_plotting_structure(
             col.replace(organ_channel, organ) for col in organ_columns
         ]
 
+        start_time = perf_counter()
         for organ_feature_column, renamed_feature_organ_column in zip(
             organ_feature_columns, renamed_organ_feature_columns
         ):
@@ -202,6 +235,7 @@ def _process_condition_id_plotting_structure(
                 worm_types,
                 recompute_values_at_molt=recompute_values_at_molt,
             )
+
     return condition_dict
 
 
@@ -212,7 +246,8 @@ def build_plotting_struct(
     organ_channels={"body": 2, "pharynx": 1},
     recompute_values_at_molt=False,
 ):
-    experiment_filemap = pd.read_csv(filemap_path)
+    start_time = perf_counter()
+    experiment_filemap = pl.read_csv(filemap_path)
 
     conditions = build_conditions(conditions_yaml_path)
     conditions_keys = list(conditions[0].keys())
@@ -223,21 +258,19 @@ def build_plotting_struct(
     if "pad" in conditions_keys:
         conditions_keys.remove("pad")
 
-    experiment_filemap = add_conditions_to_filemap(
+    experiment_filemap = _add_conditions_to_filemap(
         experiment_filemap,
         conditions,
     )
 
-    experiment_filemap.columns
-
     # if ExperimentTime is not present in the filemap, add it
     if "ExperimentTime" not in experiment_filemap.columns:
-        experiment_filemap["ExperimentTime"] = np.nan
+        experiment_filemap = experiment_filemap.with_columns(
+            pl.lit(np.nan).alias("ExperimentTime")
+        )
 
-    # remove rows where condition_id is NaN
-    experiment_filemap = experiment_filemap[
-        ~experiment_filemap["condition_id"].isnull()
-    ]
+    # remove rows where condition_id is null
+    experiment_filemap = experiment_filemap.filter(~pl.col("condition_id").is_null())
 
     # set molts that should be ignored to NaN
     if "Ignore" in experiment_filemap.columns:
@@ -249,7 +282,12 @@ def build_plotting_struct(
 
     conditions_struct = []
 
+    print(
+        f"Initial processing of filemap took {perf_counter() - start_time:.2f} seconds"
+    )
+
     for condition_id in experiment_filemap["condition_id"].unique():
+        start_time = perf_counter()
         condition_dict = _process_condition_id_plotting_structure(
             experiment_dir,
             experiment_filemap,
@@ -258,6 +296,9 @@ def build_plotting_struct(
             conditions_keys,
             condition_id,
             recompute_values_at_molt=recompute_values_at_molt,
+        )
+        print(
+            f"Processing condition {condition_id} took {perf_counter() - start_time:.2f} seconds"
         )
 
         conditions_struct.append(condition_dict)
@@ -274,6 +315,17 @@ def build_plotting_struct(
     return conditions_struct, conditions_info
 
 
+def _compute_larval_stage_duration(ecdysis_array):
+    durations = np.full(len(ecdysis_array) - 1, np.nan)
+    for i, (start, end) in enumerate(zip(ecdysis_array[:-1], ecdysis_array[1:])):
+        # check if start or end is NaN
+        if np.isnan(start) or np.isnan(end):
+            durations[i] = np.nan
+        else:
+            durations[i] = end - start
+    return durations
+
+
 def _get_ecdysis_and_durations(filemap):
     all_ecdysis_time_step = []
     all_ecdysis_index = []
@@ -282,53 +334,44 @@ def _get_ecdysis_and_durations(filemap):
     all_ecdysis_experiment_time = []
     all_durations_experiment_time = []
 
-    for point in filemap["Point"].unique():
-        point_df = filemap[filemap["Point"] == point]
-        point_time = point_df["Time"].values
-        point_ecdysis = point_df[["HatchTime", "M1", "M2", "M3", "M4"]].iloc[0]
+    ecdysis_columns = ["HatchTime", "M1", "M2", "M3", "M4"]
+    column_list = ["Point", "Time", "ExperimentTime"] + ecdysis_columns
+    filemap = filemap.select(pl.col(column_list))
 
-        point_ecdysis_index = []
-        for ecdysis in point_ecdysis:
-            matches = np.where(point_time == ecdysis)[0]
+    ecdysis_values = (
+        filemap.group_by("Point", maintain_order=True)
+        .agg(pl.col(ecdysis_columns).first())
+        .drop("Point")
+        .cast(pl.Float64)
+    )
 
-            if len(matches) == 0:
-                point_ecdysis_index.append(np.nan)
-            else:
-                point_ecdysis_index.append(float(matches[0]))
+    point_dataframes = filemap.select(
+        pl.col("Point"), pl.col("Time"), pl.col("ExperimentTime")
+    ).partition_by("Point", maintain_order=True)
 
-        larval_stage_durations = list(
-            compute_larval_stage_duration(point_ecdysis).values()
-        )
+    for i, point_df in enumerate(point_dataframes):
+        ecdysis = ecdysis_values[i].to_numpy().squeeze()
+        time = point_df.select(pl.col("Time")).to_numpy().squeeze()
+        experiment_time = point_df.select(pl.col("ExperimentTime")).to_numpy().squeeze()
 
-        point_ecdysis = point_ecdysis.to_numpy()
-        all_ecdysis_time_step.append(point_ecdysis)
+        point_ecdysis_index = [
+            float(np.where(time == ecdysis)[0][0]) if ecdysis in time else np.nan
+            for ecdysis in ecdysis
+        ]
+        ecdysis_experiment_time = [
+            experiment_time[int(index)] if not np.isnan(index) else np.nan
+            for index in point_ecdysis_index
+        ]
+        all_ecdysis_time_step.append(ecdysis)
         all_ecdysis_index.append(point_ecdysis_index)
-        all_durations_time_step.append(larval_stage_durations)
-
-        ecdysis_experiment_time = []
-        for ecdys in point_ecdysis:
-            if np.isnan(ecdys):
-                ecdysis_experiment_time.append(np.nan)
-            else:
-                # if ecdys is not in the time column, set it to nan
-                if ecdys not in point_df["Time"].values:
-                    ecdys_experiment_time = np.nan
-                else:
-                    ecdys_experiment_time = point_df[point_df["Time"] == ecdys][
-                        "ExperimentTime"
-                    ].iloc[0]
-                ecdysis_experiment_time.append(ecdys_experiment_time)
-
         all_ecdysis_experiment_time.append(ecdysis_experiment_time)
 
-        durations_experiment_time = []
-        for i in range(len(ecdysis_experiment_time) - 1):
-            start = ecdysis_experiment_time[i]
-            end = ecdysis_experiment_time[i + 1]
-            duration_experiment_time = end - start
-            durations_experiment_time.append(duration_experiment_time)
-
-        all_durations_experiment_time.append(durations_experiment_time)
+        larval_stage_durations = _compute_larval_stage_duration(ecdysis)
+        larval_stage_durations_experiment_time = _compute_larval_stage_duration(
+            ecdysis_experiment_time
+        )
+        all_durations_time_step.append(larval_stage_durations)
+        all_durations_experiment_time.append(larval_stage_durations_experiment_time)
 
     return (
         np.array(all_ecdysis_index),
@@ -344,16 +387,21 @@ def _get_values_at_molt(filemap, column):
     ecdysis = ["HatchTime", "M1", "M2", "M3", "M4"]
 
     columns_at_ecdysis = [f"{column}_at_{e}" for e in ecdysis]
+    unique_points = filemap.select(pl.col("Point")).unique().to_numpy().squeeze()
 
-    for point in filemap["Point"].unique():
-        point_df = filemap.loc[filemap["Point"] == point].copy()
+    for point in unique_points:
+        point_df = filemap.filter(pl.col("Point") == point)
 
         for col in columns_at_ecdysis:
             if col not in point_df.columns:
-                print(f"Column {col} not found in point {point}, adding it.")
-                point_df[col] = np.nan
+                point_df = point_df.with_columns(pl.lit(np.nan).alias(col))
 
-        values_at_ecdysis_point = point_df[columns_at_ecdysis].to_numpy()[0]
+        values_at_ecdysis_point = (
+            point_df.select(pl.col(columns_at_ecdysis))[0]
+            .cast(float)
+            .to_numpy()
+            .squeeze()
+        )
 
         all_values.append(values_at_ecdysis_point)
 
@@ -412,68 +460,63 @@ def _compute_values_at_molt(
 
 
 def separate_column_by_point(filemap, column):
-    max_number_of_values = np.max(
-        [
-            len(filemap[filemap["Point"] == point][column].values)
-            for point in filemap["Point"].unique()
-        ]
+    points = filemap.select(pl.col("Point").unique().sort()).to_numpy().flatten()
+
+    filemap_points = filemap.select(pl.col("Point"), pl.col(column))
+    point_dataframes = filemap_points.partition_by("Point", maintain_order=True)
+
+    sample = point_dataframes[0].select(pl.col(column)).head(1).item()
+    is_string = isinstance(sample, str) or (
+        hasattr(sample, "dtype") and np.issubdtype(sample.dtype, np.str_)
     )
 
-    all_values = []
-    for i, point in enumerate(filemap["Point"].unique()):
-        point_df = filemap[filemap["Point"] == point]
-        values_of_point = point_df[column].values
+    max_height = max(point_df.height for point_df in point_dataframes)
+    if is_string:
+        result = np.full((len(points), max_height), "error", dtype=object)
+    else:
+        result = np.full((len(points), max_height), np.nan)
 
-        if isinstance(values_of_point[0], str):
-            dtype = str
-            pad_value = "error"
-        else:
-            dtype = float
-            pad_value = np.nan
+    for i, point_df in enumerate(point_dataframes):
+        point_column = point_df.select(pl.col(column)).to_numpy().squeeze()
+        result[i, : len(point_column)] = point_column
+    return result
 
-        values_of_point = np.array(values_of_point, dtype=dtype)
-        values_of_point = np.pad(
-            values_of_point,
-            (0, max_number_of_values - len(values_of_point)),
-            mode="constant",
-            constant_values=pad_value,
-        )
-
-        all_values.append(values_of_point)
-
-    return np.array(all_values)
+    return result
 
 
 def remove_ignored_molts(filemap):
-    df = filemap.copy()
-
     molt_columns = ["HatchTime", "M1", "M2", "M3", "M4"]
 
-    for point in df["Point"].unique():
-        point_mask = df["Point"] == point
-        point_df = df[point_mask]
+    for point in filemap["Point"].unique():
+        point_mask = pl.col("Point") == point
+        point_df = filemap.filter(point_mask)
 
-        if point_df.empty:
+        if point_df.is_empty():
             continue
 
         # Get molt times for this point
-        molt_times = point_df[molt_columns].iloc[0]
+        molt_times = point_df.select(molt_columns).row(0)
 
         # Check each molt time
-        for col, molt_time in molt_times.items():
-            if pd.isna(molt_time):
+        for col, molt_time in zip(molt_columns, molt_times):
+            if molt_time is None:
                 continue
 
             # Find if this molt should be ignored
-            try:
-                if point_df[point_df["Time"] == molt_time]["Ignore"].iloc[0]:
-                    # Use .loc to avoid chained indexing warning
-                    df.loc[point_mask, col] = np.nan
-            except IndexError:
-                print(f"No row found for time {molt_time} in point {point}")
-                df.loc[point_mask, col] = np.nan
+            ignore_mask = (pl.col("Time") == molt_time) & (pl.col("Ignore"))
+            if filemap.filter(point_mask & ignore_mask).height > 0:
+                filemap = filemap.with_columns(
+                    pl.when(point_mask)
+                    .then(
+                        pl.when(pl.col("Time") == molt_time)
+                        .then(None)
+                        .otherwise(pl.col(col))
+                    )
+                    .otherwise(pl.col(col))
+                    .alias(col)
+                )
 
-    return df
+    return filemap
 
 
 def remove_unwanted_info(conditions_info):
@@ -514,6 +557,7 @@ def combine_experiments(
         experiment_dir = (
             experiment_dirs[i] if experiment_dirs else os.path.dirname(filemap_path)
         )
+
         conditions_struct, conditions_info = build_plotting_struct(
             experiment_dir,
             filemap_path,
