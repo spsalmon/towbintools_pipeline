@@ -28,12 +28,11 @@ def _setup_figure(
         print("Number of titles does not match the number of ecdysis events.")
         titles = None
 
-    # Create figure with extra space on the right for legend
     fig, ax = plt.subplots(
         1,
         df["Event"].nunique(),
         figsize=(figsize[0] + 3, figsize[1]),
-        sharey=share_y_axis,
+        sharey=False,
     )
 
     return fig, ax
@@ -250,6 +249,9 @@ def boxplot_at_molt(
 
     if share_y_axis:
         _set_all_y_limits(ax, y_min, y_max)
+        # set the figure to sharey
+        for i in range(len(ax)):
+            ax[i].sharey(ax[0])
 
     # Make subplots closer together while leaving space for legend
     plt.tight_layout(rect=[0, 0, 0.9, 1])

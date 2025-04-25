@@ -1,6 +1,5 @@
 import os
 from collections import defaultdict
-from time import perf_counter
 
 import numpy as np
 import polars as pl
@@ -200,31 +199,26 @@ def _process_condition_id_plotting_structure(
                 [col for col in organ_columns if feature in col]
             )
 
-        renamed_organ_feature_columns = [
-            col.replace(organ_channel, organ) for col in organ_columns
-        ]
+        for organ_feature_column in organ_feature_columns:
+            # rename the column to remove the organ channel
+            renamed_feature_organ_column = organ_feature_column.replace(
+                organ_channel, organ
+            )
 
-        for organ_feature_column, renamed_feature_organ_column in zip(
-            organ_feature_columns, renamed_organ_feature_columns
-        ):
             condition_dict[renamed_feature_organ_column] = separate_column_by_point(
                 condition_df, organ_feature_column
             )
             condition_dict[
                 f"{renamed_feature_organ_column}_at_ecdysis"
             ] = _get_values_at_molt(condition_df, organ_feature_column)
-        # remove any column with worm_type in it
-        renamed_organ_feature_columns = [
-            col for col in renamed_organ_feature_columns if "worm_type" not in col
-        ]
 
-        for column in renamed_organ_feature_columns:
-            condition_dict = _compute_values_at_molt(
-                condition_dict,
-                column,
-                worm_types,
-                recompute_values_at_molt=recompute_values_at_molt,
-            )
+            if "worm_type" not in organ_feature_column:
+                condition_dict = _compute_values_at_molt(
+                    condition_dict,
+                    renamed_feature_organ_column,
+                    worm_types,
+                    recompute_values_at_molt=recompute_values_at_molt,
+                )
 
     return condition_dict
 
@@ -236,7 +230,6 @@ def build_plotting_struct(
     organ_channels={"body": 2, "pharynx": 1},
     recompute_values_at_molt=False,
 ):
-    start_time = perf_counter()
     experiment_filemap = pl.read_csv(filemap_path)
 
     conditions = build_conditions(conditions_yaml_path)
@@ -272,12 +265,7 @@ def build_plotting_struct(
 
     conditions_struct = []
 
-    print(
-        f"Initial processing of filemap took {perf_counter() - start_time:.2f} seconds"
-    )
-
     for condition_id in experiment_filemap["condition_id"].unique():
-        start_time = perf_counter()
         condition_dict = _process_condition_id_plotting_structure(
             experiment_dir,
             experiment_filemap,
@@ -286,9 +274,6 @@ def build_plotting_struct(
             conditions_keys,
             condition_id,
             recompute_values_at_molt=recompute_values_at_molt,
-        )
-        print(
-            f"Processing condition {condition_id} took {perf_counter() - start_time:.2f} seconds"
         )
 
         conditions_struct.append(condition_dict)
