@@ -135,3 +135,23 @@ def rescale_without_flattening(
         condition[rescaled_series_name] = rescaled_series
 
     return conditions_struct
+
+
+def exclude_arrests_from_series_at_ecdysis(series_at_ecdysis):
+    filtered_series = np.full(series_at_ecdysis.shape, np.nan)
+    # keep only a value at one ecdys event if the next one is not nan
+    if series_at_ecdysis.shape[0] == 1 or len(series_at_ecdysis.shape) == 1:
+        for i in range(len(series_at_ecdysis)):
+            if i == len(series_at_ecdysis) - 1:
+                filtered_series[i] = series_at_ecdysis[i]
+            elif not np.isnan(series_at_ecdysis[i + 1]):
+                filtered_series[i] = series_at_ecdysis[i]
+        return filtered_series
+    else:
+        for i in range(series_at_ecdysis.shape[0]):
+            for j in range(series_at_ecdysis.shape[1]):
+                if j == series_at_ecdysis.shape[1] - 1:
+                    filtered_series[i, j] = series_at_ecdysis[i, j]
+                elif not np.isnan(series_at_ecdysis[i, j + 1]):
+                    filtered_series[i, j] = series_at_ecdysis[i, j]
+        return filtered_series
