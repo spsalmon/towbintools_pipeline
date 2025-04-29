@@ -560,22 +560,8 @@ def plot_model_comparison_at_ecdysis(
         else f"deviation from modeled {column_two}"
     )
 
-    # control_condition = conditions_struct[control_condition_id]
-    # control_model = get_proportion_model_ecdysis(
-    #     control_condition[column_one],
-    #     control_condition[column_two],
-    #     remove_hatch,
-    #     exclude_arrests=exclude_arrests,
-    #     poly_degree=poly_degree,
-    #     plot_model=False,
-    # )
-
-    column_one_minimums = []
-    column_one_maximums = []
-    column_two_minimums = []
-    column_two_maximums = []
-
     models = {}
+    xs = {}
 
     for i, condition_id in enumerate(conditions_to_plot):
         condition = conditions_struct[condition_id]
@@ -590,25 +576,27 @@ def plot_model_comparison_at_ecdysis(
         )
 
         column_one_values = np.log(condition[column_one])
-        column_two_values = np.log(condition[column_two])
 
-        column_one_minimums.append(np.nanmin(column_one_values))
-        column_one_maximums.append(np.nanmax(column_one_values))
-        column_two_minimums.append(np.nanmin(column_two_values))
-        column_two_maximums.append(np.nanmax(column_two_values))
+        x = np.linspace(np.nanmin(column_one_values), np.nanmax(column_one_values), 100)
 
         models[condition_id] = model
+        xs[condition_id] = x
 
-    column_one_minimum = np.nanmin(column_one_minimums)
-    column_one_maximum = np.nanmax(column_one_maximums)
+    # determine the overlap of all the x values
+    x_min = np.nanmax(
+        [np.nanmin(xs[condition_id]) for condition_id in conditions_to_plot]
+    )
+    x_max = np.nanmin(
+        [np.nanmax(xs[condition_id]) for condition_id in conditions_to_plot]
+    )
 
-    x = np.linspace(column_one_minimum, column_one_maximum, 100)
-    # control_y = np.exp(control_model(x))
+    x = np.linspace(x_min, x_max, 100)
+    control_values = np.exp(models[control_condition_id](x))
 
     for i, condition_id in enumerate(conditions_to_plot):
         plt.plot(
             np.exp(x),
-            np.exp(models[condition_id](x)),
+            (np.exp(models[condition_id](x)) / control_values - 1) * 100,
             color=color_palette[i],
             label=build_legend(conditions_struct[condition_id], legend),
         )

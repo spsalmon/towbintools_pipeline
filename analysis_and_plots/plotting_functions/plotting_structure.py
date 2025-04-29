@@ -227,8 +227,9 @@ def build_plotting_struct(
     experiment_dir,
     filemap_path,
     conditions_yaml_path,
-    organ_channels={"body": 2, "pharynx": 1},
+    organ_channels={"body": "ch2", "pharynx": "ch1"},
     recompute_values_at_molt=False,
+    rescale_n_points=100,
 ):
     experiment_filemap = pl.read_csv(filemap_path)
 
@@ -274,6 +275,7 @@ def build_plotting_struct(
             conditions_keys,
             condition_id,
             recompute_values_at_molt=recompute_values_at_molt,
+            rescale_n_points=rescale_n_points,
         )
 
         conditions_struct.append(condition_dict)
@@ -501,8 +503,9 @@ def combine_experiments(
     filemap_paths,
     config_paths,
     experiment_dirs=None,
-    organ_channels=[{"body": 2, "pharynx": 1}],
+    organ_channels=[{"body": "ch2", "pharynx": "ch1"}],
     recompute_values_at_molt=False,
+    rescale_n_points=100,
 ):
     all_conditions_struct = []
     condition_info_merge_list = []
@@ -533,6 +536,7 @@ def combine_experiments(
             config_path,
             organ_channels=organ_channel,
             recompute_values_at_molt=recompute_values_at_molt,
+            rescale_n_points=rescale_n_points,
         )
 
         # Process conditions for this experiment
