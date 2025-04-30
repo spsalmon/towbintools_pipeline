@@ -13,24 +13,19 @@ from .utils_plotting import get_colors
 
 def _setup_figure(
     df,
-    conditions_struct,
-    conditions_to_plot,
-    legend,
-    color_palette,
     figsize,
     titles,
-    share_y_axis,
 ):
     # Determine figure size
     if figsize is None:
-        figsize = (6 * df["Event"].nunique(), 10)
-    if titles is not None and len(titles) != df["Event"].nunique():
+        figsize = (6 * df["Order"].nunique(), 10)
+    if titles is not None and len(titles) != df["Order"].nunique():
         print("Number of titles does not match the number of ecdysis events.")
         titles = None
 
     fig, ax = plt.subplots(
         1,
-        df["Event"].nunique(),
+        df["Order"].nunique(),
         figsize=(figsize[0] + 3, figsize[1]),
         sharey=False,
     )
@@ -39,7 +34,12 @@ def _setup_figure(
 
 
 def _annotate_significance(
-    df, conditions_to_plot, column, boxplot, significance_pairs, event_index
+    df,
+    conditions_to_plot,
+    column,
+    boxplot,
+    significance_pairs,
+    event_index,
 ):
     if significance_pairs is None:
         pairs = list(combinations(df["Condition"].unique(), 2))
@@ -48,7 +48,7 @@ def _annotate_significance(
     annotator = Annotator(
         ax=boxplot,
         pairs=pairs,
-        data=df[df["Event"] == event_index],
+        data=df[df["Order"] == event_index],
         x="Condition",
         order=conditions_to_plot,
         y=column,
@@ -69,17 +69,23 @@ def _plot_boxplot(
     share_y_axis,
     plot_significance,
     significance_pairs,
+    hide_outliers=True,
 ):
     y_min, y_max = [], []
-    for event_index in range(df["Event"].nunique()):
+    for event_index in range(df["Order"].nunique()):
         if share_y_axis:
             if event_index > 0:
                 ax[event_index].tick_params(
                     axis="y", which="both", left=False, labelleft=False
                 )
 
+        if isinstance(ax, np.ndarray):
+            current_ax = ax[event_index]
+        else:
+            current_ax = ax
+
         boxplot = sns.boxplot(
-            data=df[df["Event"] == event_index],
+            data=df[df["Order"] == event_index],
             x="Condition",
             y=column,
             order=conditions_to_plot,
@@ -87,33 +93,51 @@ def _plot_boxplot(
             hue="Condition",
             palette=color_palette,
             showfliers=False,
-            ax=ax[event_index],
+            ax=current_ax,
             dodge=False,
             linewidth=2,
             legend="full",
         )
 
+        if hide_outliers:
+            data = df[df["Order"] == event_index]
+            for condition in conditions_to_plot:
+                condition_data = data[data["Condition"] == condition]
+                mean = condition_data[column].mean()
+                std = condition_data[column].std()
+                outliers = condition_data[
+                    (condition_data[column] < mean - 3 * std)
+                    | (condition_data[column] > mean + 3 * std)
+                ]
+                # set outliers to NaN
+                df.loc[
+                    (df["Order"] == event_index)
+                    & (df["Condition"] == condition)
+                    & (df[column].isin(outliers[column])),
+                    column,
+                ] = np.nan
+
         sns.stripplot(
-            data=df[df["Event"] == event_index],
+            data=df[df["Order"] == event_index],
             x="Condition",
             order=conditions_to_plot,
             y=column,
-            ax=ax[event_index],
+            ax=current_ax,
             alpha=0.5,
             color="black",
             dodge=True,
         )
 
-        ax[event_index].set_xlabel("")
+        current_ax.set_xlabel("")
         # Hide y-axis labels and ticks for all subplots except the first one
         if event_index > 0:
-            ax[event_index].set_ylabel("")
+            current_ax.set_ylabel("")
 
         if titles is not None:
-            ax[event_index].set_title(titles[event_index])
+            current_ax.set_title(titles[event_index])
 
         # remove ticks
-        ax[event_index].tick_params(
+        current_ax.tick_params(
             axis="x", which="both", bottom=False, top=False, labelbottom=False
         )
 
@@ -122,7 +146,7 @@ def _plot_boxplot(
                 df, conditions_to_plot, column, boxplot, significance_pairs, event_index
             )
 
-        min_y, max_y = ax[event_index].get_ylim()
+        min_y, max_y = current_ax.get_ylim()
         y_min.append(min_y)
         y_max.append(max_y)
 
@@ -148,6 +172,9 @@ def _set_labels_and_legend(
     y_axis_label,
     legend,
 ):
+    if not isinstance(ax, np.ndarray):
+        ax = [ax]
+
     # Set y label for the first plot
     if y_axis_label is not None:
         ax[0].set_ylabel(y_axis_label)
@@ -177,11 +204,11 @@ def _set_labels_and_legend(
     )
 
 
-def boxplot_at_molt(
+def boxplot(
     conditions_struct,
     column,
     conditions_to_plot,
-    remove_hatch=False,
+    remove_first=False,
     log_scale: bool = True,
     figsize: tuple = None,
     colors=None,
@@ -191,6 +218,7 @@ def boxplot_at_molt(
     y_axis_label=None,
     titles=None,
     share_y_axis: bool = False,
+    hide_outliers: bool = True,
 ):
     color_palette = get_colors(
         conditions_to_plot,
@@ -202,13 +230,20 @@ def boxplot_at_molt(
     for condition_id in conditions_to_plot:
         condition_dict = conditions_struct[condition_id]
         data = condition_dict[column]
-        range_start = 1 if remove_hatch else 0
+        number_of_events = data.shape[1]
+        if remove_first and number_of_events > 1:
+            range_start = 1
+        elif not remove_first and number_of_events > 1:
+            range_start = 0
+        else:
+            range_start = 0
+
         for j in range(range_start, data.shape[1]):
             for value in data[:, j]:
                 data_list.append(
                     {
                         "Condition": condition_id,
-                        "Event": j,
+                        "Order": j,
                         column: np.log(value) if log_scale else value,
                     }
                 )
@@ -216,13 +251,8 @@ def boxplot_at_molt(
 
     fig, ax = _setup_figure(
         df,
-        conditions_struct,
-        conditions_to_plot,
-        legend,
-        color_palette,
         figsize,
         titles,
-        share_y_axis,
     )
 
     y_min, y_max = _plot_boxplot(
@@ -235,6 +265,7 @@ def boxplot_at_molt(
         share_y_axis,
         plot_significance,
         significance_pairs,
+        hide_outliers,
     )
 
     _set_labels_and_legend(
@@ -274,11 +305,11 @@ def boxplot_larval_stage(
     colors=None,
     plot_significance: bool = False,
     significance_pairs=None,
-    significance_position="inside",
     legend=None,
     y_axis_label=None,
     titles=None,
     share_y_axis: bool = False,
+    hide_outliers: bool = True,
 ):
     color_palette = get_colors(
         conditions_to_plot,
@@ -316,7 +347,7 @@ def boxplot_larval_stage(
                 data_list.append(
                     {
                         "Condition": condition_id,
-                        "Event": i,
+                        "Order": i,
                         column: aggregated_data_of_stage[j],
                     }
                 )
@@ -344,6 +375,7 @@ def boxplot_larval_stage(
         share_y_axis,
         plot_significance,
         significance_pairs,
+        hide_outliers,
     )
 
     _set_labels_and_legend(
