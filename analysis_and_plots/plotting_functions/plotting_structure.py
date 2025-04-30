@@ -137,6 +137,7 @@ def _process_condition_id_plotting_structure(
     conditions_keys,
     condition_id,
     recompute_values_at_molt=False,
+    rescale_n_points=100,
 ):
     condition_df = experiment_filemap.filter(pl.col("condition_id") == condition_id)
     condition_dict = {}
@@ -180,6 +181,8 @@ def _process_condition_id_plotting_structure(
     condition_dict["experiment_time"] = separate_column_by_point(
         condition_df, "ExperimentTime"
     ).astype(float)
+
+    condition_dict["experiment_time_hours"] = condition_dict["experiment_time"] / 3600
 
     condition_dict["worm_type"] = worm_types
 
