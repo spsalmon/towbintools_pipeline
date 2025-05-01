@@ -129,6 +129,7 @@ def _add_conditions_to_filemap(experiment_filemap, conditions):
     return experiment_filemap
 
 
+# TODO: Instead of doing it for each condition, do it for all conditions at once, then split
 def _process_condition_id_plotting_structure(
     experiment_dir,
     experiment_filemap,
@@ -146,45 +147,40 @@ def _process_condition_id_plotting_structure(
         condition_dict[key] = condition_df.select(pl.col(key))[0].item()
 
     (
+        time,
+        experiment_time,
         ecdysis_index,
         ecdysis_time_step,
         ecdysis_experiment_time,
         larval_stage_durations_time_step,
         larval_stage_durations_experiment_time,
-    ) = _get_ecdysis_and_durations(condition_df)
+    ) = _get_time_ecdysis_and_durations(condition_df)
 
     n_points = condition_df.select(pl.col("Point")).n_unique()
 
-    condition_dict["condition_id"] = int(condition_dict["condition_id"])
-    condition_dict["ecdysis_index"] = ecdysis_index
-    condition_dict["ecdysis_time_step"] = ecdysis_time_step
-    condition_dict[
-        "larval_stage_durations_time_step"
-    ] = larval_stage_durations_time_step
-    condition_dict["ecdysis_experiment_time"] = ecdysis_experiment_time
-    condition_dict[
-        "larval_stage_durations_experiment_time"
-    ] = larval_stage_durations_experiment_time
-    condition_dict["larval_stage_durations_experiment_time_hours"] = (
-        larval_stage_durations_experiment_time / 3600
-    )
-    condition_dict["experiment"] = np.array([experiment_dir] * n_points)[:, np.newaxis]
-    condition_dict["filemap_path"] = np.array([filemap_path] * n_points)[:, np.newaxis]
-    condition_dict["point"] = condition_df.select(pl.col("Point").unique()).to_numpy()
     # TEMPORARY, ONLY WORKS WITH SINGLE CLASSIFICATION, FIND A WAY TO GENERALIZE
     worm_type_column = [col for col in condition_df.columns if "worm_type" in col][0]
     worm_types = separate_column_by_point(condition_df, worm_type_column)
 
-    condition_dict["time"] = separate_column_by_point(condition_df, "Time").astype(
-        float
+    condition_dict.update(
+        {
+            "condition_id": int(condition_dict["condition_id"]),
+            "ecdysis_index": ecdysis_index,
+            "ecdysis_time_step": ecdysis_time_step,
+            "larval_stage_durations_time_step": larval_stage_durations_time_step,
+            "ecdysis_experiment_time": ecdysis_experiment_time,
+            "larval_stage_durations_experiment_time": larval_stage_durations_experiment_time,
+            "larval_stage_durations_experiment_time_hours": larval_stage_durations_experiment_time
+            / 3600,
+            "experiment": np.full((n_points, 1), experiment_dir),
+            "filemap_path": np.full((n_points, 1), filemap_path),
+            "point": condition_df.select(pl.col("Point").unique()).to_numpy(),
+            "time": time,
+            "experiment_time": experiment_time,
+            "experiment_time_hours": experiment_time / 3600,
+            "worm_type": worm_types,
+        }
     )
-    condition_dict["experiment_time"] = separate_column_by_point(
-        condition_df, "ExperimentTime"
-    ).astype(float)
-
-    condition_dict["experiment_time_hours"] = condition_dict["experiment_time"] / 3600
-
-    condition_dict["worm_type"] = worm_types
 
     for organ in organ_channels.keys():
         organ_channel = organ_channels[organ]
@@ -306,7 +302,7 @@ def _compute_larval_stage_duration(ecdysis_array):
     return durations
 
 
-def _get_ecdysis_and_durations(filemap):
+def _get_time_ecdysis_and_durations(filemap):
     all_ecdysis_time_step = []
     all_ecdysis_index = []
     all_durations_time_step = []
@@ -325,25 +321,26 @@ def _get_ecdysis_and_durations(filemap):
         .cast(pl.Float64)
     )
 
-    point_dataframes = filemap.select(
-        pl.col("Point"), pl.col("Time"), pl.col("ExperimentTime")
-    ).partition_by("Point", maintain_order=True)
+    time = separate_column_by_point(filemap, "Time").astype(float)
+    experiment_time = separate_column_by_point(filemap, "ExperimentTime").astype(float)
 
-    for i, point_df in enumerate(point_dataframes):
+    for i in range(len(ecdysis_values)):
         ecdysis = ecdysis_values[i].to_numpy().squeeze()
-        time = point_df.select(pl.col("Time")).to_numpy().squeeze()
-        experiment_time = point_df.select(pl.col("ExperimentTime")).to_numpy().squeeze()
+        time_of_point = time[i]
+        experiment_time_of_point = experiment_time[i]
 
-        point_ecdysis_index = [
-            float(np.where(time == ecdysis)[0][0]) if ecdysis in time else np.nan
+        ecdysis_index = [
+            float(np.where(time_of_point == ecdysis)[0][0])
+            if ecdysis in time_of_point
+            else np.nan
             for ecdysis in ecdysis
         ]
         ecdysis_experiment_time = [
-            experiment_time[int(index)] if not np.isnan(index) else np.nan
-            for index in point_ecdysis_index
+            experiment_time_of_point[int(index)] if not np.isnan(index) else np.nan
+            for index in ecdysis_index
         ]
         all_ecdysis_time_step.append(ecdysis)
-        all_ecdysis_index.append(point_ecdysis_index)
+        all_ecdysis_index.append(ecdysis_index)
         all_ecdysis_experiment_time.append(ecdysis_experiment_time)
 
         larval_stage_durations = _compute_larval_stage_duration(ecdysis)
@@ -354,6 +351,8 @@ def _get_ecdysis_and_durations(filemap):
         all_durations_experiment_time.append(larval_stage_durations_experiment_time)
 
     return (
+        time,
+        experiment_time,
         np.array(all_ecdysis_index),
         np.array(all_ecdysis_time_step),
         np.array(all_ecdysis_experiment_time),
@@ -391,11 +390,12 @@ def _compute_values_at_molt(
     column_at_molt = f"{column}_at_ecdysis"
 
     values_at_molt = condition_dict[column_at_molt]
+    updated_values_at_molt = values_at_molt.copy()
 
     nan_indexes_values_mask = np.isnan(values_at_molt)
     experiment_time = condition_dict["experiment_time"]
 
-    if not np.any(np.isnan(experiment_time)):
+    if (~np.isnan(experiment_time)).any():
         time = condition_dict["experiment_time"]
         ecdysis = condition_dict["ecdysis_experiment_time"]
     else:
@@ -427,14 +427,18 @@ def _compute_values_at_molt(
             series_time=time[i],
         )
 
-        values_at_molt[i][idx_values_to_recompute] = recomputed_values
+        updated_values_at_molt[i][idx_values_to_recompute] = recomputed_values
 
-    condition_dict[column_at_molt] = values_at_molt
+    condition_dict[column_at_molt] = updated_values_at_molt
     return condition_dict
 
 
 def separate_column_by_point(filemap, column):
-    points = filemap.select(pl.col("Point").unique().sort()).to_numpy().flatten()
+    points = (
+        filemap.select(pl.col("Point").unique(maintain_order=True).sort())
+        .to_numpy()
+        .flatten()
+    )
 
     filemap_points = filemap.select(pl.col("Point"), pl.col(column))
     point_dataframes = filemap_points.partition_by("Point", maintain_order=True)
@@ -453,8 +457,6 @@ def separate_column_by_point(filemap, column):
     for i, point_df in enumerate(point_dataframes):
         point_column = point_df.select(pl.col(column)).to_numpy().squeeze()
         result[i, : len(point_column)] = point_column
-    return result
-
     return result
 
 
