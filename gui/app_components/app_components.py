@@ -104,6 +104,9 @@ def populate_column_choices(filemap):
         "M2",
         "M3",
         "M4",
+        "Arrest",
+        "Ignore",
+        "Dead",
     ]
 
     usual_columns.extend(
@@ -114,6 +117,8 @@ def populate_column_choices(filemap):
         usual_columns.extend(
             [column for column in filemap.columns if feature in column]
         )
+
+    usual_columns.extend([column for column in filemap.columns if "analysis" in column])
 
     feature_columns = []
     for feature in FEATURES_TO_COMPUTE_AT_MOLT:
@@ -218,11 +223,9 @@ def get_time_and_ecdysis(filemap):
     experiment_time = experiment_time / 3600
 
     ecdysis_index = []
-    ecdysis_experiment_time = []
 
     for i in range(len(ecdysis_time)):
         time_of_point = time[i]
-        experiment_time_of_point = experiment_time[i]
         ecdysis_of_point = ecdysis_time[i]
         ecdysis_index.append(
             [
@@ -232,17 +235,10 @@ def get_time_and_ecdysis(filemap):
                 for ecdysis in ecdysis_of_point
             ]
         )
-        ecdysis_experiment_time.append(
-            [
-                experiment_time_of_point[int(index)] if not np.isnan(index) else np.nan
-                for index in ecdysis_index[i]
-            ]
-        )
 
     ecdysis_index = np.array(ecdysis_index)
-    ecdysis_experiment_time = np.array(ecdysis_experiment_time)
 
-    return time, experiment_time, ecdysis_time, ecdysis_index, ecdysis_experiment_time
+    return time, experiment_time, ecdysis_index
 
 
 def build_single_values_df(filemap):
@@ -276,9 +272,7 @@ def process_feature_at_molt_columns(
     (
         time,
         experiment_time,
-        ecdysis_time,
         ecdysis_index,
-        ecdysis_experiment_time,
     ) = get_time_and_ecdysis(filemap)
 
     worm_types = separate_column_by_point(filemap, worm_type_column)
@@ -302,7 +296,6 @@ def process_feature_at_molt_columns(
             series,
             series_at_ecdysis,
             worm_types,
-            ecdysis_experiment_time,
             ecdysis_index,
             experiment_time,
             time,
@@ -356,11 +349,97 @@ def _get_values_at_molt(filemap, column):
     return values_at_ecdysis
 
 
+def update_molt_and_ecdysis_columns(
+    point_filemap,
+    single_values_df,
+    ecdys_event,
+    new_time,
+    new_time_index,
+    worm_type_column,
+    experiment_time=True,
+):
+    single_values_df = single_values_df.with_columns(
+        pl.lit(new_time).alias(ecdys_event)
+    )
+
+    worm_type_values = (
+        point_filemap.select(pl.col(worm_type_column)).to_numpy().squeeze()
+    )
+    if experiment_time:
+        time = (
+            point_filemap.select(pl.col("ExperimentTime")).to_numpy().squeeze() / 3600
+        )
+    else:
+        time = point_filemap.select(pl.col("Time")).to_numpy().squeeze()
+
+    value_at_ecdys_columns = [
+        column for column in point_filemap.columns if f"_at_{ecdys_event}" in column
+    ]
+
+    value_columns = [
+        re.sub(r"_at_.*$", "", column) for column in value_at_ecdys_columns
+    ]
+
+    for value_column, value_at_ecdys_column in zip(
+        value_columns, value_at_ecdys_columns
+    ):
+        if np.isnan(new_time_index):
+            new_value_at_ecdys = np.nan
+        else:
+            series = (
+                point_filemap.select(pl.col(value_column)).to_numpy().squeeze().copy()
+            )
+            new_value_at_ecdys = compute_series_at_time_classified(
+                series,
+                worm_type_values,
+                time[int(new_time_index)],
+                series_time=time,
+            )
+
+        print(
+            f"Old value {value_at_ecdys_column}: {single_values_df.select(pl.col(value_at_ecdys_column)).to_numpy().squeeze()}"
+        )
+
+        single_values_df = single_values_df.with_columns(
+            pl.lit(new_value_at_ecdys).alias(value_at_ecdys_column)
+        )
+
+        print(
+            f"New value {value_at_ecdys_column}: {single_values_df.select(pl.col(value_at_ecdys_column)).to_numpy().squeeze()}"
+        )
+
+    return single_values_df
+
+
+def correct_ecdysis_columns(point_filemap, single_values_df, ecdys_event, time_index):
+    value_at_ecdys_columns = [
+        column for column in point_filemap.columns if f"_at_{ecdys_event}" in column
+    ]
+
+    value_columns = [
+        re.sub(r"_at_.*$", "", column) for column in value_at_ecdys_columns
+    ]
+
+    for value_column, value_at_ecdys_column in zip(
+        value_columns, value_at_ecdys_columns
+    ):
+        new_value_at_ecdys = (
+            point_filemap.select(pl.col(value_column))
+            .to_numpy()
+            .squeeze()
+            .copy()[int(time_index)]
+        )
+        single_values_df = single_values_df.with_columns(
+            pl.lit(new_value_at_ecdys).alias(value_at_ecdys_column)
+        )
+
+    return single_values_df
+
+
 def _compute_series_at_molt(
     series,
     series_at_ecdysis,
     worm_types,
-    ecdysis_experiment_time,
     ecdysis_index,
     experiment_time,
     time,
@@ -372,10 +451,10 @@ def _compute_series_at_molt(
 
     if (~np.isnan(experiment_time)).any():
         time = experiment_time
-        ecdysis = ecdysis_experiment_time
     else:
         time = time
-        ecdysis = ecdysis_index
+
+    ecdysis = ecdysis_index
 
     non_nan_indexes_ecdysis_mask = np.invert(np.isnan(ecdysis))
 
@@ -393,12 +472,12 @@ def _compute_series_at_molt(
         if len(idx_values_to_recompute) == 0:
             continue
 
-        ecdys = ecdysis[i][idx_values_to_recompute]
+        ecdys = ecdysis[i][idx_values_to_recompute].astype(int)
 
         recomputed_values = compute_series_at_time_classified(
             series[i],
             worm_types[i],
-            ecdys,
+            time[i][ecdys],
             series_time=time[i],
         )
 
@@ -418,17 +497,8 @@ def set_marker_shape(
     m4,
     custom_annotations: list = [],
 ):
-    # fill the gaps in the times_of_point list
-    times_of_point_filled = np.arange(
-        np.min(times_of_point), np.max(times_of_point) + 1
-    )
-
-    worm_types_filled = [""] * len(times_of_point_filled)
-    for time, worm_type in zip(times_of_point, worm_types):
-        worm_types_filled[time] = worm_type
-
     symbols = []
-    for worm_type in worm_types_filled:
+    for worm_type in worm_types:
         if worm_type == "egg":
             symbol = "square-open"
         elif worm_type == "worm":
@@ -446,33 +516,38 @@ def set_marker_shape(
     for custom_annotation in custom_annotations:
         if np.isfinite(custom_annotation):
             symbols[int(custom_annotation)] = "circle"
-            sizes[int(custom_annotation)] = 8
+            sizes[int(custom_annotation)] = 12
             colors[int(custom_annotation)] = "pink"
 
     if np.isfinite(hatch_time):
-        symbols[int(hatch_time)] = "square"
-        sizes[int(hatch_time)] = 8
-        colors[int(hatch_time)] = "red"
+        hatch_index = np.where(times_of_point == hatch_time)[0][0]
+        symbols[hatch_index] = "square"
+        sizes[hatch_index] = 8
+        colors[hatch_index] = "red"
 
     if np.isfinite(m1):
-        symbols[int(m1)] = "circle"
-        sizes[int(m1)] = 8
-        colors[int(m1)] = "orange"
+        m1_index = np.where(times_of_point == m1)[0][0]
+        symbols[m1_index] = "circle"
+        sizes[m1_index] = 8
+        colors[m1_index] = "orange"
 
     if np.isfinite(m2):
-        symbols[int(m2)] = "circle"
-        sizes[int(m2)] = 8
-        colors[int(m2)] = "yellow"
+        m2_index = np.where(times_of_point == m2)[0][0]
+        symbols[m2_index] = "circle"
+        sizes[m2_index] = 8
+        colors[m2_index] = "yellow"
 
     if np.isfinite(m3):
-        symbols[int(m3)] = "circle"
-        sizes[int(m3)] = 8
-        colors[int(m3)] = "green"
+        m3_index = np.where(times_of_point == m3)[0][0]
+        symbols[m3_index] = "circle"
+        sizes[m3_index] = 8
+        colors[m3_index] = "green"
 
     if np.isfinite(m4):
-        symbols[int(m4)] = "circle"
-        sizes[int(m4)] = 8
-        colors[int(m4)] = "blue"
+        m4_index = np.where(times_of_point == m4)[0][0]
+        symbols[m4_index] = "circle"
+        sizes[m4_index] = 8
+        colors[m4_index] = "blue"
 
     widths = [1] * len(symbols)
     widths[int(selected_time_index)] = 4
