@@ -1,3 +1,4 @@
+import traceback
 from time import perf_counter
 
 import matplotlib.pyplot as plt
@@ -7,7 +8,6 @@ import plotly.graph_objs as go
 import polars as pl
 import scipy.io as sio
 from app_components.app_components import build_single_values_df
-from app_components.app_components import correct_ecdysis_columns
 from app_components.app_components import get_points_for_value_at_molts
 from app_components.app_components import infer_n_channels
 from app_components.app_components import open_filemap
@@ -15,11 +15,12 @@ from app_components.app_components import populate_column_choices
 from app_components.app_components import process_feature_at_molt_columns
 from app_components.app_components import save_filemap
 from app_components.app_components import set_marker_shape
-from app_components.app_components import update_molt_and_ecdysis_columns
 from app_components.ui_components import create_molt_annotator
 from app_components.ui_components import create_timepoint_selector
+from app_components.ui_components import molt_annotation_buttons_server
+from app_components.ui_components import time_point_navigator_server
+from polars.exceptions import ColumnNotFoundError
 from shiny import App
-from shiny import module
 from shiny import reactive
 from shiny import render
 from shiny import ui
@@ -39,7 +40,7 @@ KEY_CONVERSION_MAP = {
 ECDYSIS_COLUMNS = ["HatchTime", "M1", "M2", "M3", "M4"]
 recompute_features_at_molt = True
 
-filemap_path = "/mnt/towbin.data/shared/spsalmon/20250314_squid_10x_yap_aid_160_438_492_493/analysis/report/analysis_filemap.csv"
+filemap_path = "/mnt/towbin.data/shared/aslesarchuk/20250424_squid1_10x_wBT160_186_393_415_yap-del/analysis/report/analysis_filemap.csv"
 
 start = perf_counter()
 filemap, filemap_save_path = open_filemap(filemap_path)
@@ -81,151 +82,6 @@ filemap = process_feature_at_molt_columns(
     recompute_features_at_molt=recompute_features_at_molt,
 )
 
-
-@module.server
-def molt_annotation_buttons_server(
-    input,
-    output,
-    session,
-    point_filemap,
-    single_values_df_of_point,
-    column_to_plot,
-    current_time,
-    current_time_index,
-    molt_time,
-    value_at_molt,
-    molt_name,
-):
-    @output
-    @render.text
-    def text():
-        return f"{molt_name} : {str(molt_time())}"
-
-    @reactive.Effect
-    @reactive.event(input.set_molt)
-    def set_molt():
-        new_molt = float(current_time())
-        new_molt_index = int(current_time_index())
-
-        single_values_df_of_point.set(
-            update_molt_and_ecdysis_columns(
-                point_filemap(),
-                single_values_df_of_point(),
-                molt_name,
-                new_molt,
-                new_molt_index,
-                worm_type_column,
-            )
-        )
-        molt_time.set(new_molt)
-        value_at_molt.set(
-            single_values_df_of_point()
-            .select(pl.col(f"{column_to_plot()}_at_{molt_name}"))
-            .to_numpy()
-            .squeeze()
-        )
-
-    @reactive.Effect
-    @reactive.event(input.reset_molt)
-    def reset_molt():
-        new_molt = np.nan
-        new_molt_index = int(current_time_index())
-
-        single_values_df_of_point.set(
-            update_molt_and_ecdysis_columns(
-                point_filemap(),
-                single_values_df_of_point(),
-                molt_name,
-                new_molt,
-                new_molt_index,
-                worm_type_column,
-            )
-        )
-        molt_time.set(new_molt)
-        value_at_molt.set(
-            single_values_df_of_point()
-            .select(pl.col(f"{column_to_plot()}_at_{molt_name}"))
-            .to_numpy()
-            .squeeze()
-        )
-
-    @reactive.Effect
-    @reactive.event(input.set_value_at_molt)
-    def set_value_at_molt():
-        index = int(current_time_index())
-        single_values_df_of_point.set(
-            correct_ecdysis_columns(
-                point_filemap(), single_values_df_of_point(), molt_name, index
-            )
-        )
-        value_at_molt.set(
-            single_values_df_of_point()
-            .select(pl.col(f"{column_to_plot()}_at_{molt_name}"))
-            .to_numpy()
-            .squeeze()
-        )
-
-
-@module.server
-def time_point_navigator_server(
-    input,
-    output,
-    session,
-    clicked_value=None,
-    choices=[],
-    all_df=None,
-    current_df=None,
-    save_on_switch=False,
-):
-    index = reactive.Value("")
-    value = reactive.Value("")
-
-    def save():
-        if all_df is None or current_df is None:
-            raise ValueError("You need to specify which dataframe to save")
-        if index() != "":
-            print(f"previous values at index {index()}: {all_df[index()]}")
-            all_df[index()] = current_df()
-            print(f"updated values at index {index()}: {all_df[index()]}")
-
-    @reactive.Effect
-    def update_on_click():
-        if clicked_value is not None:
-            if clicked_value() == "":
-                return
-            print(f"Clicked value: {clicked_value()}")
-            ui.update_selectize("current", selected=clicked_value())
-
-    @reactive.Effect
-    @reactive.event(input.previous)
-    def previous():
-        current = int(input.current())
-        previous_index = max(np.where(np.array(choices) == current)[0][0] - 1, 0)
-        previous_time = choices[previous_index]
-        ui.update_selectize("current", selected=str(int(previous_time)))
-
-    @reactive.Effect
-    @reactive.event(input.next)
-    def next():
-        current = int(input.current())
-        next_index = min(
-            np.where(np.array(choices) == current)[0][0] + 1, len(choices) - 1
-        )
-        next_time = choices[next_index]
-        ui.update_selectize("current", selected=str(int(next_time)))
-
-    @reactive.Effect
-    @reactive.event(input.current)
-    def update_current():
-        if save_on_switch:
-            save()
-
-        value.set(input.current())
-        index.set(np.where(np.array(choices) == int(input.current()))[0][0])
-
-    return (index, value)
-
-
 print("Initializing the UI ...")
 
 molt_annotator = create_molt_annotator(ECDYSIS_COLUMNS, custom_columns_choices)
@@ -238,18 +94,6 @@ timepoint_selector = create_timepoint_selector(
     default_plotted_column,
 )
 app_ui = ui.page_fluid(ui.row(molt_annotator, timepoint_selector))
-
-
-def set_ignore_start(point):
-    try:
-        data_of_point = filemap.loc[filemap["Point"] == point]
-        # set ignore_start to the first time point that is ignored
-        ignore_start = data_of_point[data_of_point["Ignore"]]["Time"].min()
-
-        print(f"Ignore start: {ignore_start}")
-        return ignore_start
-    except KeyError:
-        return ""
 
 
 def server(input, output, session):
@@ -311,6 +155,7 @@ def server(input, output, session):
             molt_time,
             value_at_molt,
             molt_name=molt_name,
+            worm_type_column=worm_type_column,
         )
         for molt_name, molt_time, value_at_molt in zip(
             ECDYSIS_COLUMNS,
@@ -503,20 +348,23 @@ def server(input, output, session):
 
         print(f"Getting hatch and molts took {perf_counter() - start:.2f} seconds")
 
-    # @reactive.Effect
-    # def set_ignore_start():
-    #     ignore_start.set(set_ignore_start(int(input.point())))
+    @reactive.Effect
+    def set_ignore_start():
+        try:
+            df = work_df().filter(pl.col("Point") == int(current_point()))
+            ignore_values = df.select(pl.col("Ignore")).to_numpy().squeeze()
+            time_values = df.select(pl.col("Time")).to_numpy().squeeze()
+            # find the first True value
+            true_indices = np.where(ignore_values)[0]
+            if true_indices.size > 0:
+                ignore_start.set(time_values[true_indices[0]])
+            else:
+                ignore_start.set("")
 
-    # @reactive.Effect
-    # def get_death():
-    #     try:
-    #         death.set(
-    #             filemap.loc[filemap["Point"] == int(input.point()), "Death"].values[0]
-    #         )
-    #     except KeyError:
-    #         death.set("")
+        except ColumnNotFoundError:
+            ignore_start.set("")
 
-    #     print(f"Death: {death()}")
+        print(f"Ignore start: {ignore_start()}")
 
     # @reactive.Effect
     # def get_arrest():
@@ -527,74 +375,121 @@ def server(input, output, session):
     #     except KeyError:
     #         arrest.set(False)
 
-    # @reactive.Effect
-    # @reactive.event(input.set_ignore_point)
-    # def set_ignore_point():
-    #     global filemap
-    #     print("set ignore point")
-    #     current_point = int(input.point())
+    @reactive.Effect
+    @reactive.event(input.set_ignore_point)
+    def set_ignore_point():
+        point = int(current_point())
+        df = work_df()
 
-    #     mask = filemap["Point"] == current_point
+        print(f"Setting ignore for point {point}")
+        if "Ignore" not in df.columns:
+            df = df.with_columns(pl.lit(False).alias("Ignore"))
 
-    #     try:
-    #         if np.all(filemap.loc[mask, "Ignore"]):
-    #             filemap.loc[mask, "Ignore"] = False
-    #         else:
-    #             filemap.loc[mask, "Ignore"] = True
-    #     except KeyError:
-    #         filemap["Ignore"] = False
-    #         filemap.loc[mask, "Ignore"] = True
+        if (
+            df.filter(pl.col("Point") == point)
+            .select(pl.col("Ignore"))
+            .to_numpy()
+            .all()
+        ):
+            work_df.set(
+                df.with_columns(
+                    pl.when(pl.col("Point") == point)
+                    .then(False)
+                    .otherwise(pl.col("Ignore"))
+                    .alias("Ignore")
+                )
+            )
+        else:
+            work_df.set(
+                df.with_columns(
+                    pl.when(pl.col("Point") == point)
+                    .then(True)
+                    .otherwise(pl.col("Ignore"))
+                    .alias("Ignore")
+                )
+            )
 
-    #     ignore_start.set(set_ignore_start(current_point))
+        print(work_df().filter(pl.col("Point") == point).select(pl.col("Ignore")))
 
-    # @reactive.Effect
-    # @reactive.event(input.set_ignore_after)
-    # def set_ignore_after():
-    #     global filemap
-    #     print("set ignore after")
-    #     current_point = int(input.point())
-    #     current_time = int(input.time())
+    @reactive.Effect
+    @reactive.event(input.set_ignore_after)
+    def set_ignore_after():
+        point = int(current_point())
+        time = int(current_time())
+        df = work_df()
+        print(f"Setting ignore after for point {point}")
+        if "Ignore" not in df.columns:
+            df = df.with_columns(pl.lit(False).alias("Ignore"))
 
-    #     mask_point = filemap["Point"] == current_point
-    #     mask_after = (filemap["Point"] == current_point) & (
-    #         filemap["Time"] >= current_time
-    #     )
+        if (
+            df.filter((pl.col("Point") == point) & (pl.col("Time") >= time))
+            .select(pl.col("Ignore"))
+            .to_numpy()
+            .all()
+        ):
+            work_df.set(
+                df.with_columns(
+                    pl.when((pl.col("Point") == point) & (pl.col("Time") >= time))
+                    .then(False)
+                    .otherwise(pl.col("Ignore"))
+                    .alias("Ignore")
+                )
+            )
+        else:
+            work_df.set(
+                df.with_columns(
+                    pl.when((pl.col("Point") == point) & (pl.col("Time") >= time))
+                    .then(True)
+                    .otherwise(pl.col("Ignore"))
+                    .alias("Ignore")
+                )
+            )
 
-    #     try:
-    #         if np.all(filemap.loc[mask_point, "Ignore"]):
-    #             filemap.loc[mask_point, "Ignore"] = False
-    #             filemap.loc[mask_after, "Ignore"] = True
-    #         elif np.all(filemap.loc[mask_after, "Ignore"]):
-    #             filemap.loc[mask_point, "Ignore"] = False
-    #         else:
-    #             filemap.loc[mask_point, "Ignore"] = False
-    #             filemap.loc[mask_after, "Ignore"] = True
-    #     except KeyError:
-    #         filemap["Ignore"] = False
-    #         filemap.loc[mask_after, "Ignore"] = True
+        print(work_df().filter(pl.col("Point") == point).select(pl.col("Ignore")))
 
-    #     ignore_start.set(set_ignore_start(current_point))
+    @reactive.Effect
+    def get_death():
+        try:
+            death.set(
+                work_df()
+                .filter(pl.col("Point") == int(current_point()))
+                .select(pl.col("Death"))
+                .to_numpy()
+                .squeeze()[0]
+            )
+        except ColumnNotFoundError:
+            death.set("")
 
-    # @reactive.Effect
-    # @reactive.event(input.set_death)
-    # def set_death():
-    #     global filemap
-    #     print("set death")
-    #     current_point = int(input.point())
-    #     current_time = int(input.time())
+    @reactive.Effect
+    @reactive.event(input.set_death)
+    def set_death():
+        point = int(current_point())
+        time = int(current_time())
 
-    #     mask = filemap["Point"] == current_point
+        df = work_df()
 
-    #     try:
-    #         if filemap.loc[mask, "Death"].values[0] == current_time:
-    #             filemap.loc[mask, "Death"] = np.nan
-    #         else:
-    #             filemap.loc[mask, "Death"] = current_time
-    #     except KeyError:
-    #         filemap["Death"] = np.nan
-    #         filemap.loc[mask, "Death"] = current_time
+        if "Death" not in df.columns:
+            df = df.with_columns(pl.lit(np.nan).alias("Death"))
 
-    #     death.set(filemap.loc[mask, "Death"].values[0])
+        point_df = df.filter(pl.col("Point") == point)
+
+        if point_df.select(pl.col("Death")).to_numpy().squeeze()[0] == time:
+            df = df.with_columns(
+                pl.when(pl.col("Point") == point)
+                .then(np.nan)
+                .otherwise(pl.col("Death"))
+                .alias("Death")
+            )
+
+        else:
+            df = df.with_columns(
+                pl.when(pl.col("Point") == point)
+                .then(time)
+                .otherwise(pl.col("Death"))
+                .alias("Death")
+            )
+
+        work_df.set(df)
 
     # @reactive.Effect
     # @reactive.event(input.set_arrest)
@@ -620,7 +515,6 @@ def server(input, output, session):
     @render_widget
     def volume_plot():
         overall_start = perf_counter()
-        start = perf_counter()
         data_of_point = current_point_filemap().select(
             pl.col(
                 [
@@ -635,7 +529,6 @@ def server(input, output, session):
                 ]
             )
         )
-        print(f"Getting data of point took {perf_counter() - start:.2f} seconds")
 
         times_of_point = data_of_point.select(pl.col("Time")).to_numpy().squeeze()
         values_of_point = (
@@ -645,6 +538,7 @@ def server(input, output, session):
             data_of_point.select(pl.col(worm_type_column)).to_numpy().squeeze()
         )
 
+        print(f"Custom annotations: {custom_column_values()}")
         markers = set_marker_shape(
             times_of_point,
             current_time_index(),
@@ -776,9 +670,8 @@ def server(input, output, session):
         return fig
 
     @reactive.Effect
-    def get_custom_column_values():
-        print("get_custom_column_values")
-        print(f"custom_column: {input.custom_column()}")
+    def reactive_get_custom_column_values():
+        print("reactive_get_custom_column_values")
         custom_column = input.custom_column()
 
         local_work_df = work_df()
@@ -794,82 +687,96 @@ def server(input, output, session):
             work_df.set(local_work_df)
             custom_column_values.set([])
         else:
-            values = (
-                local_work_df.filter(pl.col("Point") == int(input.point()))
-                .select(pl.col(custom_column))
-                .to_numpy()
-                .squeeze()
-                .tolist()
+            custom_column_values.set(
+                get_custom_column_values(
+                    local_work_df, custom_column, int(current_point())
+                )
             )
-            print(f"new values: {values}")
-            custom_column_values.set(values)
-
         print(f"Custom column values: {custom_column_values()}")
+
+    def get_custom_column_values(df, column, point):
+        if column == "None" or column == "":
+            return []
+        if column not in df.columns:
+            df = df.with_columns(pl.lit(np.nan).alias(column))
+        intermediate_df = df.filter(pl.col("Point") == point)
+
+        # convert the column to index in the time values
+        time = intermediate_df.select(pl.col("Time")).to_numpy().squeeze()
+        column_values = intermediate_df.select(pl.col(column)).to_numpy().squeeze()
+
+        non_nan_column_values = column_values[~np.isnan(column_values)]
+        column_values_as_indexes = np.full_like(non_nan_column_values, np.nan)
+        for i, value in enumerate(non_nan_column_values):
+            index = np.where(time == value)[0]
+            if index.size > 0:
+                column_values_as_indexes[i] = index[0]
+        return column_values_as_indexes
 
     @reactive.Effect
     @reactive.event(input.custom_annotation)
     def set_custom_annotation():
-        new_column_name = input.new_custom_column()
-        custom_column = input.custom_column()
+        try:
+            new_column_name = input.new_custom_column()
+            custom_column = input.custom_column()
 
-        local_work_df = work_df()
+            local_work_df = work_df()
+            filemap_columns = filemap.columns
+            custom_columns = custom_columns_list()
 
-        filemap_columns = filemap.columns
+            if new_column_name != "" and (new_column_name not in custom_columns):
+                custom_columns.append(new_column_name)
+                custom_columns_list.set(custom_columns)
+                ui.update_selectize(
+                    "custom_column",
+                    choices=custom_columns_list(),
+                    selected=new_column_name,
+                )
+                ui.update_text("new_custom_column", value="")
+                custom_column = new_column_name
 
-        custom_columns = custom_columns_list()
+            if custom_column == "" or custom_column == "None":
+                return
 
-        if new_column_name != "" and (new_column_name not in custom_columns):
-            custom_columns.append(new_column_name)
-            custom_columns_list.set(custom_columns)
+            if custom_column not in filemap_columns:
+                local_work_df = local_work_df.with_columns(
+                    pl.lit(np.nan).alias(new_column_name)
+                )
+            elif custom_column not in local_work_df.columns:
+                new_column_values = (
+                    filemap.select(pl.col(custom_column)).to_numpy().squeeze()
+                )
+                local_work_df = local_work_df.with_columns(
+                    pl.lit(new_column_values).alias(custom_column)
+                )
 
-            ui.update_selectize(
-                "custom_column",
-                choices=custom_columns_list(),
-                selected=new_column_name,
+            time = int(current_time())
+            point = int(current_point())
+
+            local_work_df = local_work_df.with_columns(
+                pl.when((pl.col("Point") == point) & (pl.col("Time") == time))
+                .then(float(time))
+                .otherwise(pl.col(custom_column))
+                .alias(custom_column),
             )
-            ui.update_text("new_custom_column", value="")
+            work_df.set(local_work_df)
 
-        if custom_column == "" or custom_column == "None":
-            return
-
-        if new_column_name not in filemap_columns:
-            local_work_df.with_columns(pl.lit(np.nan).alias(new_column_name))
-        else:
-            # set the column in work df how it is in filemap
-            new_column_values = (
-                filemap.select(pl.col(new_column_name)).to_numpy().squeeze()
-            )
-            local_work_df.with_columns(pl.lit(new_column_values).alias(new_column_name))
-
-        local_work_df = local_work_df.with_columns(
-            pl.when(pl.col("Point") == int(input.point()))
-            .when(pl.col("Time") == int(input.time()))
-            .then(float(input.time()))
-            .otherwise(pl.col(custom_column))
-            .alias(new_column_name),
-        )
-        work_df.set(local_work_df)
+        except Exception as e:
+            print(f"Exception in set_custom_annotation: {e}")
+            traceback.print_exc()
 
     @reactive.Effect
     @reactive.event(input.reset_custom_annotation)
     def reset_custom_annotation():
         custom_column = input.custom_column()
         if custom_column != "":
-            print("reset custom annotation")
-            filemap.loc[
-                (
-                    (filemap["Point"] == int(input.point()))
-                    & (filemap["Time"] == int(input.time()))
-                ),
-                custom_column,
-            ] = np.nan
-            print(
-                filemap.loc[
-                    (
-                        (filemap["Point"] == int(input.point()))
-                        & (filemap["Time"] == int(input.time()))
-                    )
-                ]
+            work_df.set(
+                work_df().with_columns(
+                    pl.when(pl.col("Point") == int(current_point()))
+                    .then(np.nan)
+                    .otherwise(pl.col(custom_column))
+                    .alias(custom_column),
+                )
             )
 
     @output
