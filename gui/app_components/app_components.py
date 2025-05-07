@@ -60,6 +60,7 @@ def open_filemap(filemap_path, open_annotated=True):
             print(f"Annotated filemap already exists at {filemap_save_path}")
             print("Opening the existing filemap instead ...")
             filemap = pl.read_csv(filemap_save_path, infer_schema_length=10000)
+            print(filemap)
             filemap_path = filemap_save_path
             filemap_name = os.path.basename(filemap_path)
             filemap_name = filemap_name.split(".")[0]
@@ -67,6 +68,15 @@ def open_filemap(filemap_path, open_annotated=True):
             # backup the filemap
             backup_path = get_backup_path(filemap_folder, filemap_name)
             filemap.write_csv(backup_path)
+        else:
+            filemap = pl.read_csv(filemap_path, infer_schema_length=10000)
+            filemap_name = os.path.basename(filemap_path)
+            filemap_name = filemap_name.split(".")[0]
+
+            # backup the filemap
+            backup_path = get_backup_path(filemap_folder, filemap_name)
+            filemap.write_csv(backup_path)
+            filemap_save_path = filemap_path
     else:
         # backup the filemap
         filemap = pl.read_csv(filemap_path, infer_schema_length=10000)
@@ -520,34 +530,48 @@ def set_marker_shape(
             colors[int(custom_annotation)] = "pink"
 
     if np.isfinite(hatch_time):
-        hatch_index = np.where(times_of_point == hatch_time)[0][0]
-        symbols[hatch_index] = "square"
-        sizes[hatch_index] = 8
-        colors[hatch_index] = "red"
+        try:
+            hatch_index = np.where(times_of_point == hatch_time)[0][0]
+            symbols[hatch_index] = "square"
+            sizes[hatch_index] = 8
+            colors[hatch_index] = "red"
+        except IndexError:
+            print(f"Hatch time {hatch_time} not in list of times")
 
-    if np.isfinite(m1):
-        m1_index = np.where(times_of_point == m1)[0][0]
-        symbols[m1_index] = "circle"
-        sizes[m1_index] = 8
-        colors[m1_index] = "orange"
+    if np.isfinite(m1) and m1 in times_of_point:
+        try:
+            m1_index = np.where(times_of_point == m1)[0][0]
+            symbols[m1_index] = "circle"
+            sizes[m1_index] = 8
+            colors[m1_index] = "orange"
+        except IndexError:
+            print(f"M1 {m1} not in list of times")
 
     if np.isfinite(m2):
-        m2_index = np.where(times_of_point == m2)[0][0]
-        symbols[m2_index] = "circle"
-        sizes[m2_index] = 8
-        colors[m2_index] = "yellow"
+        try:
+            m2_index = np.where(times_of_point == m2)[0][0]
+            symbols[m2_index] = "circle"
+            sizes[m2_index] = 8
+            colors[m2_index] = "yellow"
+        except IndexError:
+            print(f"M2 {m2} not in list of times")
 
     if np.isfinite(m3):
-        m3_index = np.where(times_of_point == m3)[0][0]
-        symbols[m3_index] = "circle"
-        sizes[m3_index] = 8
-        colors[m3_index] = "green"
-
+        try:
+            m3_index = np.where(times_of_point == m3)[0][0]
+            symbols[m3_index] = "circle"
+            sizes[m3_index] = 8
+            colors[m3_index] = "green"
+        except IndexError:
+            print(f"M3 {m3} not in list of times")
     if np.isfinite(m4):
-        m4_index = np.where(times_of_point == m4)[0][0]
-        symbols[m4_index] = "circle"
-        sizes[m4_index] = 8
-        colors[m4_index] = "blue"
+        try:
+            m4_index = np.where(times_of_point == m4)[0][0]
+            symbols[m4_index] = "circle"
+            sizes[m4_index] = 8
+            colors[m4_index] = "blue"
+        except IndexError:
+            print(f"M4 {m4} not in list of times")
 
     widths = [1] * len(symbols)
     widths[int(selected_time_index)] = 4
