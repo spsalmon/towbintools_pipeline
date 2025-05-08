@@ -11,7 +11,6 @@ from app_components.app_components import get_points_for_value_at_molts
 from app_components.app_components import infer_n_channels
 from app_components.app_components import populate_column_choices
 from app_components.app_components import process_feature_at_molt_columns
-from app_components.app_components import save_filemap
 from app_components.app_components import set_marker_shape
 from app_components.app_components import update_molt_and_ecdysis_columns
 from polars.exceptions import ColumnNotFoundError
@@ -604,10 +603,36 @@ def main_server(
             .tolist()
         )
 
+    @reactive.calc
+    def save_filemap():
+        print(f"Saving filemap to {filemap_save_path} ...")
+        single_values_df = single_values_of_points()
+        single_values_columns = single_values_df[0].columns
+        single_values_columns.remove("Point")
+        filemap_to_save = filemap.drop(single_values_columns)
+
+        current_work_df = work_df()
+        work_df_columns = current_work_df.columns
+        work_df_columns.remove("Point")
+        work_df_columns.remove("Time")
+        filemap_to_save = filemap_to_save.drop(work_df_columns)
+
+        # combine the single_values_df into a big dataframe
+        combined_df = pl.concat(single_values_df, how="vertical")
+
+        filemap_to_save = filemap_to_save.join(combined_df, on=["Point"], how="left")
+
+        filemap_to_save = filemap_to_save.join(
+            current_work_df, on=["Point", "Time"], how="left"
+        )
+
+        filemap_to_save.write_csv(filemap_save_path)
+        print("Filemap saved!")
+
     @reactive.Effect
     @reactive.event(input.save)
     def save():
-        save_filemap(filemap, filemap_save_path)
+        save_filemap()
 
     @reactive.Effect
     def get_hatch_and_molts():
@@ -1140,9 +1165,9 @@ def main_server(
 
         return fig
 
-    session.on_ended(lambda: save_filemap(filemap, filemap_save_path))
-
     @reactive.Effect
     @reactive.event(input.close)
     async def _():
+        print("Closing the app ...")
+        save_filemap()
         await session.close()
