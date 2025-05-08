@@ -3,13 +3,11 @@ from app_components.ui_components import initialize_ui
 from app_components.ui_components import main_server
 from shiny import App
 
-
 recompute_features_at_molt = True
 
-filemap_path = "/mnt/towbin.data/shared/kstojanovski/20240202_Orca_10x_yap-1del_col-10-tir_wBT160-186-310-337-380-393_25C_20240202_171239_051/analysis_sacha/report/analysis_filemap.csv"
+filemap_path = "/mnt/towbin.data/shared/spsalmon/20250314_squid_10x_yap_aid_160_438_492_493/analysis/report/analysis_filemap.csv"
 
-filemap, filemap_save_path = open_filemap(filemap_path, open_annotated=False)
-
+filemap, filemap_save_path = open_filemap(filemap_path, open_annotated=True)
 
 print("Creating the app ...")
 (
@@ -29,7 +27,6 @@ def s(input, output, session):
         output,
         session,
         filemap=filemap,
-        recompute_features_at_molt=recompute_features_at_molt,
         filemap_save_path=filemap_save_path,
         feature_columns=feature_columns,
         custom_columns_choices=custom_columns_choices,
