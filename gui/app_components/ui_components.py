@@ -21,7 +21,7 @@ from shiny import render
 from shiny import ui
 from shinywidgets import output_widget
 from shinywidgets import render_widget
-from towbintools import image_handling
+from towbintools.foundation import image_handling
 from towbintools.foundation.worm_features import get_features_to_compute_at_molt
 
 FEATURES_TO_COMPUTE_AT_MOLT = get_features_to_compute_at_molt()
@@ -368,6 +368,7 @@ def main_server(
     output,
     session,
     filemap=None,
+    filemap_save_path=None,
     points=None,
     times=None,
     feature_columns=None,
@@ -606,7 +607,7 @@ def main_server(
     @reactive.Effect
     @reactive.event(input.save)
     def save():
-        save_filemap(filemap)
+        save_filemap(filemap, filemap_save_path)
 
     @reactive.Effect
     def get_hatch_and_molts():
@@ -1139,7 +1140,7 @@ def main_server(
 
         return fig
 
-    session.on_ended(save_filemap)
+    session.on_ended(lambda: save_filemap(filemap, filemap_save_path))
 
     @reactive.Effect
     @reactive.event(input.close)

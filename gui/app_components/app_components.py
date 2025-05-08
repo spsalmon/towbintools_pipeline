@@ -33,17 +33,22 @@ def open_filemap(filemap_path, open_annotated=True):
     filemap_folder = os.path.dirname(filemap_path)
     filemap_name = os.path.basename(filemap_path).split(".")[0]
 
+    annotated_name = f"{filemap_name}_annotated.csv"
+    annotated_path = os.path.join(filemap_folder, annotated_name)
+
     # If we want to open the annotated version and it's not already annotated
-    if open_annotated and "annotated" not in filemap_name:
-        annotated_name = f"{filemap_name}_annotated.csv"
-        annotated_path = os.path.join(filemap_folder, annotated_name)
-        if os.path.exists(annotated_path):
-            print(f"Annotated filemap already exists at {annotated_path}")
-            print("Opening the existing annotated filemap instead ...")
-            filemap_path = annotated_path
-            filemap_name = os.path.basename(filemap_path).split(".")[0]
-        else:
-            print(f"Annotated filemap does not exist, opening original: {filemap_path}")
+    if (
+        open_annotated
+        and os.path.exists(annotated_path)
+        and ("annotated" not in filemap_name)
+    ):
+        print(f"Annotated filemap already exists at {annotated_path}")
+        print("Opening the existing annotated filemap instead ...")
+        filemap_path = annotated_path
+        filemap_save_path = annotated_path
+        filemap_name = os.path.basename(filemap_path).split(".")[0]
+    elif "annotated" not in filemap_name:
+        filemap_save_path = annotated_path
 
     # Read the filemap (either original or annotated)
     filemap = pl.read_csv(
@@ -56,7 +61,7 @@ def open_filemap(filemap_path, open_annotated=True):
     backup_path = get_backup_path(filemap_folder, filemap_name)
     filemap.write_csv(backup_path)
 
-    return filemap, filemap_path
+    return filemap, filemap_save_path
 
 
 def infer_n_channels(filemap):
