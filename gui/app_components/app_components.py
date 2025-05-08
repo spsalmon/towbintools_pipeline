@@ -159,12 +159,6 @@ def populate_column_choices(filemap):
     )
 
 
-def save_filemap(filemap, filemap_path):
-    print("Saving filemap ...")
-    filemap.write_csv(filemap_path)
-    print("Filemap saved !")
-
-
 def separate_column_by_point(filemap, column):
     points = (
         filemap.select(pl.col("Point").unique(maintain_order=True).sort())
