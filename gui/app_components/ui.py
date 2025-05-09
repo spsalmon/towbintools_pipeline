@@ -5,14 +5,14 @@ import numpy as np
 import plotly.graph_objs as go
 import polars as pl
 import scipy.io as sio
-from app_components.app_components import build_single_values_df
-from app_components.app_components import correct_ecdysis_columns
-from app_components.app_components import get_points_for_value_at_molts
-from app_components.app_components import infer_n_channels
-from app_components.app_components import populate_column_choices
-from app_components.app_components import process_feature_at_molt_columns
-from app_components.app_components import set_marker_shape
-from app_components.app_components import update_molt_and_ecdysis_columns
+from app_components.backend import build_single_values_df
+from app_components.backend import correct_ecdysis_columns
+from app_components.backend import get_points_for_value_at_molts
+from app_components.backend import infer_n_channels
+from app_components.backend import populate_column_choices
+from app_components.backend import process_feature_at_molt_columns
+from app_components.backend import set_marker_shape
+from app_components.backend import update_molt_and_ecdysis_columns
 from polars.exceptions import ColumnNotFoundError
 from shiny import module
 from shiny import reactive
@@ -444,6 +444,15 @@ def main_server(
         )
     ]
 
+    # Create non-reactive holders for the latest values
+    latest_single_values_df = {"value": None}
+    latest_work_df = {"value": None}
+
+    @reactive.Effect
+    def cache_latest_for_save():
+        latest_single_values_df["value"] = single_values_of_points()
+        latest_work_df["value"] = work_df()
+
     @reactive.Effect
     def update_point_filemap():
         current_point_filemap.set(point_filemaps[current_point_index()])
@@ -603,16 +612,14 @@ def main_server(
             .tolist()
         )
 
-    @reactive.calc
-    def save_filemap():
+    @reactive.extended_task
+    async def save_filemap(filemap, filemap_save_path, single_values_df, work_df):
         print(f"Saving filemap to {filemap_save_path} ...")
-        single_values_df = single_values_of_points()
         single_values_columns = single_values_df[0].columns
         single_values_columns.remove("Point")
         filemap_to_save = filemap.drop(single_values_columns)
 
-        current_work_df = work_df()
-        work_df_columns = current_work_df.columns
+        work_df_columns = work_df.columns
         work_df_columns.remove("Point")
         work_df_columns.remove("Time")
         filemap_to_save = filemap_to_save.drop(work_df_columns)
@@ -623,7 +630,7 @@ def main_server(
         filemap_to_save = filemap_to_save.join(combined_df, on=["Point"], how="left")
 
         filemap_to_save = filemap_to_save.join(
-            current_work_df, on=["Point", "Time"], how="left"
+            work_df, on=["Point", "Time"], how="left"
         )
 
         filemap_to_save.write_csv(filemap_save_path)
@@ -632,7 +639,12 @@ def main_server(
     @reactive.Effect
     @reactive.event(input.save)
     def save():
-        save_filemap()
+        save_filemap(
+            filemap=filemap,
+            filemap_save_path=filemap_save_path,
+            single_values_df=single_values_of_points(),
+            work_df=work_df(),
+        )
 
     @reactive.Effect
     def get_hatch_and_molts():
@@ -851,161 +863,6 @@ def main_server(
         except ColumnNotFoundError:
             arrest.set(False)
 
-    @output
-    @render_widget
-    def plot_curve():
-        data_of_point = current_point_filemap().select(
-            pl.col(
-                [
-                    "Time",
-                    input.column_to_plot(),
-                    worm_type_column,
-                    "HatchTime",
-                    "M1",
-                    "M2",
-                    "M3",
-                    "M4",
-                ]
-            )
-        )
-
-        times_of_point = data_of_point.select(pl.col("Time")).to_numpy().squeeze()
-        values_of_point = (
-            data_of_point.select(pl.col(input.column_to_plot())).to_numpy().squeeze()
-        )
-        worm_types_of_point = (
-            data_of_point.select(pl.col(worm_type_column)).to_numpy().squeeze()
-        )
-
-        print(f"Custom annotations: {custom_column_values()}")
-        markers = set_marker_shape(
-            times_of_point,
-            current_time_index(),
-            worm_types_of_point,
-            hatch(),
-            m1(),
-            m2(),
-            m3(),
-            m4(),
-            custom_annotations=custom_column_values(),
-        )
-        fig = go.FigureWidget()
-        fig.add_trace(
-            go.Scatter(
-                x=times_of_point,
-                y=values_of_point,
-                mode="markers",
-                marker=markers,
-            )
-        )
-
-        (
-            ecdys_list,
-            value_at_ecdys_list,
-            symbols,
-            colors,
-            sizes,
-            widths,
-        ) = get_points_for_value_at_molts(
-            hatch(),
-            m1(),
-            m2(),
-            m3(),
-            m4(),
-            value_at_hatch(),
-            value_at_m1(),
-            value_at_m2(),
-            value_at_m3(),
-            value_at_m4(),
-        )
-
-        fig.add_trace(
-            go.Scatter(
-                x=ecdys_list,
-                y=value_at_ecdys_list,
-                mode="markers",
-                marker=dict(
-                    symbol=symbols,
-                    size=sizes,
-                    color=colors,
-                    line=dict(width=widths, color=colors),
-                ),
-                hoverinfo="none",  # Disable hover information
-                hoverlabel=None,  # Disable hover label
-                hoveron=None,  # Disable hover interaction
-            )
-        )
-
-        fig.update_layout(
-            xaxis_title="Time",
-            yaxis_title=input.column_to_plot(),
-            margin=dict(l=20, r=20, t=50, b=50),
-            height=input.volume_plot_size(),
-            showlegend=False,
-        )
-
-        fig.update_yaxes(type="log" if input.log_scale() else "linear")
-
-        def update_selected_time(trace, points, selector):
-            print("update_selected_time")
-            for point in points.xs:
-                clicked_time.set(str(point))
-
-        fig.data[0].on_click(update_selected_time)
-
-        if ignore_start() != "":
-            if not np.isnan(float(ignore_start())):
-                fig.update_layout(
-                    shapes=[
-                        dict(
-                            type="rect",
-                            xref="x",
-                            yref="paper",
-                            x0=float(ignore_start()),
-                            x1=max(data_of_point["Time"]) + 1,
-                            y0=0,
-                            y1=1,
-                            fillcolor="gray",
-                            opacity=0.5,
-                            layer="above",
-                            line_width=0,
-                        )
-                    ]
-                )
-
-        if death() != "":
-            if not np.isnan(float(death())):
-                fig.add_shape(
-                    dict(
-                        type="line",
-                        xref="x",
-                        yref="paper",
-                        x0=float(death()),
-                        y0=0,
-                        x1=float(death()),
-                        y1=1,
-                        line=dict(color="black", width=2),
-                    )
-                )
-
-        if arrest() != "" and arrest():
-            fig.add_shape(
-                dict(
-                    type="rect",
-                    xref="paper",
-                    yref="paper",
-                    x0=0,
-                    x1=1,
-                    y0=0,
-                    y1=1,
-                    fillcolor="red",
-                    opacity=0.5,
-                    layer="above",
-                    line_width=0,
-                )
-            )
-        return fig
-
     @reactive.Effect
     def reactive_get_custom_column_values():
         print("reactive_get_custom_column_values")
@@ -1165,9 +1022,167 @@ def main_server(
 
         return fig
 
-    @reactive.Effect
-    @reactive.event(input.close)
-    async def _():
-        print("Closing the app ...")
-        save_filemap()
-        await session.close()
+    @output
+    @render_widget
+    def plot_curve():
+        data_of_point = current_point_filemap().select(
+            pl.col(
+                [
+                    "Time",
+                    input.column_to_plot(),
+                    worm_type_column,
+                    "HatchTime",
+                    "M1",
+                    "M2",
+                    "M3",
+                    "M4",
+                ]
+            )
+        )
+
+        times_of_point = data_of_point.select(pl.col("Time")).to_numpy().squeeze()
+        values_of_point = (
+            data_of_point.select(pl.col(input.column_to_plot())).to_numpy().squeeze()
+        )
+        worm_types_of_point = (
+            data_of_point.select(pl.col(worm_type_column)).to_numpy().squeeze()
+        )
+
+        print(f"Custom annotations: {custom_column_values()}")
+        markers = set_marker_shape(
+            times_of_point,
+            current_time_index(),
+            worm_types_of_point,
+            hatch(),
+            m1(),
+            m2(),
+            m3(),
+            m4(),
+            custom_annotations=custom_column_values(),
+        )
+        fig = go.FigureWidget()
+        fig.add_trace(
+            go.Scatter(
+                x=times_of_point,
+                y=values_of_point,
+                mode="markers",
+                marker=markers,
+            )
+        )
+
+        (
+            ecdys_list,
+            value_at_ecdys_list,
+            symbols,
+            colors,
+            sizes,
+            widths,
+        ) = get_points_for_value_at_molts(
+            hatch(),
+            m1(),
+            m2(),
+            m3(),
+            m4(),
+            value_at_hatch(),
+            value_at_m1(),
+            value_at_m2(),
+            value_at_m3(),
+            value_at_m4(),
+        )
+
+        fig.add_trace(
+            go.Scatter(
+                x=ecdys_list,
+                y=value_at_ecdys_list,
+                mode="markers",
+                marker=dict(
+                    symbol=symbols,
+                    size=sizes,
+                    color=colors,
+                    line=dict(width=widths, color=colors),
+                ),
+                hoverinfo="none",  # Disable hover information
+                hoverlabel=None,  # Disable hover label
+                hoveron=None,  # Disable hover interaction
+            )
+        )
+
+        fig.update_layout(
+            xaxis_title="Time",
+            yaxis_title=input.column_to_plot(),
+            margin=dict(l=20, r=20, t=50, b=50),
+            height=input.volume_plot_size(),
+            showlegend=False,
+        )
+
+        fig.update_yaxes(type="log" if input.log_scale() else "linear")
+
+        def update_selected_time(trace, points, selector):
+            print("update_selected_time")
+            for point in points.xs:
+                clicked_time.set(str(point))
+
+        fig.data[0].on_click(update_selected_time)
+
+        if ignore_start() != "":
+            if not np.isnan(float(ignore_start())):
+                fig.update_layout(
+                    shapes=[
+                        dict(
+                            type="rect",
+                            xref="x",
+                            yref="paper",
+                            x0=float(ignore_start()),
+                            x1=max(data_of_point["Time"]) + 1,
+                            y0=0,
+                            y1=1,
+                            fillcolor="gray",
+                            opacity=0.5,
+                            layer="above",
+                            line_width=0,
+                        )
+                    ]
+                )
+
+        if death() != "":
+            if not np.isnan(float(death())):
+                fig.add_shape(
+                    dict(
+                        type="line",
+                        xref="x",
+                        yref="paper",
+                        x0=float(death()),
+                        y0=0,
+                        x1=float(death()),
+                        y1=1,
+                        line=dict(color="black", width=2),
+                    )
+                )
+
+        if arrest() != "" and arrest():
+            fig.add_shape(
+                dict(
+                    type="rect",
+                    xref="paper",
+                    yref="paper",
+                    x0=0,
+                    x1=1,
+                    y0=0,
+                    y1=1,
+                    fillcolor="red",
+                    opacity=0.5,
+                    layer="above",
+                    line_width=0,
+                )
+            )
+        return fig
+
+    def save_on_session_end():
+        save_filemap(
+            filemap=filemap,
+            filemap_save_path=filemap_save_path,
+            single_values_df=latest_single_values_df["value"],
+            work_df=latest_work_df["value"],
+        )
+
+    session.on_ended(save_on_session_end)

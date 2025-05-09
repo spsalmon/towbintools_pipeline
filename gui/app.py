@@ -1,6 +1,6 @@
-from app_components.app_components import open_filemap
-from app_components.ui_components import initialize_ui
-from app_components.ui_components import main_server
+from app_components.backend import open_filemap
+from app_components.ui import initialize_ui
+from app_components.ui import main_server
 from shiny import App
 
 recompute_features_at_molt = True
