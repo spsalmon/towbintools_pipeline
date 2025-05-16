@@ -290,7 +290,6 @@ def add_dir_to_experiment_filemap(experiment_filemap, dir_path, subdir_name):
 
 
 def get_experiment_time_from_filemap(experiment_filemap):
-    print("### Calculating ExperimentTime ###")
     experiment_filemap["date"] = experiment_filemap["raw"].apply(get_acquisition_date)
 
     # in case all acquisition dates are None, return a nan filled ExperimentTime column
@@ -324,7 +323,6 @@ def get_experiment_time_from_filemap(experiment_filemap):
 
 
 def get_experiment_time_from_filemap_parallel(experiment_filemap):
-    print("### Calculating ExperimentTime ###")
     # copy the filemap to avoid modifying the original
     experiment_filemap = experiment_filemap.copy()
 
@@ -413,8 +411,25 @@ def cleanup_files(*filepaths):
 # ----BOILERPLATE CODE FOR SLURM----
 
 
-def run_command(command, script_name, config, requires_gpu=False):
-    if config["sbatch_gpus"] == 0 or config["sbatch_gpus"] is None:
+def create_linker_command(
+    micromamba_path,
+    temp_dir,
+    result,
+):
+    linker_command = f"{micromamba_path} run -n towbintools python3 -m pipeline_scripts.block_linker --temp_dir {temp_dir} --result {result}"
+    return linker_command
+
+
+def run_command(
+    command,
+    script_name,
+    config,
+    run_linker=True,
+    linker_command=None,
+    requires_gpu=False,
+):
+    gpus = config.get("sbatch_gpus", None)
+    if requires_gpu and gpus is not None:
         script_path = create_sbatch_file(
             script_name,
             config["temp_dir"],
@@ -422,16 +437,9 @@ def run_command(command, script_name, config, requires_gpu=False):
             config["sbatch_time"],
             config["sbatch_memory"],
             command,
-        )
-    elif requires_gpu:
-        script_path = create_sbatch_file(
-            script_name,
-            config["temp_dir"],
-            config["sbatch_cpus"],
-            config["sbatch_time"],
-            config["sbatch_memory"],
-            command,
-            gpus=config["sbatch_gpus"],
+            gpus=gpus,
+            run_linker=run_linker,
+            linker_command=linker_command,
         )
     else:
         script_path = create_sbatch_file(
@@ -441,29 +449,51 @@ def run_command(command, script_name, config, requires_gpu=False):
             config["sbatch_time"],
             config["sbatch_memory"],
             command,
+            run_linker=run_linker,
+            linker_command=linker_command,
         )
     subprocess.run(["sbatch", script_path])
 
 
-def create_sbatch_file(job_name, temp_dir, cores, time_limit, memory, command, gpus=0):
+def create_sbatch_file(
+    job_name,
+    temp_dir,
+    cores,
+    time_limit,
+    memory,
+    command,
+    gpus=None,
+    run_linker=True,
+    linker_command=None,
+):
+    # Ensure batch directory exists
+    batch_dir = os.path.join(temp_dir, "batch")
+    os.makedirs(batch_dir, exist_ok=True)
+
+    # Build SLURM header
     content = f"""#!/bin/bash
 #SBATCH -J {job_name}
 #SBATCH -o {os.path.join(temp_dir, 'sbatch_output', job_name)}-%j.out
 #SBATCH -e {os.path.join(temp_dir, 'sbatch_output', job_name)}-%j.err
 #SBATCH -c {cores}
-#SBATCH --gres=gpu:{gpus}
 #SBATCH -t {time_limit}
 #SBATCH --mem={memory}
-#SBATCH --wait
-
-export OMP_NUM_THREADS=1
-export MKL_NUM_THREADS=1
-export OPENBLAS_NUM_THREADS=1
-
-{command}
 """
+    if gpus is not None:
+        content += f"#SBATCH --gres=gpu:{gpus}\n"
 
-    script_path = os.path.join(temp_dir, "batch", f"{job_name}.sh")
+    # set environment variables for single threaded execution (doesn't solve our problem, so I commented it out)
+    #     content += """
+    # export OMP_NUM_THREADS=1
+    # export MKL_NUM_THREADS=1
+    # export OPENBLAS_NUM_THREADS=1
+    # """
+    content += "\n" + command + "\n"
+
+    if run_linker and linker_command is not None:
+        content += linker_command + "\n"
+
+    script_path = os.path.join(batch_dir, f"{job_name}.sh")
     with open(script_path, "w") as file:
         file.write(content)
 

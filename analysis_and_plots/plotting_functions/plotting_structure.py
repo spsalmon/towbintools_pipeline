@@ -169,6 +169,7 @@ def _process_condition_id_plotting_structure(
             "ecdysis_time_step": ecdysis_time_step,
             "larval_stage_durations_time_step": larval_stage_durations_time_step,
             "ecdysis_experiment_time": ecdysis_experiment_time,
+            "ecdysis_experiment_time_hours": ecdysis_experiment_time / 3600,
             "larval_stage_durations_experiment_time": larval_stage_durations_experiment_time,
             "larval_stage_durations_experiment_time_hours": larval_stage_durations_experiment_time
             / 3600,
@@ -393,11 +394,11 @@ def _compute_values_at_molt(
     updated_values_at_molt = values_at_molt.copy()
 
     nan_indexes_values_mask = np.isnan(values_at_molt)
-    experiment_time = condition_dict["experiment_time"]
+    experiment_time = condition_dict["experiment_time_hours"]
 
     if (~np.isnan(experiment_time)).any():
-        time = condition_dict["experiment_time"]
-        ecdysis = condition_dict["ecdysis_experiment_time"]
+        time = condition_dict["experiment_time_hours"]
+        ecdysis = condition_dict["ecdysis_experiment_time_hours"]
     else:
         time = condition_dict["time"]
         ecdysis = condition_dict["ecdysis_index"]
@@ -422,9 +423,9 @@ def _compute_values_at_molt(
 
         recomputed_values = compute_series_at_time_classified(
             condition_dict[column][i],
-            worm_types[i],
             ecdys,
-            series_time=time[i],
+            time[i],
+            worm_types[i],
         )
 
         updated_values_at_molt[i][idx_values_to_recompute] = recomputed_values

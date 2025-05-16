@@ -4,7 +4,7 @@
 #SBATCH -o ./sbatch_output/pipeline-%j.out
 #SBATCH -e ./sbatch_output/pipeline-%j.err
 #SBATCH -c 8
-#SBATCH -t 24:00:00
+#SBATCH -t 0:05:00
 #SBATCH --mem=8GB
 #SBATCH --gres=pipelinecapacity:1
 
@@ -54,4 +54,5 @@ cp "$CONFIG_FILE" "$TEMP_DIR"
 config_file_name=$(basename "$CONFIG_FILE")
 CONFIG_FILE="$TEMP_DIR/$config_file_name"
 # Run the Python script with the specified or default configuration file
-~/.local/bin/micromamba run -n towbintools python3 pimp_your_pipeline.py -c "$CONFIG_FILE" --temp_dir "$TEMP_DIR"
+# ~/.local/bin/micromamba run -n towbintools python3 -m pipeline_scripts.pimp_your_pipeline.py -c "$CONFIG_FILE" --temp_dir "$TEMP_DIR"
+~/.local/bin/micromamba run -n towbintools python3 -m pipeline_scripts.init_pipeline -c "$CONFIG_FILE" --temp_dir "$TEMP_DIR"

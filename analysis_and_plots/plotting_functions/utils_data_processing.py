@@ -44,8 +44,9 @@ def compute_growth_rate(
     series_name,
     gr_series_name,
     experiment_time=True,
-    smoothing_method="savgol",
-    savgol_filter_window=5,
+    lmbda=0.0075,
+    order=2,
+    medfilt_window=5,
 ):
     for condition in conditions_struct:
         series_values = condition[series_name]
@@ -54,19 +55,19 @@ def compute_growth_rate(
         worm_type = condition[worm_type_key]
 
         if experiment_time:
-            time = condition["experiment_time"]
+            time = condition["experiment_time_hours"]
         else:
             time = condition["time"]
 
         growth_rate = []
         for i in range(series_values.shape[0]):
-            # gr = compute_instantaneous_growth_rate_classified(series_values[i], time[i], worm_type[i], smoothing_method = 'savgol', savgol_filter_window = 7)
             gr = compute_instantaneous_growth_rate_classified(
                 series_values[i],
                 time[i],
                 worm_type[i],
-                smoothing_method=smoothing_method,
-                savgol_filter_window=savgol_filter_window,
+                lmbda=lmbda,
+                order=order,
+                medfilt_window=medfilt_window,
             )
             growth_rate.append(gr)
 

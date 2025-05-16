@@ -7,12 +7,11 @@ import yaml
 from towbintools.foundation import file_handling as file_handling
 
 from pipeline_scripts.building_blocks import parse_and_create_building_blocks
-from pipeline_scripts.utils import add_dir_to_experiment_filemap
 from pipeline_scripts.utils import create_temp_folders
 from pipeline_scripts.utils import get_and_create_folders
 from pipeline_scripts.utils import get_experiment_pads
 from pipeline_scripts.utils import get_experiment_time_from_filemap_parallel
-from pipeline_scripts.utils import merge_and_save_csv
+from pipeline_scripts.utils import pickle_objects
 from pipeline_scripts.utils import sync_backup_folder
 
 
@@ -31,6 +30,7 @@ def get_args():
 
 config_file = get_args().config
 temp_dir = get_args().temp_dir
+
 with open(config_file) as f:
     config = yaml.load(f, Loader=yaml.FullLoader)
 
@@ -46,10 +46,8 @@ temp_dir_basename = os.path.basename(temp_dir)
 create_temp_folders(temp_dir)
 
 
-def main(config, pad=None):
-    global temp_dir_basename
-    global temp_dir
-
+def main(config, temp_dir_basename, temp_dir, pad=None):
+    print(f"### Initializing the pipeline for pad {pad} ###")
     (
         experiment_dir,
         raw_subdir,
@@ -78,14 +76,6 @@ def main(config, pad=None):
 
     extract_experiment_time = config.get("get_experiment_time", True)
 
-    # # copy the config file to the report folder
-    # # if it already exists, change the name of the new one by adding a number
-    # config_dir = os.path.join(report_subdir, "config")
-
-    # os.makedirs(config_dir, exist_ok=True)
-
-    # backup_file(config_file, config_dir)
-
     if not os.path.exists(os.path.join(report_subdir, "analysis_filemap.csv")):
         experiment_filemap = file_handling.get_dir_filemap(raw_subdir)
         experiment_filemap.rename(columns={"ImagePath": "raw"}, inplace=True)
@@ -101,7 +91,7 @@ def main(config, pad=None):
     # if the ExperimentTime column is not present, create it
     if "ExperimentTime" not in experiment_filemap.columns:
         if extract_experiment_time:
-            print("Computing experiment time ...")
+            print("### Calculating ExperimentTime ###")
             experiment_filemap[
                 "ExperimentTime"
             ] = get_experiment_time_from_filemap_parallel(experiment_filemap)
@@ -118,46 +108,31 @@ def main(config, pad=None):
 
     building_blocks = parse_and_create_building_blocks(config)
 
-    for building_block in building_blocks:
-        print(f"Running {building_block} ...")
-        result = building_block.run(experiment_filemap, config, pad=pad)
+    building_blocks = [{"block": block, "pad": pad} for block in building_blocks]
 
-        # reload the experiment filemap in case it was modified during the function call
-        experiment_filemap = pd.read_csv(
-            os.path.join(report_subdir, "analysis_filemap.csv")
-        )
-
-        if building_block.return_type == "subdir":
-            if pad:
-                column_name = f'{config["analysis_dir_name"]}/{os.path.basename(os.path.dirname(os.path.normpath(result)))}'
-            else:
-                column_name = f'{config["analysis_dir_name"]}/{os.path.basename(os.path.normpath(result))}'
-
-            experiment_filemap = add_dir_to_experiment_filemap(
-                experiment_filemap,
-                result,
-                column_name,
-            )
-            experiment_filemap.to_csv(
-                os.path.join(report_subdir, "analysis_filemap.csv"), index=False
-            )
-
-        elif building_block.return_type == "csv":
-            if building_block.name == "molt_detection":
-                experiment_filemap = merge_and_save_csv(
-                    experiment_filemap, report_subdir, result, merge_cols=["Point"]
-                )
-            else:
-                experiment_filemap = merge_and_save_csv(
-                    experiment_filemap, report_subdir, result
-                )
+    return building_blocks
 
 
 pads = get_experiment_pads(config)
-
+building_blocks = []
 print(f"Running the pipeline for pads: {pads}")
 if not pads:
-    main(config)
+    building_blocks.extend(main(config, temp_dir_basename, temp_dir))
 else:
     for pad in pads:
-        main(config, pad)
+        building_blocks.extend(main(config, temp_dir_basename, temp_dir, pad))
+
+# initialize on 1 as we're gonna run the first block immediately
+progress_tracker = {"current_block_index": 1, "building_blocks": building_blocks}
+progress_tracker_pickle = {"path": "progress_tracker", "obj": progress_tracker}
+config_pickle = {"path": "config", "obj": config}
+
+_ = pickle_objects(temp_dir, progress_tracker_pickle, config_pickle)
+
+current = building_blocks[0]
+current_building_block, current_pad = current["block"], current["pad"]
+
+experiment_filemap = pd.read_csv(
+    os.path.join(config["report_subdir"], "analysis_filemap.csv")
+)
+current_building_block.run(experiment_filemap, config, pad=current_pad)
