@@ -5,7 +5,7 @@ from abc import abstractmethod
 import numpy as np
 
 from pipeline_scripts.utils import add_dir_to_experiment_filemap
-from pipeline_scripts.utils import cleanup_files
+from pipeline_scripts.utils import create_linker_command
 from pipeline_scripts.utils import filter_files_of_group
 from pipeline_scripts.utils import get_input_and_output_files_parallel
 from pipeline_scripts.utils import get_output_name
@@ -116,12 +116,16 @@ DEFAULT_OPTIONS = {
 
 
 class BuildingBlock(ABC):
-    def __init__(self, name, options, block_config, return_type):
+    def __init__(
+        self, name, options, block_config, return_type, script_path, requires_gpu=False
+    ):
         self.name = name
         self.options = options
         self.block_config = block_config
         # self.script_path = script_path
         self.return_type = return_type
+        self.script_path = script_path
+        self.requires_gpu = requires_gpu
 
     def __str__(self):
         return f"{self.name}: {self.block_config}"
@@ -134,19 +138,31 @@ class BuildingBlock(ABC):
     def get_input_and_output_files(self, config, experiment_filemap, subdir):
         pass
 
-    @abstractmethod
     def create_command(
-        self, input_pickle_path, output_pickle_path, pickled_block_config, config
+        self,
+        micromamba_path,
+        input_pickle_path,
+        output_pickle_path,
+        pickled_block_config,
+        config,
     ):
-        pass
+        script_path = self.script_path
 
-    @abstractmethod
-    def run_command(self, command, name, config):
-        pass
+        if script_path.endswith(".sh"):
+            command = f"bash {script_path} -i {input_pickle_path} -o {output_pickle_path} -c {pickled_block_config}"
+        elif script_path.endswith(".py"):
+            command = f"{micromamba_path} run -n towbintools python3 {script_path} -i {input_pickle_path} -o {output_pickle_path} -c {pickled_block_config} -j {config['sbatch_cpus']}"
+        else:
+            raise ValueError(
+                f"Script type of {script_path} is not supported. The pipeline only supports bash or python scripts."
+            )
+        return command
 
     def run(self, experiment_filemap, config, pad=None):
         block_config = self.block_config
         pipeline_backup_dir = config["pipeline_backup_dir"]
+        micromamba_path = config.get("micromamba_path", "~/.local/bin/micromamba")
+        temp_dir = config["temp_dir"]
 
         if self.return_type == "subdir":
             subdir = self.get_output_name(config, pad)
@@ -155,25 +171,41 @@ class BuildingBlock(ABC):
             )
 
             if len(input_files) != 0:
-                input_pickle_path, output_pickle_path = pickle_objects(
-                    config["temp_dir"],
-                    {"path": "input_files", "obj": input_files},
+                (
+                    input_pickle_path,
+                    output_pickle_path,
+                    pickled_block_config,
+                ) = pickle_objects(
+                    temp_dir,
+                    {"path": f"{self.name}_input_files", "obj": input_files},
                     {"path": f"{self.name}_output_files", "obj": output_files},
+                    {"path": f"{self.name}_block_config", "obj": block_config},
                 )
-
-                pickled_block_config = pickle_objects(
-                    config["temp_dir"], {"path": "block_config", "obj": block_config}
-                )[0]
 
                 command = self.create_command(
-                    input_pickle_path, output_pickle_path, pickled_block_config, config
+                    micromamba_path,
+                    input_pickle_path,
+                    output_pickle_path,
+                    pickled_block_config,
+                    config,
                 )
 
-                self.run_command(command, self.name, config)
-
-                cleanup_files(
-                    input_pickle_path, output_pickle_path, pickled_block_config
+                linker_command = create_linker_command(
+                    micromamba_path, temp_dir, subdir
                 )
+
+                run_command(
+                    command,
+                    self.name,
+                    config,
+                    requires_gpu=self.requires_gpu,
+                    run_linker=True,
+                    linker_command=linker_command,
+                )
+
+                # cleanup_files(
+                #     input_pickle_path, output_pickle_path, pickled_block_config
+                # )
 
             return subdir
 
@@ -188,21 +220,32 @@ class BuildingBlock(ABC):
             )
 
             if len(input_files) != 0 and rerun:
-                input_pickle_path = pickle_objects(
-                    config["temp_dir"], {"path": "input_files", "obj": input_files}
-                )[0]
-
-                pickled_block_config = pickle_objects(
-                    config["temp_dir"], {"path": "block_config", "obj": block_config}
-                )[0]
-
-                command = self.create_command(
-                    input_pickle_path, output_file, pickled_block_config, config
+                input_pickle_path, pickled_block_config = pickle_objects(
+                    temp_dir,
+                    {"path": "input_files", "obj": input_files},
+                    {"path": "block_config", "obj": block_config},
                 )
 
-                self.run_command(command, self.name, config)
+                command = self.create_command(
+                    micromamba_path,
+                    input_pickle_path,
+                    output_file,
+                    pickled_block_config,
+                    config,
+                )
 
-                cleanup_files(input_pickle_path, pickled_block_config)
+                linker_command = create_linker_command(
+                    micromamba_path, temp_dir, output_file
+                )
+
+                run_command(
+                    command,
+                    self.name,
+                    config,
+                    requires_gpu=self.requires_gpu,
+                    run_linker=True,
+                    linker_command=linker_command,
+                )
 
             sync_backup_folder(config["temp_dir"], pipeline_backup_dir)
             return output_file
@@ -210,8 +253,27 @@ class BuildingBlock(ABC):
 
 class SegmentationBuildingBlock(BuildingBlock):
     def __init__(self, block_config):
+        NON_LEARNING_METHODS = ["double_threshold", "edge_based"]
+        LEARNING_BASED_METHODS = ["deep_learning", "ilastik"]
+
+        if block_config["segmentation_method"] in NON_LEARNING_METHODS:
+            requires_gpu = False
+            script_path = "./pipeline_scripts/non_learning_segment.py"
+        elif block_config["segmentation_method"] in LEARNING_BASED_METHODS:
+            requires_gpu = True
+            script_path = "./pipeline_scripts/learning_based_segment.py"
+        else:
+            raise ValueError(
+                f"Segmentation method {block_config['segmentation_method']} not supported."
+            )
+
         super().__init__(
-            "segmentation", OPTIONS_MAP["segmentation"], block_config, "subdir"
+            "segmentation",
+            OPTIONS_MAP["segmentation"],
+            block_config,
+            "subdir",
+            script_path,
+            requires_gpu,
         )
 
     def get_output_name(self, config, pad):
@@ -243,33 +305,16 @@ class SegmentationBuildingBlock(BuildingBlock):
 
         return input_files, output_files
 
-    def create_command(
-        self, input_pickle_path, output_pickle_path, pickled_block_config, config
-    ):
-        NON_LEARNING_METHODS = ["double_threshold", "edge_based"]
-        LEARNING_BASED_METHODS = ["deep_learning", "ilastik"]
-
-        if self.block_config["segmentation_method"] in NON_LEARNING_METHODS:
-            command = f"~/.local/bin/micromamba run -n towbintools python3 ./pipeline_scripts/non_learning_segment.py -i {input_pickle_path} -o {output_pickle_path} -c {pickled_block_config} -j {config['sbatch_cpus']}"
-        elif self.block_config["segmentation_method"] in LEARNING_BASED_METHODS:
-            command = f"~/.local/bin/micromamba run -n towbintools python3 ./pipeline_scripts/learning_based_segment.py -i {input_pickle_path} -o {output_pickle_path} -c {pickled_block_config} -j {config['sbatch_cpus']}"
-        else:
-            raise ValueError(
-                f"Segmentation method {self.block_config['segmentation_method']} not supported."
-            )
-        return command
-
-    def run_command(self, command, name, config):
-        if self.block_config["segmentation_method"] == "deep_learning":
-            return run_command(command, name, config, requires_gpu=True)
-        else:
-            return run_command(command, name, config)
-
 
 class StraighteningBuildingBlock(BuildingBlock):
     def __init__(self, block_config):
+        script_path = "./pipeline_scripts/straighten.py"
         super().__init__(
-            "straightening", OPTIONS_MAP["straightening"], block_config, "subdir"
+            "straightening",
+            OPTIONS_MAP["straightening"],
+            block_config,
+            "subdir",
+            script_path,
         )
 
     def get_output_name(self, config, pad):
@@ -323,23 +368,16 @@ class StraighteningBuildingBlock(BuildingBlock):
 
         return input_files, straightening_output_files
 
-    def create_command(
-        self, input_pickle_path, output_pickle_path, pickled_block_config, config
-    ):
-        command = f"~/.local/bin/micromamba run -n towbintools python3 ./pipeline_scripts/straighten.py -i {input_pickle_path} -o {output_pickle_path} -c {pickled_block_config} -j {config['sbatch_cpus']}"
-        return command
-
-    def run_command(self, command, name, config):
-        return run_command(command, name, config)
-
 
 class MorphologyComputationBuildingBlock(BuildingBlock):
     def __init__(self, block_config):
+        script_path = "./pipeline_scripts/compute_morphology.py"
         super().__init__(
             "morphology_computation",
             OPTIONS_MAP["morphology_computation"],
             block_config,
             "csv",
+            script_path,
         )
 
     def get_output_name(self, config, pad):
@@ -368,20 +406,16 @@ class MorphologyComputationBuildingBlock(BuildingBlock):
 
         return input_files, None
 
-    def create_command(
-        self, input_pickle_path, output_pickle_path, pickled_block_config, config
-    ):
-        command = f"~/.local/bin/micromamba run -n towbintools python3 ./pipeline_scripts/compute_morphology.py -i {input_pickle_path} -o {output_pickle_path} -c {pickled_block_config} -j {config['sbatch_cpus']}"
-        return command
-
-    def run_command(self, command, name, config):
-        return run_command(command, name, config)
-
 
 class ClassificationBuildingBlock(BuildingBlock):
     def __init__(self, block_config):
+        script_path = "./pipeline_scripts/classify.py"
         super().__init__(
-            "classification", OPTIONS_MAP["classification"], block_config, "csv"
+            "classification",
+            OPTIONS_MAP["classification"],
+            block_config,
+            "csv",
+            script_path,
         )
 
     def get_output_name(self, config, pad):
@@ -407,20 +441,16 @@ class ClassificationBuildingBlock(BuildingBlock):
 
         return input_files, None
 
-    def create_command(
-        self, input_pickle_path, output_pickle_path, pickled_block_config, config
-    ):
-        command = f"~/.local/bin/micromamba run -n towbintools python3 ./pipeline_scripts/classify.py -i {input_pickle_path} -o {output_pickle_path} -c {pickled_block_config} -j {config['sbatch_cpus']}"
-        return command
-
-    def run_command(self, command, name, config):
-        return run_command(command, name, config)
-
 
 class MoltDetectionBuildingBlock(BuildingBlock):
     def __init__(self, block_config):
+        script_path = "./pipeline_scripts/detect_molts.py"
         super().__init__(
-            "molt_detection", OPTIONS_MAP["molt_detection"], block_config, "csv"
+            "molt_detection",
+            OPTIONS_MAP["molt_detection"],
+            block_config,
+            "csv",
+            script_path,
         )
 
     def get_output_name(self, config, pad):
@@ -429,23 +459,16 @@ class MoltDetectionBuildingBlock(BuildingBlock):
     def get_input_and_output_files(self, config, experiment_filemap, subdir):
         return experiment_filemap, None
 
-    def create_command(
-        self, input_pickle_path, output_pickle_path, pickled_block_config, config
-    ):
-        command = f"~/.local/bin/micromamba run -n towbintools python3 ./pipeline_scripts/detect_molts.py -i {input_pickle_path} -o {output_pickle_path} -c {pickled_block_config} -j {config['sbatch_cpus']}"
-        return command
-
-    def run_command(self, command, name, config):
-        return run_command(command, name, config)
-
 
 class FluorescenceQuantificationBuildingBlock(BuildingBlock):
     def __init__(self, block_config):
+        script_path = "./pipeline_scripts/quantify_fluorescence.py"
         super().__init__(
             "fluorescence_quantification",
             OPTIONS_MAP["fluorescence_quantification"],
             block_config,
             "csv",
+            script_path,
         )
 
     def get_output_name(self, config, pad):
@@ -498,23 +521,16 @@ class FluorescenceQuantificationBuildingBlock(BuildingBlock):
 
         return input_files, None
 
-    def create_command(
-        self, input_pickle_path, output_pickle_path, pickled_block_config, config
-    ):
-        command = f"~/.local/bin/micromamba run -n towbintools python3 ./pipeline_scripts/quantify_fluorescence.py -i {input_pickle_path} -o {output_pickle_path} -c {pickled_block_config} -j {config['sbatch_cpus']}"
-        return command
-
-    def run_command(self, command, name, config):
-        return run_command(command, name, config)
-
 
 class CustomBuildingBlock(BuildingBlock):
     def __init__(self, block_config):
+        script_path = block_config["custom_script_path"]
         super().__init__(
             "custom",
             OPTIONS_MAP["custom"],
             block_config,
             block_config["custom_script_return_type"],
+            script_path,
         )
 
     def get_output_name(self, config, pad):
@@ -557,9 +573,6 @@ class CustomBuildingBlock(BuildingBlock):
                 f"Script type of {custom_script_path} is not supported. The pipeline only supports bash or python scripts."
             )
         return command
-
-    def run_command(self, command, name, config):
-        return run_command(command, name, config)
 
 
 def count_building_blocks_types(building_block_names):

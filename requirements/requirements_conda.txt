@@ -3,3 +3,5 @@ statsmodels
 plotly
 ipykernel
 numba
+polars
+bottleneck

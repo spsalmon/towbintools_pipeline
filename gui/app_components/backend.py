@@ -374,9 +374,9 @@ def update_molt_and_ecdysis_columns(
             )
             new_value_at_ecdys = compute_series_at_time_classified(
                 series,
-                worm_type_values,
                 time[int(new_time_index)],
-                series_time=time,
+                time,
+                worm_type_values,
             )
 
         print(
@@ -459,9 +459,9 @@ def _compute_series_at_molt(
 
         recomputed_values = compute_series_at_time_classified(
             series[i],
-            worm_types[i],
             time[i][ecdys],
-            series_time=time[i],
+            time[i],
+            worm_types[i],
         )
 
         new_series_at_ecdysis[i][idx_values_to_recompute] = recomputed_values

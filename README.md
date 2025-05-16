@@ -93,11 +93,11 @@ source ~/.bashrc
 - Run the installation script :
 
 ```bash
-chmod +x ~/towbintools_pipeline/pipeline_instalation_script.sh
+chmod +x ~/towbintools_pipeline/install_pipeline.sh
 ```
 
 ```bash
-~/towbintools_pipeline/pipeline_instalation_script.sh
+~/towbintools_pipeline/install_pipeline.sh
 ```
 
 For some reason, the script doesn't really work for some people. In case it doesn't work for you, just run every line of the installation script manually.

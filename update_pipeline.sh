@@ -11,4 +11,5 @@ git reset --hard origin/main
 ~/.local/bin/micromamba run -n towbintools pip install --upgrade towbintools
 
 # install any new package added
-~/.local/bin/micromamba run -n towbintools pip install --upgrade -r requirements_pip.txt
+~/.local/bin/micromamba run -n towbintools pip install --upgrade -r ./requirements/requirements_pip.txt
+~/.local/bin/micromamba run upgrade ./requirements/requirements_conda.txt

@@ -90,9 +90,9 @@ def compute_features_at_molt(
                         f"{column}_at_{molt}"
                     ] = compute_series_at_time_classified(
                         column_data,
-                        worm_types,
                         molt_time,
-                        series_time=data_of_point["Time"].values,
+                        data_of_point["Time"].values,
+                        worm_types,
                     )
                 else:
                     features_at_molt[f"{column}_at_{molt}"] = np.nan
