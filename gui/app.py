@@ -3,15 +3,16 @@ from app_components.ui import initialize_ui
 from app_components.ui import main_server
 from shiny import App
 
-recompute_features_at_molt = True
+recompute_features_at_molt = False
 
-filemap_path = "/mnt/towbin.data/shared/spsalmon/20250314_squid_10x_yap_aid_160_438_492_493/analysis/report/analysis_filemap.csv"
+filemap_path = "/mnt/towbin.data/shared/spsalmon/20250515_SQUID_10x_125_493_527_yap_aid_functionality/analysis/report/analysis_filemap.csv"
 
 filemap, filemap_save_path = open_filemap(filemap_path, open_annotated=True)
 
 print("Creating the app ...")
 (
     app_ui,
+    filemap,
     feature_columns,
     custom_columns_choices,
     points,

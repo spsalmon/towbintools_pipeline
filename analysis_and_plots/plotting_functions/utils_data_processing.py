@@ -1,7 +1,11 @@
+import bottleneck as bn
 import numpy as np
 from towbintools.data_analysis import rescale_series
 from towbintools.data_analysis.growth_rate import (
     compute_instantaneous_growth_rate_classified,
+)
+from towbintools.data_analysis.time_series import (
+    smooth_series_classified,
 )
 
 
@@ -156,3 +160,133 @@ def exclude_arrests_from_series_at_ecdysis(series_at_ecdysis):
                 elif not np.isnan(series_at_ecdysis[i, j + 1]):
                     filtered_series[i, j] = series_at_ecdysis[i, j]
         return filtered_series
+
+
+def smooth_series(
+    conditions_struct,
+    series_name,
+    smoothed_series_name,
+    experiment_time=True,
+    lmbda=0.0075,
+    order=2,
+    medfilt_window=5,
+):
+    for condition in conditions_struct:
+        series_values = condition[series_name]
+        # TEMPORARY, ONLY WORKS WITH SINGLE CLASSIFICATION, FIND A WAY TO GENERALIZE
+        worm_type_key = [key for key in condition.keys() if "worm_type" in key][0]
+        worm_type = condition[worm_type_key]
+        if experiment_time:
+            time = condition["experiment_time_hours"]
+        else:
+            time = condition["time"]
+
+        smoothed_series = []
+        for i in range(len(series_values)):
+            values = series_values[i]
+            smoothed = smooth_series_classified(
+                values,
+                worm_type[i],
+                time[i],
+                lmbda=lmbda,
+                order=order,
+                medfilt_window=medfilt_window,
+            )
+
+            # pad with 0 until it's the same length as the original series
+            if len(smoothed) < len(values):
+                smoothed = np.pad(
+                    smoothed,
+                    (0, len(values) - len(smoothed)),
+                    "constant",
+                    constant_values=(np.nan, np.nan),
+                )
+
+            smoothed_series.append(smoothed)
+
+        smoothed_series = np.array(smoothed_series)
+        condition[smoothed_series_name] = smoothed_series
+
+    return conditions_struct
+
+
+def smooth_and_rescale_series(
+    conditions_struct,
+    series_name,
+    smoothed_series_name,
+    experiment_time=True,
+    lmbda=0.0075,
+    order=2,
+    medfilt_window=5,
+    n_points=100,
+    flatten=True,
+):
+    for condition in conditions_struct:
+        series_values = condition[series_name]
+        # TEMPORARY, ONLY WORKS WITH SINGLE CLASSIFICATION, FIND A WAY TO GENERALIZE
+        worm_type_key = [key for key in condition.keys() if "worm_type" in key][0]
+        worm_type = condition[worm_type_key]
+        ecdysis = condition["ecdysis_index"]
+        if experiment_time:
+            time = condition["experiment_time_hours"]
+        else:
+            time = condition["time"]
+
+        smoothed_series = []
+        for i in range(len(series_values)):
+            values = series_values[i]
+            smoothed = smooth_series_classified(
+                values,
+                time[i],
+                worm_type[i],
+                lmbda=lmbda,
+                order=order,
+                medfilt_window=medfilt_window,
+            )
+
+            # pad with 0 until it's the same length as the original series
+            if len(smoothed) < len(values):
+                smoothed = np.pad(
+                    smoothed,
+                    (0, len(values) - len(smoothed)),
+                    "constant",
+                    constant_values=(np.nan, np.nan),
+                )
+
+            smoothed_series.append(smoothed)
+
+        smoothed_series = np.array(smoothed_series)
+
+        # we don't need the classification anymore
+        worm_type = np.full_like(smoothed_series, "worm", dtype=object)
+
+        # rescale the smoothed series
+        _, rescaled_series = rescale_series(
+            smoothed_series, time, ecdysis, worm_type, n_points=n_points
+        )  # shape (n_worms, 4, n_points)
+
+        # reshape into (n_worms, 4*n_points)
+        if flatten:
+            rescaled_series = rescaled_series.reshape(rescaled_series.shape[0], -1)
+
+        condition[smoothed_series_name] = smoothed_series
+        condition[f"{smoothed_series_name}_rescaled"] = rescaled_series
+    return conditions_struct
+
+
+def detrend_rescaled_series_population_mean(conditions_struct, rescaled_series):
+    for condition in conditions_struct:
+        series = condition[rescaled_series]
+        detrended_series = _detrend_rescaled_series_population_mean(series)
+        new_name = f"{rescaled_series}_detrended"
+        condition[new_name] = detrended_series
+
+    return conditions_struct
+
+
+def _detrend_rescaled_series_population_mean(series):
+    # detrend the series by subtracting the population mean
+    population_mean = bn.nanmean(series, axis=0)
+    detrended_series = series - population_mean
+
+    return detrended_series

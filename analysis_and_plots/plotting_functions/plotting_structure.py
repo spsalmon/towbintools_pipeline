@@ -1,5 +1,6 @@
 import os
 from collections import defaultdict
+from time import perf_counter
 
 import numpy as np
 import polars as pl
@@ -231,7 +232,11 @@ def build_plotting_struct(
     recompute_values_at_molt=False,
     rescale_n_points=100,
 ):
-    experiment_filemap = pl.read_csv(filemap_path)
+    experiment_filemap = pl.read_csv(
+        filemap_path,
+        infer_schema_length=10000,
+        null_values=["np.nan", "[nan]", ""],
+    )
 
     conditions = build_conditions(conditions_yaml_path)
     conditions_keys = list(conditions[0].keys())
@@ -247,6 +252,8 @@ def build_plotting_struct(
         conditions,
     )
 
+    experiment_filemap.write_csv("test.csv")
+
     # if ExperimentTime is not present in the filemap, add it
     if "ExperimentTime" not in experiment_filemap.columns:
         experiment_filemap = experiment_filemap.with_columns(
@@ -256,17 +263,25 @@ def build_plotting_struct(
     # remove rows where condition_id is null
     experiment_filemap = experiment_filemap.filter(~pl.col("condition_id").is_null())
 
+    start = perf_counter()
+
     # set molts that should be ignored to NaN
     if "Ignore" in experiment_filemap.columns:
         experiment_filemap = remove_ignored_molts(experiment_filemap)
 
     # remove rows where Ignore is True
     if "Ignore" in experiment_filemap.columns:
-        experiment_filemap = experiment_filemap[~experiment_filemap["Ignore"]]
+        experiment_filemap = experiment_filemap.filter(~pl.col("Ignore"))
 
+    print(f"Processing ignore times took {perf_counter() - start:.2f} seconds")
     conditions_struct = []
 
-    for condition_id in experiment_filemap["condition_id"].unique():
+    for condition_id in (
+        experiment_filemap.select(pl.col("condition_id"))
+        .unique(maintain_order=True)
+        .to_numpy()
+        .squeeze()
+    ):
         condition_dict = _process_condition_id_plotting_structure(
             experiment_dir,
             experiment_filemap,
@@ -464,34 +479,34 @@ def separate_column_by_point(filemap, column):
 def remove_ignored_molts(filemap):
     molt_columns = ["HatchTime", "M1", "M2", "M3", "M4"]
 
-    for point in filemap["Point"].unique():
-        point_mask = pl.col("Point") == point
-        point_df = filemap.filter(point_mask)
+    # Only process if "Ignore" column exists
+    if "Ignore" not in filemap.columns:
+        return filemap
 
-        if point_df.is_empty():
-            continue
+    # Get all rows where Ignore is True
+    ignored_rows = filemap.filter(pl.col("Ignore"))
 
-        # Get molt times for this point
-        molt_times = point_df.select(molt_columns).row(0)
+    # Build a set of (Point, Time) pairs to ignore
+    ignored_points = ignored_rows.select(pl.col("Point")).to_numpy().flatten()
+    ignored_times = ignored_rows.select(pl.col("Time")).to_numpy().flatten()
+    ignored_pairs = set(zip(ignored_points, ignored_times))
 
-        # Check each molt time
-        for col, molt_time in zip(molt_columns, molt_times):
-            if molt_time is None:
-                continue
-
-            # Find if this molt should be ignored
-            ignore_mask = (pl.col("Time") == molt_time) & (pl.col("Ignore"))
-            if filemap.filter(point_mask & ignore_mask).height > 0:
-                filemap = filemap.with_columns(
-                    pl.when(point_mask)
-                    .then(
-                        pl.when(pl.col("Time") == molt_time)
-                        .then(None)
-                        .otherwise(pl.col(col))
-                    )
-                    .otherwise(pl.col(col))
-                    .alias(col)
-                )
+    # For each molt column, set to None where (Point, molt_time) is in ignored_pairs
+    for col in molt_columns:
+        molt_times = filemap.select(pl.col(col)).to_numpy().flatten()
+        points = filemap.select(pl.col("Point")).to_numpy().flatten()
+        mask = np.array(
+            [
+                (p, mt) in ignored_pairs
+                if mt is not None and not (isinstance(mt, float) and np.isnan(mt))
+                else False
+                for p, mt in zip(points, molt_times)
+            ]
+        )
+        if mask.any():
+            filemap = filemap.with_columns(
+                pl.when(pl.Series(mask)).then(None).otherwise(pl.col(col)).alias(col)
+            )
 
     return filemap
 

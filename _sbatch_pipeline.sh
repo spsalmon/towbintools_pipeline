@@ -4,7 +4,7 @@
 #SBATCH -o ./sbatch_output/pipeline-%j.out
 #SBATCH -e ./sbatch_output/pipeline-%j.err
 #SBATCH -c 8
-#SBATCH -t 0:05:00
+#SBATCH -t 12:00:00
 #SBATCH --mem=8GB
 #SBATCH --gres=pipelinecapacity:1
 

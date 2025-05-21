@@ -30,7 +30,7 @@ def run_detect_molts(
     worm_types = data_of_point[worm_type_column].values
     try:
         # Detect molts
-        ecdysis, volume_at_ecdysis = detect_molts.find_molts(
+        ecdysis = detect_molts.find_molts(
             volumes, worm_types, molt_size_range, search_width, fit_width
         )
     except ValueError as e:
