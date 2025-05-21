@@ -4,10 +4,146 @@ import statsmodels.api as sm
 from scipy.interpolate import make_interp_spline
 from towbintools.data_analysis import rescale_and_aggregate
 
-from .utils_data_processing import exclude_arrests_from_series_at_ecdysis
 from .utils_plotting import build_legend
 from .utils_plotting import get_colors
 from .utils_plotting import set_scale
+
+# from .utils_data_processing import exclude_arrests_from_series_at_ecdysis
+
+# MODEL BUILDING
+
+
+def _get_continuous_proportion_model(
+    rescaled_series_one,
+    rescaled_series_two,
+    x_axis_label=None,
+    y_axis_label=None,
+):
+    assert len(rescaled_series_one) == len(
+        rescaled_series_two
+    ), "The two series must have the same length."
+
+    series_one = np.array(rescaled_series_one).flatten()
+    series_two = np.array(rescaled_series_two).flatten()
+
+    # remove elements that are nan in one of the two arrays
+    correct_indices = ~np.isnan(series_one) & ~np.isnan(series_two)
+    series_one = series_one[correct_indices]
+    series_two = series_two[correct_indices]
+
+    # log transform the data
+    series_one = np.log(series_one)
+    series_two = np.log(series_two)
+
+    # for duplicate values, take the mean
+    unique_series_one = np.unique(series_one)
+    unique_series_two = np.array(
+        [np.mean(series_two[series_one == value]) for value in unique_series_one]
+    )
+
+    series_one = unique_series_one
+    series_two = unique_series_two
+
+    plt.scatter(series_one, series_two)
+
+    if x_axis_label is not None:
+        plt.xlabel(x_axis_label)
+    else:
+        plt.xlabel("column one")
+
+    if y_axis_label is not None:
+        plt.ylabel(y_axis_label)
+    else:
+        plt.ylabel("column two")
+
+    # lowess will return our "smoothed" data with a y value for at every x-value
+    lowess = sm.nonparametric.lowess(series_two, series_one, frac=0.1)
+
+    # unpack the lowess smoothed points to their values
+    lowess_x = list(zip(*lowess))[0]
+    lowess_y = list(zip(*lowess))[1]
+
+    # interpolate the loess curve
+    model = make_interp_spline(lowess_x, lowess_y, k=1)
+
+    x = np.linspace(min(series_one), max(series_one), 500)
+    y = model(x)
+
+    plt.plot(x, y, color="red", linewidth=2)
+    plt.show()
+
+    return model
+
+
+def _get_proportion_model(
+    series_one_values,
+    series_two_values,
+    x_axis_label=None,
+    y_axis_label=None,
+    poly_degree=2,
+    plot_model=True,
+):
+    assert len(series_one_values) == len(
+        series_two_values
+    ), "The two series must have the same length."
+
+    series_one_values = np.array(series_one_values).flatten()
+    series_two_values = np.array(series_two_values).flatten()
+    # remove elements that are nan in one of the two arrays
+    correct_indices = ~np.isnan(series_one_values) & ~np.isnan(series_two_values)
+    series_one_values = series_one_values[correct_indices]
+    series_two_values = series_two_values[correct_indices]
+
+    # log transform the data
+    series_one_values = np.log(series_one_values)
+    series_two_values = np.log(series_two_values)
+
+    fit = np.polyfit(series_one_values, series_two_values, poly_degree)
+    model = np.poly1d(fit)
+
+    if plot_model:
+        plt.scatter(series_one_values, series_two_values)
+
+        if x_axis_label is not None:
+            plt.xlabel(x_axis_label)
+        else:
+            plt.xlabel("column one")
+
+        if y_axis_label is not None:
+            plt.ylabel(y_axis_label)
+        else:
+            plt.ylabel("column two")
+
+        x = np.linspace(np.nanmin(series_one_values), np.nanmax(series_one_values), 100)
+        y = model(x)
+        plt.plot(
+            x,
+            y,
+            color="red",
+        )
+        plt.show()
+
+    return model
+
+
+# COMPUTE DEVIATION FROM MODEL
+
+
+def get_deviation_from_model(
+    series_one_values, series_two_values, model, percentage=True
+):
+    if percentage:
+        expected_series_two = np.exp(model(np.log(series_one_values)))
+        # Calculate percentage deviation using real values
+        deviation = (
+            (series_two_values - expected_series_two) / expected_series_two * 100
+        )
+
+    else:
+        log_expected_series_two = model(np.log(series_one_values))
+        deviation = np.log(series_two_values) - log_expected_series_two
+
+    return deviation
 
 
 def plot_correlation(
@@ -149,96 +285,13 @@ def plot_correlation_at_ecdysis(
     return fig
 
 
-def get_proportion_model(
-    rescaled_series_one, rescaled_series_two, x_axis_label=None, y_axis_label=None
-):
-    assert len(rescaled_series_one) == len(
-        rescaled_series_two
-    ), "The two series must have the same length."
-
-    series_one = np.array(rescaled_series_one).flatten()
-    series_two = np.array(rescaled_series_two).flatten()
-
-    # remove elements that are nan in one of the two arrays
-    correct_indices = ~np.isnan(series_one) & ~np.isnan(series_two)
-    series_one = series_one[correct_indices]
-    series_two = series_two[correct_indices]
-
-    # log transform the data
-    series_one = np.log(series_one)
-    series_two = np.log(series_two)
-
-    # for duplicate values, take the mean
-    unique_series_one = np.unique(series_one)
-    unique_series_two = np.array(
-        [np.mean(series_two[series_one == value]) for value in unique_series_one]
-    )
-
-    series_one = unique_series_one
-    series_two = unique_series_two
-
-    plt.scatter(series_one, series_two)
-
-    if x_axis_label is not None:
-        plt.xlabel(x_axis_label)
-    else:
-        plt.xlabel("column one")
-
-    if y_axis_label is not None:
-        plt.ylabel(y_axis_label)
-    else:
-        plt.ylabel("column two")
-
-    # lowess will return our "smoothed" data with a y value for at every x-value
-    lowess = sm.nonparametric.lowess(series_two, series_one, frac=0.1)
-
-    # unpack the lowess smoothed points to their values
-    lowess_x = list(zip(*lowess))[0]
-    lowess_y = list(zip(*lowess))[1]
-
-    # interpolate the loess curve
-    model = make_interp_spline(lowess_x, lowess_y, k=1)
-
-    x = np.linspace(min(series_one), max(series_one), 500)
-    y = model(x)
-
-    plt.plot(x, y, color="red", linewidth=2)
-    plt.show()
-
-    return model
-
-
-def get_deviation_from_model(rescaled_series_one, rescaled_series_two, model):
-    # log transform the data
-
-    expected_series_two = np.exp(model(np.log(rescaled_series_one)))
-
-    # log_residuals = rescaled_series_two - expected_series_two
-    # residuals = np.exp(log_residuals)
-    percentage_deviation = (
-        (rescaled_series_two - expected_series_two) / expected_series_two * 100
-    )
-
-    mean_series_one = np.nanmean(rescaled_series_one, axis=0)
-    # mean_residuals = np.nanmean(residuals, axis=0)
-    # std_residuals = np.nanstd(residuals, axis=0)
-    # ste_residuals = std_residuals / np.sqrt(np.sum(np.isfinite(residuals), axis=0))
-
-    mean_residuals = np.nanmean(percentage_deviation, axis=0)
-    std_residuals = np.nanstd(percentage_deviation, axis=0)
-    ste_residuals = std_residuals / np.sqrt(
-        np.sum(np.isfinite(percentage_deviation), axis=0)
-    )
-
-    return mean_series_one, mean_residuals, std_residuals, ste_residuals
-
-
-def plot_deviation_from_model(
+def plot_continuous_deviation_from_model(
     conditions_struct,
-    column_one,
-    column_two,
+    rescaled_column_one,
+    rescaled_column_two,
     control_condition_id,
     conditions_to_plot,
+    deviation_as_percentage=True,
     colors=None,
     log_scale=(True, False),
     legend=None,
@@ -250,45 +303,60 @@ def plot_deviation_from_model(
         colors,
     )
 
-    xlbl = column_one
-    ylbl = column_two
+    xlbl = rescaled_column_one
+    ylbl = rescaled_column_two
 
     x_axis_label = x_axis_label if x_axis_label is not None else xlbl
     y_axis_label = (
         y_axis_label
         if y_axis_label is not None
-        else f"deviation from modeled {column_two}"
+        else f"deviation from modeled {rescaled_column_two}"
     )
 
     control_condition = conditions_struct[control_condition_id]
 
-    control_model = get_proportion_model(
-        control_condition[column_one],
-        control_condition[column_two],
+    control_model = _get_continuous_proportion_model(
+        control_condition[rescaled_column_one],
+        control_condition[rescaled_column_two],
         x_axis_label=xlbl,
         y_axis_label=ylbl,
+        plot_model=True,
     )
 
     for i, condition_id in enumerate(conditions_to_plot):
         condition = conditions_struct[condition_id]
-        body_data, pharynx_data = condition[column_one], condition[column_two]
-        x, residuals, std_residuals, ste_residuals = get_deviation_from_model(
-            body_data,
-            pharynx_data,
+        rescaled_column_one_values, rescaled_column_two_values = (
+            condition[rescaled_column_one],
+            condition[rescaled_column_two],
+        )
+        residuals = get_deviation_from_model(
+            rescaled_column_one_values,
+            rescaled_column_two_values,
             control_model,
+            percentage=deviation_as_percentage,
         )
 
-        sorted_indices = np.argsort(x)
-        x = x[sorted_indices]
+        sorted_indices = np.argsort(rescaled_column_one_values)
+        rescaled_column_one_values = rescaled_column_one_values[sorted_indices]
         residuals = residuals[sorted_indices]
-        ste_residuals = ste_residuals[sorted_indices]
+
+        average_column_one_values = np.nanmean(rescaled_column_one_values, axis=0)
+        average_residuals = np.nanmean(residuals, axis=0)
+        ste_residuals = np.nanstd(residuals, axis=0) / np.sqrt(
+            np.sum(~np.isnan(residuals), axis=0)
+        )
 
         label = build_legend(condition, legend)
-        plt.plot(x, residuals, label=label, color=color_palette[i])
+        plt.plot(
+            average_column_one_values,
+            average_residuals,
+            label=label,
+            color=color_palette[i],
+        )
         plt.fill_between(
-            x,
-            residuals - 1.96 * ste_residuals,
-            residuals + 1.96 * ste_residuals,
+            average_column_one_values,
+            average_residuals - 1.96 * ste_residuals,
+            average_residuals + 1.96 * ste_residuals,
             color=color_palette[i],
             alpha=0.2,
         )
@@ -306,173 +374,20 @@ def plot_deviation_from_model(
     return fig
 
 
-def get_proportion_model_ecdysis(
-    series_one_at_ecdysis,
-    series_two_at_ecdysis,
-    remove_hatch=True,
-    x_axis_label=None,
-    y_axis_label=None,
-    exclude_arrests=False,
-    poly_degree=3,
-    plot_model=True,
-):
-    assert len(series_one_at_ecdysis) == len(
-        series_two_at_ecdysis
-    ), "The two series must have the same length."
-
-    if remove_hatch:
-        series_one_at_ecdysis = series_one_at_ecdysis[:, 1:]
-        series_two_at_ecdysis = series_two_at_ecdysis[:, 1:]
-
-    if exclude_arrests:
-        series_one_at_ecdysis = exclude_arrests_from_series_at_ecdysis(
-            series_one_at_ecdysis
-        )
-        series_two_at_ecdysis = exclude_arrests_from_series_at_ecdysis(
-            series_two_at_ecdysis
-        )
-
-    series_one_at_ecdysis = np.array(series_one_at_ecdysis).flatten()
-    series_two_at_ecdysis = np.array(series_two_at_ecdysis).flatten()
-    # remove elements that are nan in one of the two arrays
-    correct_indices = ~np.isnan(series_one_at_ecdysis) & ~np.isnan(
-        series_two_at_ecdysis
-    )
-    series_one_at_ecdysis = series_one_at_ecdysis[correct_indices]
-    series_two_at_ecdysis = series_two_at_ecdysis[correct_indices]
-
-    # log transform the data
-    series_one_at_ecdysis = np.log(series_one_at_ecdysis)
-    series_two_at_ecdysis = np.log(series_two_at_ecdysis)
-
-    fit = np.polyfit(series_one_at_ecdysis, series_two_at_ecdysis, poly_degree)
-    model = np.poly1d(fit)
-
-    if plot_model:
-        plt.scatter(series_one_at_ecdysis, series_two_at_ecdysis)
-
-        if x_axis_label is not None:
-            plt.xlabel(x_axis_label)
-        else:
-            plt.xlabel("column one")
-
-        if y_axis_label is not None:
-            plt.ylabel(y_axis_label)
-        else:
-            plt.ylabel("column two")
-
-        plt.plot(
-            np.sort(series_one_at_ecdysis),
-            model(np.sort(series_one_at_ecdysis)),
-            color="red",
-        )
-        plt.show()
-
-    return model
-
-
-def get_deviation_from_model_at_ecdysis(
-    series_one_at_ecdysis,
-    series_two_at_ecdysis,
-    model,
-    remove_hatch=True,
-    exclude_arrests=False,
-):
-    if remove_hatch:
-        series_one_at_ecdysis = series_one_at_ecdysis[:, 1:]
-        series_two_at_ecdysis = series_two_at_ecdysis[:, 1:]
-
-    if exclude_arrests:
-        series_one_at_ecdysis = exclude_arrests_from_series_at_ecdysis(
-            series_one_at_ecdysis
-        )
-        series_two_at_ecdysis = exclude_arrests_from_series_at_ecdysis(
-            series_two_at_ecdysis
-        )
-
-    # remove elements that are nan in one of the two arrays
-    for i in range(series_one_at_ecdysis.shape[1]):
-        nan_mask = np.isnan(series_one_at_ecdysis[:, i]) | np.isnan(
-            series_two_at_ecdysis[:, i]
-        )
-        series_one_at_ecdysis[:, i][nan_mask] = np.nan
-        series_two_at_ecdysis[:, i][nan_mask] = np.nan
-
-    # log transform the data
-    series_one_at_ecdysis = np.log(series_one_at_ecdysis)
-    series_two_at_ecdysis = np.log(series_two_at_ecdysis)
-
-    expected_series_two = model(series_one_at_ecdysis)
-
-    log_residuals = series_two_at_ecdysis - expected_series_two
-    residuals = np.exp(log_residuals)
-
-    y = np.nanmean(residuals, axis=0)
-    y_err = np.nanstd(residuals, axis=0) / np.sqrt(len(residuals))
-    x = np.nanmean(np.exp(series_one_at_ecdysis), axis=0)
-
-    return x, y, y_err
-
-
-def get_deviation_percentage_from_model_at_ecdysis(
-    series_one_at_ecdysis,
-    series_two_at_ecdysis,
-    model,
-    remove_hatch=True,
-    exclude_arrests=False,
-):
-    if remove_hatch:
-        series_one_at_ecdysis = series_one_at_ecdysis[:, 1:]
-        series_two_at_ecdysis = series_two_at_ecdysis[:, 1:]
-
-    if exclude_arrests:
-        series_one_at_ecdysis = exclude_arrests_from_series_at_ecdysis(
-            series_one_at_ecdysis
-        )
-        series_two_at_ecdysis = exclude_arrests_from_series_at_ecdysis(
-            series_two_at_ecdysis
-        )
-
-    # remove elements that are nan in one of the two arrays
-    for i in range(series_one_at_ecdysis.shape[1]):
-        nan_mask = np.isnan(series_one_at_ecdysis[:, i]) | np.isnan(
-            series_two_at_ecdysis[:, i]
-        )
-        series_one_at_ecdysis[:, i][nan_mask] = np.nan
-        series_two_at_ecdysis[:, i][nan_mask] = np.nan
-
-    # Apply the model to the log-transformed series_one to get expected values
-    expected_series_two = np.exp(model(np.log(series_one_at_ecdysis)))
-
-    # Calculate percentage deviation using real values
-    percentage_deviation = (
-        (series_two_at_ecdysis - expected_series_two) / expected_series_two * 100
-    )
-
-    y = np.nanmean(percentage_deviation, axis=0)
-    y_err = np.nanstd(percentage_deviation, axis=0) / np.sqrt(
-        np.sum(~np.isnan(percentage_deviation), axis=0)
-    )
-    x = np.nanmean(series_one_at_ecdysis, axis=0)
-
-    return x, y, y_err
-
-
 def plot_deviation_from_model_at_ecdysis(
     conditions_struct,
     column_one,
     column_two,
     control_condition_id,
     conditions_to_plot,
-    remove_hatch=True,
+    remove_hatch=False,
+    deviation_as_percentage=True,
     log_scale=(True, False),
     colors=None,
     legend=None,
     x_axis_label=None,
     y_axis_label=None,
-    percentage=True,
-    exclude_arrests=False,
-    poly_degree=3,
+    poly_degree=2,
 ):
     color_palette = get_colors(
         conditions_to_plot,
@@ -490,32 +405,62 @@ def plot_deviation_from_model_at_ecdysis(
     )
 
     control_condition = conditions_struct[control_condition_id]
-    control_model = get_proportion_model_ecdysis(
-        control_condition[column_one],
-        control_condition[column_two],
-        remove_hatch,
+
+    column_one_values = control_condition[column_one]
+    column_two_values = control_condition[column_two]
+
+    if remove_hatch:
+        column_one_values = column_one_values[:, 1:]
+        column_two_values = column_two_values[:, 1:]
+
+    control_model = _get_proportion_model(
+        column_one_values,
+        column_two_values,
         x_axis_label=xlbl,
         y_axis_label=ylbl,
-        exclude_arrests=exclude_arrests,
         poly_degree=poly_degree,
+        plot_model=True,
     )
 
     for i, condition_id in enumerate(conditions_to_plot):
         condition = conditions_struct[condition_id]
-        body_data, pharynx_data = condition[column_one], condition[column_two]
+        column_one_values, column_two_values = (
+            condition[column_one],
+            condition[column_two],
+        )
+        if remove_hatch:
+            column_one_values = column_one_values[:, 1:]
+            column_two_values = column_two_values[:, 1:]
+        deviations = get_deviation_from_model(
+            column_one_values,
+            column_two_values,
+            control_model,
+            percentage=deviation_as_percentage,
+        )
 
-        if percentage:
-            x, y, y_err = get_deviation_percentage_from_model_at_ecdysis(
-                body_data, pharynx_data, control_model, remove_hatch, exclude_arrests
-            )
-        else:
-            x, y, y_err = get_deviation_from_model_at_ecdysis(
-                body_data, pharynx_data, control_model, remove_hatch, exclude_arrests
-            )
+        mean_column_one_values = np.nanmean(column_one_values, axis=0)
+        mean_deviations = np.nanmean(deviations, axis=0)
+        # std_deviations = np.nanstd(deviations, axis=0)
+        ste_deviations = np.nanstd(deviations, axis=0) / np.sqrt(
+            np.sum(~np.isnan(deviations), axis=0)
+        )
 
         label = build_legend(condition, legend)
-        plt.plot(x, y, label=label, color=color_palette[i], marker="o")
-        plt.errorbar(x, y, yerr=y_err, color=color_palette[i], fmt="o", capsize=3)
+        plt.plot(
+            mean_column_one_values,
+            mean_deviations,
+            label=label,
+            color=color_palette[i],
+            marker="o",
+        )
+        plt.errorbar(
+            mean_column_one_values,
+            mean_deviations,
+            yerr=ste_deviations,
+            color=color_palette[i],
+            fmt="o",
+            capsize=3,
+        )
 
     plt.xlabel(x_axis_label)
     plt.ylabel(y_axis_label)
@@ -527,6 +472,121 @@ def plot_deviation_from_model_at_ecdysis(
     fig = plt.gcf()
     plt.show()
 
+    return fig
+
+
+def plot_deviation_from_model_development_percentage(
+    conditions_struct,
+    column_one,
+    column_two,
+    control_condition_id,
+    conditions_to_plot,
+    percentages,
+    deviation_as_percentage=True,
+    log_scale=(True, False),
+    colors=None,
+    legend=None,
+    x_axis_label=None,
+    y_axis_label=None,
+    poly_degree=3,
+):
+    """
+    Plot the percentage deviation from a model at specified development percentages for multiple conditions.
+
+    Args:
+        conditions_struct (dict): Dictionary of condition data.
+        column_one (str): Key for the first variable.
+        column_two (str): Key for the second variable.
+        control_condition_id (str): Key for the control condition.
+        conditions_to_plot (list): List of condition keys to plot.
+        percentages (np.ndarray): Array of percentages (0-1) at which to sample.
+        colors (list, optional): List of colors for plotting.
+        legend (list, optional): Legend labels.
+        x_axis_label (str, optional): Label for x-axis.
+        y_axis_label (str, optional): Label for y-axis.
+        poly_degree (int, optional): Degree of polynomial for model fitting.
+    """
+    color_palette = get_colors(conditions_to_plot, colors)
+
+    xlbl = column_one
+    ylbl = column_two
+
+    x_axis_label = x_axis_label if x_axis_label is not None else xlbl
+    y_axis_label = (
+        y_axis_label
+        if y_axis_label is not None
+        else f"deviation from modeled {column_two}"
+    )
+
+    control_condition = conditions_struct[control_condition_id]
+    column_one_values = control_condition[column_one]
+    column_two_values = control_condition[column_two]
+
+    indices = np.clip(
+        (percentages * column_one_values.shape[1]).astype(int),
+        0,
+        column_one_values.shape[1] - 1,
+    ).astype(int)
+
+    control_one_values = column_one_values[:, indices]
+    control_two_values = column_two_values[:, indices]
+
+    # Fit the model on the control condition
+    control_model = _get_proportion_model(
+        control_one_values,
+        control_two_values,
+        x_axis_label=xlbl,
+        y_axis_label=ylbl,
+        poly_degree=poly_degree,
+        plot_model=True,
+    )
+
+    for i, condition_id in enumerate(conditions_to_plot):
+        condition = conditions_struct[condition_id]
+        column_one_values, column_two_values = (
+            condition[column_one],
+            condition[column_two],
+        )
+        column_one_values = column_one_values[:, indices]
+        column_two_values = column_two_values[:, indices]
+
+        deviations = get_deviation_from_model(
+            column_one_values,
+            column_two_values,
+            control_model,
+            percentage=deviation_as_percentage,
+        )
+
+        mean_column_one_values = np.nanmean(column_one_values, axis=0)
+        mean_deviations = np.nanmean(deviations, axis=0)
+        # std_deviations = np.nanstd(deviations, axis=0)
+        ste_deviations = np.nanstd(deviations, axis=0) / np.sqrt(
+            np.sum(~np.isnan(deviations), axis=0)
+        )
+
+        label = build_legend(condition, legend)
+        plt.plot(
+            mean_column_one_values,
+            mean_deviations,
+            label=label,
+            color=color_palette[i],
+            marker="o",
+        )
+        plt.errorbar(
+            mean_column_one_values,
+            mean_deviations,
+            yerr=ste_deviations,
+            fmt="o",
+            capsize=3,
+            color=color_palette[i],
+        )
+
+    plt.xlabel(x_axis_label)
+    plt.ylabel(y_axis_label)
+    plt.legend()
+    set_scale(plt.gca(), log_scale)
+    fig = plt.gcf()
+    plt.show()
     return fig
 
 
@@ -566,7 +626,7 @@ def plot_model_comparison_at_ecdysis(
     for i, condition_id in enumerate(conditions_to_plot):
         condition = conditions_struct[condition_id]
 
-        model = get_proportion_model_ecdysis(
+        model = _get_proportion_model(
             condition[column_one],
             condition[column_two],
             remove_hatch,

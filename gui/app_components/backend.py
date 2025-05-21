@@ -54,7 +54,7 @@ def open_filemap(filemap_path, open_annotated=True):
     filemap = pl.read_csv(
         filemap_path,
         infer_schema_length=10000,
-        null_values=["np.nan", "NaN", "[nan]", ""],
+        null_values=["np.nan", "[nan]", ""],
     )
 
     # Backup the filemap
@@ -250,7 +250,7 @@ def process_feature_at_molt_columns(
 
     for ecdys in ECDYSIS_COLUMNS:
         if ecdys not in filemap.columns:
-            filemap.with_columns(pl.lit(np.nan).alias(ecdys))
+            filemap = filemap.with_columns(pl.lit(np.nan).alias(ecdys))
 
     (
         time,
@@ -271,7 +271,7 @@ def process_feature_at_molt_columns(
         ]
         for column in feature_at_ecdysis_columns:
             if column not in columns:
-                filemap.with_columns(pl.lit(np.nan).alias(column))
+                filemap = filemap.with_columns(pl.lit(np.nan).alias(column))
 
         series_at_ecdysis = _get_values_at_molt(filemap, feature_column)
 
@@ -315,6 +315,7 @@ def process_feature_at_molt_columns(
 def _get_values_at_molt(filemap, column):
     ecdysis = ["HatchTime", "M1", "M2", "M3", "M4"]
     columns_at_ecdysis = [f"{column}_at_{e}" for e in ecdysis]
+
     column_list = ["Point"] + columns_at_ecdysis
     filemap = filemap.select(pl.col(column_list))
 

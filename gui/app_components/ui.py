@@ -353,6 +353,7 @@ def initialize_ui(filemap, recompute_features_at_molt=False):
 
     return (
         app_ui,
+        filemap,
         feature_columns,
         custom_columns_choices,
         points,
@@ -378,8 +379,28 @@ def main_server(
     # global filemap
     # global custom_columns_choices
     point_filemaps = filemap.partition_by("Point", maintain_order=True)
-    work_df = filemap.select((pl.col("Point"), pl.col("Time"))).cast(pl.Int32)
+
+    work_df_columns = [
+        "Time",
+        "Point",
+        "Death",
+        "Ignore",
+        "Arrest",
+    ] + custom_columns_choices
+
+    columns_to_get = [c for c in work_df_columns if c in filemap.columns]
+    # Remove duplicates while preserving order
+    seen = set()
+    columns_to_get_unique = []
+    for c in columns_to_get:
+        if c not in seen:
+            columns_to_get_unique.append(c)
+            seen.add(c)
+
+    print(f"Columns to get: {columns_to_get_unique}")
+    work_df = filemap.select(pl.col(columns_to_get_unique))
     work_df = reactive.Value(work_df)
+
     single_values_df = build_single_values_df(filemap)
 
     single_values_of_points = single_values_df.partition_by(
@@ -445,11 +466,15 @@ def main_server(
     ]
 
     # Create non-reactive holders for the latest values
+    latest_point = {"value": None}
+    latest_single_values = {"value": None}
     latest_single_values_df = {"value": None}
     latest_work_df = {"value": None}
 
     @reactive.Effect
     def cache_latest_for_save():
+        latest_point["value"] = current_point_index()
+        latest_single_values["value"] = single_values_of_point()
         latest_single_values_df["value"] = single_values_of_points()
         latest_work_df["value"] = work_df()
 
@@ -612,17 +637,34 @@ def main_server(
             .tolist()
         )
 
-    @reactive.extended_task
-    async def save_filemap(filemap, filemap_save_path, single_values_df, work_df):
+    def save_filemap(
+        filemap,
+        filemap_save_path,
+        current_index,
+        current_single_values_df,
+        single_values_df,
+        work_df,
+    ):
         print(f"Saving filemap to {filemap_save_path} ...")
+
+        # because the list of single values is only updated when the point is changed, change it here to make sure to include the latest changes
+        single_values_df[current_index] = current_single_values_df
+
         single_values_columns = single_values_df[0].columns
         single_values_columns.remove("Point")
-        filemap_to_save = filemap.drop(single_values_columns)
+        columns_to_drop = [c for c in single_values_columns if c in filemap.columns]
+        if len(columns_to_drop) > 0:
+            filemap_to_save = filemap.drop(columns_to_drop)
+        else:
+            filemap_to_save = filemap
 
         work_df_columns = work_df.columns
         work_df_columns.remove("Point")
         work_df_columns.remove("Time")
-        filemap_to_save = filemap_to_save.drop(work_df_columns)
+
+        columns_to_drop = [c for c in work_df_columns if c in filemap.columns]
+        if len(columns_to_drop) > 0:
+            filemap_to_save = filemap_to_save.drop(columns_to_drop)
 
         # combine the single_values_df into a big dataframe
         combined_df = pl.concat(single_values_df, how="vertical")
@@ -633,7 +675,7 @@ def main_server(
             work_df, on=["Point", "Time"], how="left"
         )
 
-        filemap_to_save.write_csv(filemap_save_path)
+        filemap_to_save.write_csv(filemap_save_path, null_value="")
         print("Filemap saved!")
 
     @reactive.Effect
@@ -641,6 +683,8 @@ def main_server(
     def save():
         save_filemap(
             filemap=filemap,
+            current_index=current_point_index(),
+            current_single_values_df=single_values_of_point(),
             filemap_save_path=filemap_save_path,
             single_values_df=single_values_of_points(),
             work_df=work_df(),
@@ -690,6 +734,7 @@ def main_server(
     def set_ignore_start():
         try:
             df = work_df().filter(pl.col("Point") == int(current_point()))
+            print(df)
             ignore_values = df.select(pl.col("Ignore")).to_numpy().squeeze()
             time_values = df.select(pl.col("Time")).to_numpy().squeeze()
             # find the first True value
@@ -1180,6 +1225,8 @@ def main_server(
     def save_on_session_end():
         save_filemap(
             filemap=filemap,
+            current_index=latest_point["value"],
+            current_single_values_df=latest_single_values["value"],
             filemap_save_path=filemap_save_path,
             single_values_df=latest_single_values_df["value"],
             work_df=latest_work_df["value"],
