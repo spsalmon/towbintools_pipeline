@@ -176,3 +176,4 @@ configs/*
 analysis_and_plots/*.ipynb
 !analysis_and_plots/analysis_development_notebook.ipynb
 !analysis_and_plots/plotting_functions.py
+analysis_and_plots/plots/*

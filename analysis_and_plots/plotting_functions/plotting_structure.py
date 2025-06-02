@@ -1,6 +1,5 @@
 import os
 from collections import defaultdict
-from time import perf_counter
 
 import numpy as np
 import polars as pl
@@ -156,6 +155,7 @@ def _process_condition_id_plotting_structure(
         larval_stage_durations_time_step,
         larval_stage_durations_experiment_time,
     ) = _get_time_ecdysis_and_durations(condition_df)
+    death, arrest = _get_death_and_arrest(condition_df)
 
     n_points = condition_df.select(pl.col("Point")).n_unique()
 
@@ -176,11 +176,15 @@ def _process_condition_id_plotting_structure(
             / 3600,
             "experiment": np.full((n_points, 1), experiment_dir),
             "filemap_path": np.full((n_points, 1), filemap_path),
-            "point": condition_df.select(pl.col("Point").unique()).to_numpy(),
+            "point": condition_df.select(
+                pl.col("Point").unique(maintain_order=True)
+            ).to_numpy(),
             "time": time,
             "experiment_time": experiment_time,
             "experiment_time_hours": experiment_time / 3600,
             "worm_type": worm_types,
+            "death": death,
+            "arrest": arrest,
         }
     )
 
@@ -262,9 +266,6 @@ def build_plotting_struct(
 
     # remove rows where condition_id is null
     experiment_filemap = experiment_filemap.filter(~pl.col("condition_id").is_null())
-
-    start = perf_counter()
-
     # set molts that should be ignored to NaN
     if "Ignore" in experiment_filemap.columns:
         experiment_filemap = remove_ignored_molts(experiment_filemap)
@@ -273,7 +274,6 @@ def build_plotting_struct(
     if "Ignore" in experiment_filemap.columns:
         experiment_filemap = experiment_filemap.filter(~pl.col("Ignore"))
 
-    print(f"Processing ignore times took {perf_counter() - start:.2f} seconds")
     conditions_struct = []
 
     for condition_id in (
@@ -395,6 +395,38 @@ def _get_values_at_molt(filemap, column):
     )
 
     return values_at_ecdysis
+
+
+def _get_death_and_arrest(filemap):
+    column_list = ["Point", "Death", "Arrest"]
+    if "Death" not in filemap.columns:
+        column_list.remove("Death")
+        death = np.full(
+            filemap.select(pl.col("Point")).n_unique(),
+            np.nan,
+        )
+    if "Arrest" not in filemap.columns:
+        column_list.remove("Arrest")
+        arrest = np.full(
+            filemap.select(pl.col("Point")).n_unique(),
+            False,
+        )
+
+    if len(column_list) > 1:
+        filemap = filemap.select(pl.col(column_list))
+
+        death_and_arrest = (
+            (
+                filemap.group_by("Point", maintain_order=True)
+                .agg(pl.col(["Death", "Arrest"]).first())
+                .drop("Point")
+            )
+            .to_numpy()
+            .squeeze()
+        )
+        death = death_and_arrest[:, 0].astype(float)
+        arrest = death_and_arrest[:, 1].astype(bool)
+    return death[:, np.newaxis], arrest[:, np.newaxis]
 
 
 def _compute_values_at_molt(
