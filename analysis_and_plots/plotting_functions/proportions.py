@@ -740,3 +740,97 @@ def plot_normalized_proportions_at_ecdysis(
     plt.show()
 
     return fig
+
+
+def compute_deviation_from_model_at_ecdysis(
+    conditions_struct,
+    column_one,
+    column_two,
+    control_condition,
+    output_column_name,
+    remove_hatch=True,
+    deviations_as_percentage=True,
+    poly_degree=2,
+):
+    control_condition = conditions_struct[control_condition]
+    control_column_one_values = control_condition[column_one]
+    control_column_two_values = control_condition[column_two]
+
+    if remove_hatch:
+        control_column_one_values = control_column_one_values[:, 1:]
+        control_column_two_values = control_column_two_values[:, 1:]
+
+    control_model = _get_proportion_model(
+        control_column_one_values,
+        control_column_two_values,
+        poly_degree=poly_degree,
+        plot_model=True,
+    )
+
+    for condition in conditions_struct:
+        column_one_values, column_two_values = (
+            condition[column_one],
+            condition[column_two],
+        )
+        if remove_hatch:
+            column_one_values = column_one_values[:, 1:]
+            column_two_values = column_two_values[:, 1:]
+
+        deviations = get_deviation_from_model(
+            column_one_values,
+            column_two_values,
+            control_model,
+            percentage=deviations_as_percentage,
+        )
+        condition[output_column_name] = deviations
+
+    return conditions_struct
+
+
+def compute_deviation_from_model_development_percentage(
+    conditions_struct,
+    column_one,
+    column_two,
+    control_condition,
+    percentages,
+    output_column_name,
+    deviations_as_percentage=True,
+    poly_degree=2,
+):
+    control_condition = conditions_struct[control_condition]
+    control_column_one_values = control_condition[column_one]
+    control_column_two_values = control_condition[column_two]
+
+    indices = np.clip(
+        (percentages * control_column_one_values.shape[1]).astype(int),
+        0,
+        control_column_one_values.shape[1] - 1,
+    ).astype(int)
+
+    control_column_one_values = control_column_one_values[:, indices]
+    control_column_two_values = control_column_two_values[:, indices]
+
+    control_model = _get_proportion_model(
+        control_column_one_values,
+        control_column_two_values,
+        poly_degree=poly_degree,
+        plot_model=True,
+    )
+
+    for condition in conditions_struct:
+        column_one_values, column_two_values = (
+            condition[column_one],
+            condition[column_two],
+        )
+        column_one_values = column_one_values[:, indices]
+        column_two_values = column_two_values[:, indices]
+
+        deviations = get_deviation_from_model(
+            column_one_values,
+            column_two_values,
+            control_model,
+            percentage=deviations_as_percentage,
+        )
+        condition[output_column_name] = deviations
+
+    return conditions_struct
