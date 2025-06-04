@@ -726,13 +726,8 @@ def violinplot_larval_stage(
 
     fig, ax = _setup_figure(
         df,
-        conditions_struct,
-        conditions_to_plot,
-        legend,
-        color_palette,
         figsize,
         titles,
-        share_y_axis,
     )
 
     y_min, y_max = _plot_violinplot(
@@ -835,13 +830,8 @@ def boxplot_larval_stage(
 
     fig, ax = _setup_figure(
         df,
-        conditions_struct,
-        conditions_to_plot,
-        legend,
-        color_palette,
         figsize,
         titles,
-        share_y_axis,
     )
 
     y_min, y_max = _plot_boxplot(
