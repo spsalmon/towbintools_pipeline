@@ -2,11 +2,17 @@ import matplotlib.pyplot as plt
 import numpy as np
 import statsmodels.api as sm
 from scipy.interpolate import make_interp_spline
+from sklearn.linear_model import HuberRegressor
+from sklearn.pipeline import Pipeline
+from sklearn.preprocessing import PolynomialFeatures
 from towbintools.data_analysis import rescale_and_aggregate
 
 from .utils_plotting import build_legend
 from .utils_plotting import get_colors
 from .utils_plotting import set_scale
+
+# from sklearn.linear_model import LinearRegression
+# from sklearn.linear_model import RANSACRegressor
 
 # from .utils_data_processing import exclude_arrests_from_series_at_ecdysis
 
@@ -98,8 +104,17 @@ def _get_proportion_model(
     series_one_values = np.log(series_one_values)
     series_two_values = np.log(series_two_values)
 
-    fit = np.polyfit(series_one_values, series_two_values, poly_degree)
-    model = np.poly1d(fit)
+    # fit = np.polyfit(series_one_values, series_two_values, poly_degree)
+    # model = np.poly1d(fit)
+
+    # robustly fit a polynomial model to the data
+    model = Pipeline(
+        [
+            ("poly_features", PolynomialFeatures(degree=poly_degree)),
+            ("regression", HuberRegressor()),
+        ]
+    )
+    model.fit(series_one_values.reshape(-1, 1), series_two_values)
 
     if plot_model:
         plt.scatter(series_one_values, series_two_values)
@@ -115,7 +130,7 @@ def _get_proportion_model(
             plt.ylabel("column two")
 
         x = np.linspace(np.nanmin(series_one_values), np.nanmax(series_one_values), 100)
-        y = model(x)
+        y = model.predict(x.reshape(-1, 1))
         plt.plot(
             x,
             y,
@@ -132,18 +147,35 @@ def _get_proportion_model(
 def get_deviation_from_model(
     series_one_values, series_two_values, model, percentage=True
 ):
-    if percentage:
-        expected_series_two = np.exp(model(np.log(series_one_values)))
-        # Calculate percentage deviation using real values
-        deviation = (
-            (series_two_values - expected_series_two) / expected_series_two * 100
-        )
+    deviations = []
+    for i in range(series_two_values.shape[-1]):
+        values_one = series_one_values[:, i].flatten()
+        values_two = series_two_values[:, i].flatten()
 
-    else:
-        log_expected_series_two = model(np.log(series_one_values))
-        deviation = np.log(series_two_values) - log_expected_series_two
+        correct_indices = ~np.isnan(values_one) & ~np.isnan(values_two)
+        values_one = values_one[correct_indices]
+        values_two = values_two[correct_indices]
 
-    return deviation
+        log_expected_series_two = model.predict(np.log(values_one).reshape(-1, 1))
+
+        if percentage:
+            expected_series_two = np.exp(log_expected_series_two)
+            # Calculate percentage deviation using real values
+            deviation = (values_two - expected_series_two) / expected_series_two * 100
+        else:
+            deviation = np.log(values_two) - log_expected_series_two
+
+        deviations.append(deviation)
+
+    # Pad deviations to the same length with np.nan so they can be stacked into an array
+    max_len = max(len(dev) for dev in deviations)
+    padded_devs = [
+        np.pad(dev, (0, max_len - len(dev)), constant_values=np.nan)
+        for dev in deviations
+    ]
+    deviations = np.array(padded_devs).T
+    print(f"deviation shape: {deviations.shape}")
+    return deviations
 
 
 def plot_correlation(
@@ -780,6 +812,42 @@ def compute_deviation_from_model_at_ecdysis(
             column_one_values,
             column_two_values,
             control_model,
+            percentage=deviations_as_percentage,
+        )
+        condition[output_column_name] = deviations
+
+    return conditions_struct
+
+
+def compute_deviation_from_each_model_at_ecdysis(
+    conditions_struct,
+    column_one,
+    column_two,
+    output_column_name,
+    remove_hatch=True,
+    deviations_as_percentage=True,
+    poly_degree=2,
+):
+    for condition in conditions_struct:
+        column_one_values, column_two_values = (
+            condition[column_one],
+            condition[column_two],
+        )
+        if remove_hatch:
+            column_one_values = column_one_values[:, 1:]
+            column_two_values = column_two_values[:, 1:]
+
+        model = _get_proportion_model(
+            column_one_values,
+            column_two_values,
+            poly_degree=poly_degree,
+            plot_model=False,
+        )
+
+        deviations = get_deviation_from_model(
+            column_one_values,
+            column_two_values,
+            model,
             percentage=deviations_as_percentage,
         )
         condition[output_column_name] = deviations
