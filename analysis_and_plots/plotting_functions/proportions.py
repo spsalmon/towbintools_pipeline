@@ -1,8 +1,10 @@
 import matplotlib.pyplot as plt
 import numpy as np
 import statsmodels.api as sm
+from scipy import stats
 from scipy.interpolate import make_interp_spline
-from sklearn.linear_model import HuberRegressor
+from sklearn.ensemble import IsolationForest
+from sklearn.linear_model import LinearRegression
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import PolynomialFeatures
 from towbintools.data_analysis import rescale_and_aggregate
@@ -24,6 +26,7 @@ def _get_continuous_proportion_model(
     rescaled_series_two,
     x_axis_label=None,
     y_axis_label=None,
+    remove_outliers=True,
 ):
     assert len(rescaled_series_one) == len(
         rescaled_series_two
@@ -88,57 +91,319 @@ def _get_proportion_model(
     y_axis_label=None,
     poly_degree=2,
     plot_model=True,
+    remove_outliers=True,
 ):
     assert len(series_one_values) == len(
         series_two_values
     ), "The two series must have the same length."
 
-    series_one_values = np.array(series_one_values).flatten()
-    series_two_values = np.array(series_two_values).flatten()
-    # remove elements that are nan in one of the two arrays
-    correct_indices = ~np.isnan(series_one_values) & ~np.isnan(series_two_values)
-    series_one_values = series_one_values[correct_indices]
-    series_two_values = series_two_values[correct_indices]
+    alpha = 0.05  # significance level for confidence intervals
 
-    # log transform the data
-    series_one_values = np.log(series_one_values)
-    series_two_values = np.log(series_two_values)
+    isolation_forest = IsolationForest()
+    fitting_x = []
+    fitting_y = []
 
-    # fit = np.polyfit(series_one_values, series_two_values, poly_degree)
-    # model = np.poly1d(fit)
+    model_plot_x = []
 
-    # robustly fit a polynomial model to the data
+    for i in range(series_two_values.shape[-1]):
+        values_one = series_one_values[:, i].flatten()
+        values_two = series_two_values[:, i].flatten()
+        correct_indices = ~np.isnan(values_one) & ~np.isnan(values_two)
+        values_one = values_one[correct_indices]
+        values_two = values_two[correct_indices]
+        values_one = np.log(values_one)
+        values_two = np.log(values_two)
+
+        model_plot_x.extend(values_one)
+
+        if remove_outliers:
+            # remove outliers using an isolation forest
+            outlier_mask = (
+                isolation_forest.fit_predict(np.column_stack((values_one, values_two)))
+                == 1
+            )
+            if plot_model:
+                # plot outliers as empty circles
+                plt.scatter(
+                    values_one[~outlier_mask],
+                    values_two[~outlier_mask],
+                    facecolors="none",
+                    edgecolors="black",
+                )
+
+            values_one = values_one[outlier_mask]
+            values_two = values_two[outlier_mask]
+
+        fitting_x.extend(values_one)
+        fitting_y.extend(values_two)
+
+    fitting_x = np.array(fitting_x).flatten()
+    fitting_y = np.array(fitting_y).flatten()
+
+    # Fit polynomial model with OLS
     model = Pipeline(
         [
             ("poly_features", PolynomialFeatures(degree=poly_degree)),
-            ("regression", HuberRegressor()),
+            ("regression", LinearRegression()),
         ]
     )
-    model.fit(series_one_values.reshape(-1, 1), series_two_values)
+    model.fit(fitting_x.reshape(-1, 1), fitting_y)
+
+    # Calculate confidence intervals
+    def get_confidence_intervals(x_pred):
+        # Transform features
+        poly_features = model.named_steps["poly_features"]
+        X_design = poly_features.fit_transform(fitting_x.reshape(-1, 1))
+        X_pred = poly_features.transform(x_pred.reshape(-1, 1))
+
+        # Get predictions
+        y_pred = model.predict(x_pred.reshape(-1, 1))
+
+        # Calculate residuals and standard error
+        y_fitted = model.predict(fitting_x.reshape(-1, 1))
+        residuals = fitting_y - y_fitted
+        n = len(fitting_y)
+        p = X_design.shape[1]  # number of parameters
+
+        # Mean squared error
+        mse = np.sum(residuals**2) / (n - p)
+
+        # Standard error of prediction
+        # SE = sqrt(MSE * (1 + x'(X'X)^(-1)x))
+        try:
+            XTX_inv = np.linalg.inv(X_design.T @ X_design)
+            se_pred = np.sqrt(mse * (1 + np.sum((X_pred @ XTX_inv) * X_pred, axis=1)))
+        except np.linalg.LinAlgError:
+            # If matrix is singular, use simpler approximation
+            se_pred = np.sqrt(mse) * np.ones(len(x_pred))
+
+        # Critical value
+        t_crit = stats.t.ppf(1 - alpha / 2, n - p)
+
+        # Confidence intervals
+        ci_lower = y_pred - t_crit * se_pred
+        ci_upper = y_pred + t_crit * se_pred
+
+        return y_pred, ci_lower, ci_upper
 
     if plot_model:
-        plt.scatter(series_one_values, series_two_values)
+        plt.scatter(fitting_x, fitting_y, color="black", label="Data")
 
         if x_axis_label is not None:
             plt.xlabel(x_axis_label)
         else:
             plt.xlabel("column one")
-
         if y_axis_label is not None:
             plt.ylabel(y_axis_label)
         else:
             plt.ylabel("column two")
 
-        x = np.linspace(np.nanmin(series_one_values), np.nanmax(series_one_values), 100)
-        y = model.predict(x.reshape(-1, 1))
-        plt.plot(
-            x,
-            y,
+        # Plot model with confidence intervals
+        x_plot = np.linspace(np.nanmin(model_plot_x), np.nanmax(model_plot_x), 100)
+        y_pred, ci_lower, ci_upper = get_confidence_intervals(x_plot)
+
+        plt.plot(x_plot, y_pred, color="red", label="Fitted model")
+        plt.fill_between(
+            x_plot,
+            ci_lower,
+            ci_upper,
+            alpha=0.3,
             color="red",
+            label=f"{int((1-alpha)*100)}% CI",
         )
+        plt.legend()
         plt.show()
 
+    # Add method to model for getting confidence intervals
+    model.get_confidence_intervals = get_confidence_intervals
+
     return model
+
+
+# COMPARE MODELS FOR DIFFERENT CONDITIONS
+
+
+def plot_model_comparison_at_ecdysis(
+    conditions_struct,
+    column_one,
+    column_two,
+    conditions_to_plot,
+    remove_hatch=True,
+    poly_degree=2,
+    remove_outliers_fitting=True,
+    log_scale=(True, False),
+    colors=None,
+    legend=None,
+    x_axis_label=None,
+    y_axis_label=None,
+    single_plot=True,
+):
+    color_palette = get_colors(
+        conditions_to_plot,
+        colors,
+    )
+
+    r_squared_texts = []
+
+    if single_plot:
+        fig, axs = plt.subplots(1, 1)
+    else:
+        fig, axs = plt.subplots(1, len(conditions_to_plot), sharey=True, sharex=True)
+
+    for i, condition_idx in enumerate(conditions_to_plot):
+        if single_plot or len(conditions_to_plot) == 1:
+            current_ax = axs
+        else:
+            current_ax = axs[i]
+
+        condition = conditions_struct[condition_idx]
+
+        label = build_legend(
+            condition,
+            legend,
+        )
+        column_one_values = condition[column_one]
+        column_two_values = condition[column_two]
+
+        if remove_hatch:
+            column_one_values = column_one_values[:, 1:]
+            column_two_values = column_two_values[:, 1:]
+
+        model = _get_proportion_model(
+            column_one_values,
+            column_two_values,
+            poly_degree=poly_degree,
+            plot_model=False,
+            remove_outliers=remove_outliers_fitting,
+        )
+
+        scatter_x = []
+        scatter_y = []
+        model_plot_x = []
+        model_plot_y = []
+
+        isolation_forest = IsolationForest()
+
+        for j in range(column_two_values.shape[-1]):
+            values_one = column_one_values[:, j].flatten()
+            values_two = column_two_values[:, j].flatten()
+            correct_indices = ~np.isnan(values_one) & ~np.isnan(values_two)
+            values_one = values_one[correct_indices]
+            values_two = values_two[correct_indices]
+            values_one = np.log(values_one)
+            values_two = np.log(values_two)
+
+            model_plot_x.extend(values_one)
+            model_plot_y.extend(values_two)
+
+            if remove_outliers_fitting:
+                # remove outliers using an isolation forest
+                outlier_mask = (
+                    isolation_forest.fit_predict(
+                        np.column_stack((values_one, values_two))
+                    )
+                    == 1
+                )
+
+                # plot outliers as empty circles
+                current_ax.scatter(
+                    values_one[~outlier_mask],
+                    values_two[~outlier_mask],
+                    facecolors="none",
+                    edgecolors=color_palette[i],
+                    alpha=0.5,
+                )
+
+                values_one = values_one[outlier_mask]
+                values_two = values_two[outlier_mask]
+
+            scatter_x.extend(values_one)
+            scatter_y.extend(values_two)
+
+        model_plot_x = np.array(model_plot_x)
+        model_plot_y = np.array(model_plot_y)
+
+        current_ax.scatter(
+            scatter_x,
+            scatter_y,
+            color=color_palette[i],
+            alpha=0.5,
+        )
+
+        # plot the model
+        x_values = np.linspace(np.nanmin(model_plot_x), np.nanmax(model_plot_x), 100)
+        y_values, ci_low, ci_high = model.get_confidence_intervals(x_values)
+
+        current_ax.plot(
+            x_values,
+            y_values,
+            color=color_palette[i],
+            linestyle="--",
+            label=label,
+        )
+
+        current_ax.fill_between(
+            x_values,
+            ci_low,
+            ci_high,
+            color=color_palette[i],
+            alpha=0.2,
+        )
+
+        # if not the first plot, remove the ticks on the y-axis
+        if not single_plot and i > 0:
+            current_ax.tick_params(axis="y", which="both", left=False, labelleft=False)
+
+        # text box with R^2 value
+        r_squared = model.score(model_plot_x.reshape(-1, 1), model_plot_y)
+        textstr = f"$R^2$ = {r_squared:.2f}"
+
+        r_squared_texts.append(textstr)
+
+    # modify the legend to include R^2 values
+    if single_plot or len(conditions_to_plot) == 1:
+        handles, labels = axs.get_legend_handles_labels()
+        new_labels = [
+            f"{label} ({r_squared})"
+            for label, r_squared in zip(labels, r_squared_texts)
+        ]
+        axs.legend(handles, new_labels, loc="upper left")
+
+        plt.xlabel(x_axis_label if x_axis_label else column_one)
+        plt.ylabel(y_axis_label if y_axis_label else column_two)
+    else:
+        # For multiple plots, set labels for each subplot and create a shared legend
+        for ax in axs:
+            ax.set_xlabel(x_axis_label if x_axis_label else column_one)
+        axs[0].set_ylabel(y_axis_label if y_axis_label else column_two)
+
+        # Collect legend handles and labels from all subplots
+        all_handles = []
+        all_labels = []
+        for ax in axs:
+            handles, labels = ax.get_legend_handles_labels()
+            all_handles.extend(handles)
+            all_labels.extend(labels)
+
+        # Create new labels with R^2 values
+        new_labels = [
+            f"{label} ({r_squared})"
+            for label, r_squared in zip(all_labels, r_squared_texts)
+        ]
+
+        # Create shared legend
+        fig.legend(
+            all_handles,
+            new_labels,
+            bbox_to_anchor=(1.01, 0.5),
+            loc="center left",
+            title=None,
+            frameon=True,
+        )
+
+    fig = plt.gcf()
+    plt.show()
+    return fig
 
 
 # COMPUTE DEVIATION FROM MODEL
@@ -174,7 +439,6 @@ def get_deviation_from_model(
         for dev in deviations
     ]
     deviations = np.array(padded_devs).T
-    print(f"deviation shape: {deviations.shape}")
     return deviations
 
 
@@ -420,6 +684,7 @@ def plot_deviation_from_model_at_ecdysis(
     x_axis_label=None,
     y_axis_label=None,
     poly_degree=2,
+    remove_outliers_fitting=True,
 ):
     color_palette = get_colors(
         conditions_to_plot,
@@ -452,6 +717,7 @@ def plot_deviation_from_model_at_ecdysis(
         y_axis_label=ylbl,
         poly_degree=poly_degree,
         plot_model=True,
+        remove_outliers=remove_outliers_fitting,
     )
 
     for i, condition_id in enumerate(conditions_to_plot):
@@ -520,7 +786,8 @@ def plot_deviation_from_model_development_percentage(
     legend=None,
     x_axis_label=None,
     y_axis_label=None,
-    poly_degree=3,
+    poly_degree=2,
+    remove_outliers_fitting=True,
 ):
     """
     Plot the percentage deviation from a model at specified development percentages for multiple conditions.
@@ -622,88 +889,88 @@ def plot_deviation_from_model_development_percentage(
     return fig
 
 
-def plot_model_comparison_at_ecdysis(
-    conditions_struct,
-    column_one,
-    column_two,
-    control_condition_id,
-    conditions_to_plot,
-    remove_hatch=True,
-    log_scale=(True, False),
-    colors=None,
-    legend=None,
-    x_axis_label=None,
-    y_axis_label=None,
-    percentage=True,
-    exclude_arrests=False,
-    poly_degree=3,
-):
-    color_palette = get_colors(
-        conditions_to_plot,
-        colors,
-    )
+# def plot_model_comparison_at_ecdysis(
+#     conditions_struct,
+#     column_one,
+#     column_two,
+#     control_condition_id,
+#     conditions_to_plot,
+#     remove_hatch=True,
+#     log_scale=(True, False),
+#     colors=None,
+#     legend=None,
+#     x_axis_label=None,
+#     y_axis_label=None,
+#     percentage=True,
+#     exclude_arrests=False,
+#     poly_degree=3,
+# ):
+#     color_palette = get_colors(
+#         conditions_to_plot,
+#         colors,
+#     )
 
-    xlbl = column_one
+#     xlbl = column_one
 
-    x_axis_label = x_axis_label if x_axis_label is not None else xlbl
-    y_axis_label = (
-        y_axis_label
-        if y_axis_label is not None
-        else f"deviation from modeled {column_two}"
-    )
+#     x_axis_label = x_axis_label if x_axis_label is not None else xlbl
+#     y_axis_label = (
+#         y_axis_label
+#         if y_axis_label is not None
+#         else f"deviation from modeled {column_two}"
+#     )
 
-    models = {}
-    xs = {}
+#     models = {}
+#     xs = {}
 
-    for i, condition_id in enumerate(conditions_to_plot):
-        condition = conditions_struct[condition_id]
+#     for i, condition_id in enumerate(conditions_to_plot):
+#         condition = conditions_struct[condition_id]
 
-        model = _get_proportion_model(
-            condition[column_one],
-            condition[column_two],
-            remove_hatch,
-            exclude_arrests=exclude_arrests,
-            poly_degree=poly_degree,
-            plot_model=False,
-        )
+#         model = _get_proportion_model(
+#             condition[column_one],
+#             condition[column_two],
+#             remove_hatch,
+#             exclude_arrests=exclude_arrests,
+#             poly_degree=poly_degree,
+#             plot_model=False,
+#         )
 
-        column_one_values = np.log(condition[column_one])
+#         column_one_values = np.log(condition[column_one])
 
-        x = np.linspace(np.nanmin(column_one_values), np.nanmax(column_one_values), 100)
+#         x = np.linspace(np.nanmin(column_one_values), np.nanmax(column_one_values), 100)
 
-        models[condition_id] = model
-        xs[condition_id] = x
+#         models[condition_id] = model
+#         xs[condition_id] = x
 
-    # determine the overlap of all the x values
-    x_min = np.nanmax(
-        [np.nanmin(xs[condition_id]) for condition_id in conditions_to_plot]
-    )
-    x_max = np.nanmin(
-        [np.nanmax(xs[condition_id]) for condition_id in conditions_to_plot]
-    )
+#     # determine the overlap of all the x values
+#     x_min = np.nanmax(
+#         [np.nanmin(xs[condition_id]) for condition_id in conditions_to_plot]
+#     )
+#     x_max = np.nanmin(
+#         [np.nanmax(xs[condition_id]) for condition_id in conditions_to_plot]
+#     )
 
-    x = np.linspace(x_min, x_max, 100)
-    control_values = np.exp(models[control_condition_id](x))
+#     x = np.linspace(x_min, x_max, 100)
+#     control_values = np.exp(models[control_condition_id](x))
 
-    for i, condition_id in enumerate(conditions_to_plot):
-        plt.plot(
-            np.exp(x),
-            (np.exp(models[condition_id](x)) / control_values - 1) * 100,
-            color=color_palette[i],
-            label=build_legend(conditions_struct[condition_id], legend),
-        )
+#     for i, condition_id in enumerate(conditions_to_plot):
+#         plt.plot(
+#             np.exp(x),
+#             (np.exp(models[condition_id](x)) / control_values - 1) * 100,
+#             color=color_palette[i],
+#             label=build_legend(conditions_struct[condition_id], legend),
+#         )
 
-    plt.xlabel(x_axis_label)
-    plt.ylabel(y_axis_label)
+#     plt.xlabel(x_axis_label)
+#     plt.ylabel(y_axis_label)
 
-    set_scale(plt.gca(), log_scale)
+#     set_scale(plt.gca(), log_scale)
 
-    plt.legend()
+#     plt.legend()
 
-    fig = plt.gcf()
-    plt.show()
+#     fig = plt.gcf()
+#     plt.show()
 
-    return fig
+#     return fig
 
 
 def plot_normalized_proportions_at_ecdysis(
@@ -783,6 +1050,7 @@ def compute_deviation_from_model_at_ecdysis(
     remove_hatch=True,
     deviations_as_percentage=True,
     poly_degree=2,
+    remove_outliers_fitting=True,
 ):
     control_condition = conditions_struct[control_condition]
     control_column_one_values = control_condition[column_one]
@@ -797,6 +1065,7 @@ def compute_deviation_from_model_at_ecdysis(
         control_column_two_values,
         poly_degree=poly_degree,
         plot_model=True,
+        remove_outliers=remove_outliers_fitting,
     )
 
     for condition in conditions_struct:
@@ -827,6 +1096,7 @@ def compute_deviation_from_each_model_at_ecdysis(
     remove_hatch=True,
     deviations_as_percentage=True,
     poly_degree=2,
+    remove_outliers_fitting=True,
 ):
     for condition in conditions_struct:
         column_one_values, column_two_values = (
@@ -842,6 +1112,7 @@ def compute_deviation_from_each_model_at_ecdysis(
             column_two_values,
             poly_degree=poly_degree,
             plot_model=False,
+            remove_outliers=remove_outliers_fitting,
         )
 
         deviations = get_deviation_from_model(
@@ -864,6 +1135,7 @@ def compute_deviation_from_model_development_percentage(
     output_column_name,
     deviations_as_percentage=True,
     poly_degree=2,
+    remove_outliers_fitting=True,
 ):
     control_condition = conditions_struct[control_condition]
     control_column_one_values = control_condition[column_one]
@@ -883,6 +1155,7 @@ def compute_deviation_from_model_development_percentage(
         control_column_two_values,
         poly_degree=poly_degree,
         plot_model=True,
+        remove_outliers=remove_outliers_fitting,
     )
 
     for condition in conditions_struct:

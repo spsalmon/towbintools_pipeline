@@ -400,32 +400,27 @@ def _get_values_at_molt(filemap, column):
 def _get_death_and_arrest(filemap):
     column_list = ["Point", "Death", "Arrest"]
     if "Death" not in filemap.columns:
-        column_list.remove("Death")
-        death = np.full(
-            filemap.select(pl.col("Point")).n_unique(),
-            np.nan,
+        filemap = filemap.with_columns(
+            pl.lit(np.nan).alias("Death"),
         )
     if "Arrest" not in filemap.columns:
-        column_list.remove("Arrest")
-        arrest = np.full(
-            filemap.select(pl.col("Point")).n_unique(),
-            False,
+        filemap = filemap.with_columns(
+            pl.lit(False).alias("Arrest"),
         )
 
-    if len(column_list) > 1:
-        filemap = filemap.select(pl.col(column_list))
+    filemap = filemap.select(pl.col(column_list))
 
-        death_and_arrest = (
-            (
-                filemap.group_by("Point", maintain_order=True)
-                .agg(pl.col(["Death", "Arrest"]).first())
-                .drop("Point")
-            )
-            .to_numpy()
-            .squeeze()
+    death_and_arrest = (
+        (
+            filemap.group_by("Point", maintain_order=True)
+            .agg(pl.col(["Death", "Arrest"]).first())
+            .drop("Point")
         )
-        death = death_and_arrest[:, 0].astype(float)
-        arrest = death_and_arrest[:, 1].astype(bool)
+        .to_numpy()
+        .squeeze()
+    )
+    death = death_and_arrest[:, 0].astype(float)
+    arrest = death_and_arrest[:, 1].astype(bool)
     return death[:, np.newaxis], arrest[:, np.newaxis]
 
 

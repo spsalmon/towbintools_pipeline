@@ -561,9 +561,6 @@ def violinplot(
         for i in range(len(ax)):
             ax[i].sharey(ax[0])
 
-    # Make subplots closer together while leaving space for legend
-    plt.tight_layout(rect=[0, 0, 0.9, 1])
-
     fig = plt.gcf()
     plt.show()
 
@@ -652,9 +649,6 @@ def boxplot(
         # set the figure to sharey
         for i in range(len(ax)):
             ax[i].sharey(ax[0])
-
-    # Make subplots closer together while leaving space for legend
-    plt.tight_layout(rect=[0, 0, 0.9, 1])
 
     fig = plt.gcf()
     plt.show()
@@ -757,9 +751,6 @@ def violinplot_larval_stage(
     if share_y_axis:
         _set_all_y_limits(ax, y_min, y_max)
 
-    # Make subplots closer together while leaving space for legend
-    plt.tight_layout(rect=[0, 0, 0.9, 1])
-
     fig = plt.gcf()
     plt.show()
 
@@ -860,9 +851,6 @@ def boxplot_larval_stage(
 
     if share_y_axis:
         _set_all_y_limits(ax, y_min, y_max)
-
-    # Make subplots closer together while leaving space for legend
-    plt.tight_layout(rect=[0, 0, 0.9, 1])
 
     fig = plt.gcf()
     plt.show()

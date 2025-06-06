@@ -31,7 +31,11 @@ def save_figure(fig, name, directory, format="svg", dpi=300, transparent=False):
 
     # Save the figure
     fig.savefig(
-        filepath, format=format, dpi=dpi, bbox_inches="tight", transparent=transparent
+        filepath,
+        format=format,
+        dpi=dpi,
+        bbox_inches="tight",
+        transparent=transparent,
     )
 
 
