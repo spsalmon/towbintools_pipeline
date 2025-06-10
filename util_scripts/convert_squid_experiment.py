@@ -166,9 +166,11 @@ def merge_and_rename_images(source_dir, output_dir, overwrite=False):
 
 
 if __name__ == "__main__":
-    experiment_dir = "/mnt/towbin.data/shared/spsalmon/20250314_squid_10x_yap_aid"
+    experiment_dir = (
+        "/mnt/towbin.data/shared/plenart/20250206_squid_10x_N2_vs_526_NaCl_25_degrees"
+    )
     source_dir = os.path.join(experiment_dir, "squid_raw")
-    output_dir = os.path.join(experiment_dir, "raw")
+    output_dir = os.path.join(experiment_dir, "raw_test")
 
     overwrite = True
 

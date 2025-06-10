@@ -26,6 +26,7 @@ def _get_continuous_proportion_model(
     rescaled_series_two,
     x_axis_label=None,
     y_axis_label=None,
+    plot_model=True,
     remove_outliers=True,
 ):
     assert len(rescaled_series_one) == len(
