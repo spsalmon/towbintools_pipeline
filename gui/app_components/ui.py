@@ -6,6 +6,7 @@ import plotly.graph_objs as go
 import polars as pl
 import scipy.io as sio
 from app_components.backend import build_single_values_df
+from app_components.backend import check_use_experiment_time
 from app_components.backend import correct_ecdysis_columns
 from app_components.backend import get_points_for_value_at_molts
 from app_components.backend import infer_n_channels
@@ -60,6 +61,7 @@ def molt_annotation_buttons_server(
     value_at_molt,
     molt_name,
     worm_type_column,
+    use_experiment_time=False,
 ):
     @output
     @render.text
@@ -80,6 +82,7 @@ def molt_annotation_buttons_server(
                 new_molt,
                 new_molt_index,
                 worm_type_column,
+                experiment_time=use_experiment_time,
             )
         )
         molt_time.set(new_molt)
@@ -104,6 +107,7 @@ def molt_annotation_buttons_server(
                 new_molt,
                 new_molt_index,
                 worm_type_column,
+                experiment_time=use_experiment_time,
             )
         )
         molt_time.set(new_molt)
@@ -376,8 +380,7 @@ def main_server(
     worm_type_column=None,
     default_plotted_column=None,
 ):
-    # global filemap
-    # global custom_columns_choices
+    use_experiment_time = check_use_experiment_time(filemap)
     point_filemaps = filemap.partition_by("Point", maintain_order=True)
 
     work_df_columns = [
@@ -457,6 +460,7 @@ def main_server(
             value_at_molt,
             molt_name=molt_name,
             worm_type_column=worm_type_column,
+            use_experiment_time=use_experiment_time,
         )
         for molt_name, molt_time, value_at_molt in zip(
             ECDYSIS_COLUMNS,
