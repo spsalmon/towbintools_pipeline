@@ -5,3 +5,4 @@ ipykernel
 numba
 polars
 bottleneck
+numcodecs<0.16
