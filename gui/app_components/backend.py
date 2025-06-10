@@ -49,6 +49,8 @@ def open_filemap(filemap_path, open_annotated=True):
         filemap_name = os.path.basename(filemap_path).split(".")[0]
     elif "annotated" not in filemap_name:
         filemap_save_path = annotated_path
+    elif "annotated" in filemap_name:
+        filemap_save_path = filemap_path
 
     # Read the filemap (either original or annotated)
     filemap = pl.read_csv(
@@ -62,6 +64,22 @@ def open_filemap(filemap_path, open_annotated=True):
     filemap.write_csv(backup_path)
 
     return filemap, filemap_save_path
+
+
+def check_use_experiment_time(filemap):
+    """
+    Check if the filemap contains the 'ExperimentTime' column and if this column contains valid data.
+    """
+    if "ExperimentTime" in filemap.columns:
+        experiment_time = (
+            filemap.select(pl.col("ExperimentTime")).to_numpy().squeeze().astype(float)
+        )
+        if np.any(np.isfinite(experiment_time)):
+            return True
+        else:
+            return False
+    else:
+        return False
 
 
 def infer_n_channels(filemap):
@@ -352,9 +370,9 @@ def update_molt_and_ecdysis_columns(
     if experiment_time:
         time = (
             point_filemap.select(pl.col("ExperimentTime")).to_numpy().squeeze() / 3600
-        )
+        ).astype(float)
     else:
-        time = point_filemap.select(pl.col("Time")).to_numpy().squeeze()
+        time = point_filemap.select(pl.col("Time")).to_numpy().squeeze().astype(float)
 
     value_at_ecdys_columns = [
         column for column in point_filemap.columns if f"_at_{ecdys_event}" in column
