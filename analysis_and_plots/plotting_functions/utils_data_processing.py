@@ -186,8 +186,8 @@ def smooth_series(
             values = series_values[i]
             smoothed = smooth_series_classified(
                 values,
-                worm_type[i],
                 time[i],
+                worm_type[i],
                 lmbda=lmbda,
                 order=order,
                 medfilt_window=medfilt_window,
@@ -237,8 +237,8 @@ def smooth_and_rescale_series(
             values = series_values[i]
             smoothed = smooth_series_classified(
                 values,
-                worm_type[i],
                 time[i],
+                worm_type[i],
                 lmbda=lmbda,
                 order=order,
                 medfilt_window=medfilt_window,

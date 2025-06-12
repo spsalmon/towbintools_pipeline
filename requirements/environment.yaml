@@ -1,0 +1,34 @@
+name: towbintools
+channels:
+  - conda-forge
+dependencies:
+  - python=3.12
+  - numpy
+  - pyyaml
+  - seaborn
+  - statsmodels
+  - plotly
+  - ipykernel
+  - polars
+  - bottleneck
+  - numcodecs<0.16
+  - pip
+
+  # development dependencies
+  - pytest
+  - black
+  - isort
+  - conda-lock
+  - pre-commit
+  - mypy
+  - flake8
+  - tox
+
+  - pip:
+    - bioio
+    - bioio-ome-tiff
+    - bioio-ome-zarr
+    - towbintools
+    - shiny
+    - shinywidgets
+    - statannotations

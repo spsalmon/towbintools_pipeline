@@ -5,7 +5,7 @@ from collections import defaultdict
 import numpy as np
 import ome_types
 import tifffile
-from aicsimageio.writers import OmeTiffWriter
+from bioio.writers import OmeTiffWriter
 from joblib import delayed
 from joblib import Parallel
 from joblib import parallel_config
