@@ -69,4 +69,4 @@ if [ ! -d "temp_files" ]; then
 fi
 
 # Pass command line arguments to the SBATCH script
-sbatch sbatch_pipeline.sh "$@"
+sbatch _sbatch_pipeline.sh "$@"
