@@ -11,7 +11,6 @@ from pipeline_scripts.utils import get_input_and_output_files_parallel
 from pipeline_scripts.utils import get_output_name
 from pipeline_scripts.utils import pickle_objects
 from pipeline_scripts.utils import run_command
-from pipeline_scripts.utils import sync_backup_folder
 
 OPTIONS_MAP = {
     "segmentation": [
@@ -28,8 +27,6 @@ OPTIONS_MAP = {
         "enforce_n_channels",
         "activation_layer",
         "batch_size",
-        "ilastik_project_path",
-        "ilastik_result_channel",
         "run_segmentation_on",
     ],
     "straightening": [
@@ -82,11 +79,7 @@ DEFAULT_OPTIONS = {
         "tiler_config": [None],
         "enforce_n_channels": [None],
         "activation_layer": [None],
-        # default options for segmentation that are either almost never used, or allow the user to make their config file shorter
-        # if some of those options are missing, some methods will not work (ie. ilastik if ilastik_project_path is missing)
         "run_segmentation_on": [None],
-        "ilastik_project_path": [None],
-        "ilastik_result_channel": [None],
         "model_path": [None],
         "batch_size": [1],
     },
@@ -160,7 +153,6 @@ class BuildingBlock(ABC):
 
     def run(self, experiment_filemap, config, pad=None):
         block_config = self.block_config
-        pipeline_backup_dir = config["pipeline_backup_dir"]
         micromamba_path = config.get("micromamba_path", "~/.local/bin/micromamba")
         temp_dir = config["temp_dir"]
 
@@ -203,10 +195,20 @@ class BuildingBlock(ABC):
                     linker_command=linker_command,
                 )
 
-                # cleanup_files(
-                #     input_pickle_path, output_pickle_path, pickled_block_config
-                # )
+            else:
+                linker_command = create_linker_command(
+                    micromamba_path, temp_dir, subdir
+                )
+                run_command(
+                    "# No input files found, skipping this building block.",
+                    self.name,
+                    config,
+                    requires_gpu=False,
+                    run_linker=True,
+                    linker_command=linker_command,
+                )
 
+            # sync_backup_folder(config["temp_dir"], pipeline_backup_dir)
             return subdir
 
         elif self.return_type == "csv":
@@ -247,7 +249,7 @@ class BuildingBlock(ABC):
                     linker_command=linker_command,
                 )
 
-            sync_backup_folder(config["temp_dir"], pipeline_backup_dir)
+            # sync_backup_folder(config["temp_dir"], pipeline_backup_dir)
             return output_file
 
 
