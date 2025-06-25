@@ -168,12 +168,20 @@ def create_molt_annotator(ecdysis_list_id, custom_columns_choices):
             ),
             ui.row(
                 ui.input_slider(
-                    "volume_plot_size",
-                    "Volume plot size",
+                    "curve_plot_height",
+                    "Plot height",
                     min=300,
                     max=1000,
                     step=10,
                     value=700,
+                ),
+                ui.input_slider(
+                    "curve_plot_width",
+                    "Plot width",
+                    min=300,
+                    max=2000,
+                    step=10,
+                    value=1300,
                 ),
                 ui.input_checkbox("log_scale", "Log scale", value=True),
                 ui.input_file(
@@ -318,6 +326,10 @@ def initialize_ui(filemap, recompute_features_at_molt=False):
         .squeeze()
         .tolist()
     )
+
+    if not isinstance(times, list):
+        times = [times]
+
     points = (
         filemap.select(pl.col("Point"))
         .unique(maintain_order=True)
@@ -325,6 +337,9 @@ def initialize_ui(filemap, recompute_features_at_molt=False):
         .squeeze()
         .tolist()
     )
+
+    if not isinstance(points, list):
+        points = [points]
 
     n_channels = infer_n_channels(filemap)
     list_channels = ["None"] + [f"Channel {i+1}" for i in range(n_channels)]
@@ -1059,7 +1074,7 @@ def main_server(
         fig, ax = plt.subplots()
         ax.imshow(img_to_plot, cmap="viridis")
         if plot_overlay:
-            ax.imshow(overlay, cmap="magma", alpha=0.7)
+            ax.imshow(overlay, cmap="magma", alpha=0.5)
 
         if len(segmentation_of_point) > 0:
             segmentation_path = segmentation_of_point[idx]
@@ -1071,9 +1086,9 @@ def main_server(
 
         return fig
 
-    @output
-    @render_widget
-    def plot_curve():
+    @reactive.calc
+    def create_figure():
+        print("create_figure")
         data_of_point = current_point_filemap().select(
             pl.col(
                 [
@@ -1093,78 +1108,17 @@ def main_server(
         values_of_point = (
             data_of_point.select(pl.col(input.column_to_plot())).to_numpy().squeeze()
         )
-        worm_types_of_point = (
-            data_of_point.select(pl.col(worm_type_column)).to_numpy().squeeze()
-        )
 
-        print(f"Custom annotations: {custom_column_values()}")
-        markers = set_marker_shape(
-            times_of_point,
-            current_time_index(),
-            worm_types_of_point,
-            hatch(),
-            m1(),
-            m2(),
-            m3(),
-            m4(),
-            custom_annotations=custom_column_values(),
-        )
         fig = go.FigureWidget()
+
         fig.add_trace(
             go.Scatter(
                 x=times_of_point,
                 y=values_of_point,
                 mode="markers",
-                marker=markers,
+                # marker=markers,
             )
         )
-
-        (
-            ecdys_list,
-            value_at_ecdys_list,
-            symbols,
-            colors,
-            sizes,
-            widths,
-        ) = get_points_for_value_at_molts(
-            hatch(),
-            m1(),
-            m2(),
-            m3(),
-            m4(),
-            value_at_hatch(),
-            value_at_m1(),
-            value_at_m2(),
-            value_at_m3(),
-            value_at_m4(),
-        )
-
-        fig.add_trace(
-            go.Scatter(
-                x=ecdys_list,
-                y=value_at_ecdys_list,
-                mode="markers",
-                marker=dict(
-                    symbol=symbols,
-                    size=sizes,
-                    color=colors,
-                    line=dict(width=widths, color=colors),
-                ),
-                hoverinfo="none",  # Disable hover information
-                hoverlabel=None,  # Disable hover label
-                hoveron=None,  # Disable hover interaction
-            )
-        )
-
-        fig.update_layout(
-            xaxis_title="Time",
-            yaxis_title=input.column_to_plot(),
-            margin=dict(l=20, r=20, t=50, b=50),
-            height=input.volume_plot_size(),
-            showlegend=False,
-        )
-
-        fig.update_yaxes(type="log" if input.log_scale() else "linear")
 
         def update_selected_time(trace, points, selector):
             print("update_selected_time")
@@ -1224,6 +1178,120 @@ def main_server(
                     line_width=0,
                 )
             )
+
+        return fig
+
+    @reactive.calc
+    def get_markers():
+        print("get_markers")
+        data_of_point = current_point_filemap().select(
+            pl.col(
+                [
+                    "Time",
+                    input.column_to_plot(),
+                    worm_type_column,
+                    "HatchTime",
+                    "M1",
+                    "M2",
+                    "M3",
+                    "M4",
+                ]
+            )
+        )
+
+        times_of_point = data_of_point.select(pl.col("Time")).to_numpy().squeeze()
+        worm_types_of_point = (
+            data_of_point.select(pl.col(worm_type_column)).to_numpy().squeeze()
+        )
+
+        custom_annotations_of_point = custom_column_values()
+        markers = set_marker_shape(
+            times_of_point,
+            current_time_index(),
+            worm_types_of_point,
+            hatch(),
+            m1(),
+            m2(),
+            m3(),
+            m4(),
+            custom_annotations=custom_annotations_of_point,
+        )
+        return markers
+
+    @reactive.calc
+    def get_molt_scatter():
+        print("get_molt_scatter")
+        (
+            ecdys_list,
+            value_at_ecdys_list,
+            symbols,
+            colors,
+            sizes,
+            widths,
+        ) = get_points_for_value_at_molts(
+            hatch(),
+            m1(),
+            m2(),
+            m3(),
+            m4(),
+            value_at_hatch(),
+            value_at_m1(),
+            value_at_m2(),
+            value_at_m3(),
+            value_at_m4(),
+        )
+
+        return go.Scatter(
+            x=ecdys_list,
+            y=value_at_ecdys_list,
+            mode="markers",
+            marker=dict(
+                symbol=symbols,
+                size=sizes,
+                color=colors,
+                line=dict(width=widths, color=colors),
+            ),
+            hoverinfo="none",  # Disable hover information
+            hoverlabel=None,  # Disable hover label
+            hoveron=None,  # Disable hover interaction
+        )
+
+    @output
+    @render_widget
+    def plot_curve():
+        print("plot_curve")
+        fig = create_figure()
+        markers = get_markers()
+
+        # if the figure only has one trace, we can add the scatter trace
+        molt_scatter = get_molt_scatter()
+
+        if len(fig.data) == 1:
+            fig.add_trace(molt_scatter)
+        else:
+            # check if the scatter changed
+            if not np.array_equal(fig.data[1].x, molt_scatter.x) or not np.array_equal(
+                fig.data[1].y, molt_scatter.y
+            ):
+                data = list(fig.data)
+                data.pop(1)  # Remove the second trace
+                fig.data = data
+                fig.add_trace(molt_scatter)
+
+        # Instead of modifying fig.data[0].marker in-place, use update_traces
+        fig.update_traces(marker=markers, selector=0)
+
+        fig.update_layout(
+            xaxis_title="Time",
+            yaxis_title=input.column_to_plot(),
+            margin=dict(l=20, r=20, t=50, b=50),
+            height=input.curve_plot_height(),
+            width=input.curve_plot_width(),
+            showlegend=False,
+            yaxis_type="log" if input.log_scale() else "linear",
+            autosize=False,
+        )
+
         return fig
 
     def save_on_session_end():

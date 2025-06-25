@@ -218,6 +218,14 @@ def get_time_and_ecdysis(filemap):
 
     time = separate_column_by_point(filemap, "Time").astype(float)
     experiment_time = separate_column_by_point(filemap, "ExperimentTime").astype(float)
+
+    if np.ndim(ecdysis_time) < 2:
+        ecdysis_time = ecdysis_time[np.newaxis, :]
+    if np.ndim(time) < 2:
+        time = time[np.newaxis, :]
+    if np.ndim(experiment_time) < 2:
+        experiment_time = experiment_time[np.newaxis, :]
+
     # convert experiment_time to hours
     experiment_time = experiment_time / 3600
 
@@ -226,6 +234,7 @@ def get_time_and_ecdysis(filemap):
     for i in range(len(ecdysis_time)):
         time_of_point = time[i]
         ecdysis_of_point = ecdysis_time[i]
+
         ecdysis_index.append(
             [
                 (

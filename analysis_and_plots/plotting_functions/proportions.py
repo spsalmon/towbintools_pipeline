@@ -424,12 +424,10 @@ def get_deviation_from_model(
 
         log_expected_series_two = model.predict(np.log(values_one).reshape(-1, 1))
 
+        deviation = np.exp(np.log(values_two) - log_expected_series_two) - 1
+
         if percentage:
-            expected_series_two = np.exp(log_expected_series_two)
-            # Calculate percentage deviation using real values
-            deviation = (values_two - expected_series_two) / expected_series_two * 100
-        else:
-            deviation = np.log(values_two) - log_expected_series_two
+            deviation = deviation * 100
 
         deviations.append(deviation)
 
