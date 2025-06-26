@@ -111,6 +111,7 @@ def populate_column_choices(filemap):
         "M4",
         "Arrest",
         "Ignore",
+        "Death",
         "Dead",
     ]
 

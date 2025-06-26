@@ -843,13 +843,17 @@ def main_server(
     @reactive.Effect
     def get_death():
         try:
-            death.set(
+            d = (
                 work_df()
                 .filter(pl.col("Point") == int(current_point()))
                 .select(pl.col("Death"))
                 .to_numpy()
                 .squeeze()[0]
             )
+            if d is None:
+                death.set("")
+            else:
+                death.set(d)
         except ColumnNotFoundError:
             death.set("")
 
