@@ -215,7 +215,9 @@ def _process_condition_id_plotting_structure(
             )
             condition_dict[
                 f"{renamed_feature_organ_column}_at_ecdysis"
-            ] = _get_values_at_molt(condition_df, organ_feature_column)
+            ] = _get_values_at_molt(
+                condition_df, organ_feature_column, ecdysis_time_step
+            )
 
             if "worm_type" not in organ_feature_column:
                 condition_dict = _compute_values_at_molt(
@@ -377,7 +379,7 @@ def _get_time_ecdysis_and_durations(filemap):
     )
 
 
-def _get_values_at_molt(filemap, column):
+def _get_values_at_molt(filemap, column, ecdysis_time_step):
     ecdysis = ["HatchTime", "M1", "M2", "M3", "M4"]
     columns_at_ecdysis = [f"{column}_at_{e}" for e in ecdysis]
     column_list = ["Point"] + columns_at_ecdysis
@@ -393,6 +395,10 @@ def _get_values_at_molt(filemap, column):
         .to_numpy()
         .squeeze()
     )
+
+    # Set all values at molt at the same index as nan ecdysis to nan
+    nan_mask = np.isnan(ecdysis_time_step)
+    values_at_ecdysis[nan_mask] = np.nan
 
     return values_at_ecdysis
 

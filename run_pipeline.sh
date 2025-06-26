@@ -29,24 +29,14 @@ check_git_updates() {
         echo "Latest commit:  ${remote_commit:0:8}"
         echo
 
-        # Show brief log of new commits
-        echo "New changes:"
-        git log --oneline --decorate --graph HEAD..@{u}
-        echo
-
         read -p "Would you like to update to the latest version? (y/n): " -n 1 -r
         echo
 
         if [[ $REPLY =~ ^[Yy]$ ]]; then
-            echo "Updating..."
-            if git pull; then
-                echo "Successfully updated to latest version!"
-                echo "Please restart the script to use the updated version."
-                exit 0
-            else
-                echo "Error: Failed to update. Continuing with current version."
-                return 1
-            fi
+            echo "Updating to the pipeline to the latest version..."
+            echo "This will not update the environment, for that, run the update_pipeline.sh script."
+            bash update_pipeline.sh --pipeline-only
+            echo "Pipeline updated successfully! Please restart the script."
         else
             echo "Continuing with current version..."
         fi
