@@ -129,6 +129,51 @@ def _add_conditions_to_filemap(experiment_filemap, conditions):
     return experiment_filemap
 
 
+def _get_custom_columns(filemap):
+    usual_columns = [
+        "Time",
+        "ExperimentTime",
+        "Point",
+        "raw",
+        "HatchTime",
+        "M1",
+        "M2",
+        "M3",
+        "M4",
+        "Arrest",
+        "Ignore",
+        "Death",
+        "Dead",
+    ]
+
+    usual_columns.extend(
+        [column for column in filemap.columns if "worm_type" in column]
+    )
+
+    for feature in FEATURES_TO_COMPUTE_AT_MOLT:
+        usual_columns.extend(
+            [column for column in filemap.columns if feature in column]
+        )
+
+    usual_columns.extend([column for column in filemap.columns if "analysis" in column])
+
+    feature_columns = []
+    for feature in FEATURES_TO_COMPUTE_AT_MOLT:
+        feature_columns.extend(
+            [
+                column
+                for column in filemap.columns
+                if feature in column and "_at_" not in column
+            ]
+        )
+
+    custom_columns = [
+        column for column in filemap.columns if column not in usual_columns
+    ]
+
+    return custom_columns
+
+
 # TODO: Instead of doing it for each condition, do it for all conditions at once, then split
 def _process_condition_id_plotting_structure(
     experiment_dir,
@@ -137,6 +182,7 @@ def _process_condition_id_plotting_structure(
     organ_channels,
     conditions_keys,
     condition_id,
+    custom_columns=None,
     recompute_values_at_molt=False,
     rescale_n_points=100,
 ):
@@ -227,6 +273,14 @@ def _process_condition_id_plotting_structure(
                     recompute_values_at_molt=recompute_values_at_molt,
                 )
 
+    # Add custom columns if they exist
+    if custom_columns is not None:
+        for custom_column in custom_columns:
+            if custom_column in condition_df.columns:
+                condition_dict[custom_column] = separate_column_by_point(
+                    condition_df, custom_column
+                )
+
     return condition_dict
 
 
@@ -243,6 +297,10 @@ def build_plotting_struct(
         infer_schema_length=10000,
         null_values=["np.nan", "[nan]", ""],
     )
+
+    custom_columns = _get_custom_columns(experiment_filemap)
+    if not custom_columns:
+        custom_columns = None
 
     conditions = build_conditions(conditions_yaml_path)
     conditions_keys = list(conditions[0].keys())
@@ -291,6 +349,7 @@ def build_plotting_struct(
             organ_channels,
             conditions_keys,
             condition_id,
+            custom_columns=custom_columns,
             recompute_values_at_molt=recompute_values_at_molt,
             rescale_n_points=rescale_n_points,
         )
