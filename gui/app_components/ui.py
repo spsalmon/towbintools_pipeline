@@ -986,7 +986,9 @@ def main_server(
             filemap_columns = filemap.columns
             custom_columns = custom_columns_list()
 
-            if new_column_name != "" and (new_column_name not in custom_columns):
+            if (new_column_name != "" and new_column_name != "None") and (
+                new_column_name not in custom_columns
+            ):
                 custom_columns.append(new_column_name)
                 custom_columns_list.set(custom_columns)
                 ui.update_selectize(
@@ -1031,15 +1033,18 @@ def main_server(
     @reactive.event(input.reset_custom_annotation)
     def reset_custom_annotation():
         custom_column = input.custom_column()
-        if custom_column != "":
-            work_df.set(
-                work_df().with_columns(
-                    pl.when(pl.col("Point") == int(current_point()))
-                    .then(np.nan)
-                    .otherwise(pl.col(custom_column))
-                    .alias(custom_column),
+        if custom_column != "" and custom_column != "None":
+            try:
+                work_df.set(
+                    work_df().with_columns(
+                        pl.when(pl.col("Point") == int(current_point()))
+                        .then(np.nan)
+                        .otherwise(pl.col(custom_column))
+                        .alias(custom_column),
+                    )
                 )
-            )
+            except Exception as e:
+                print(f"Exception in reset_custom_annotation: {e}")
 
     @output
     @render.plot
