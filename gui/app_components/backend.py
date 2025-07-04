@@ -268,6 +268,10 @@ def build_single_values_df(filemap):
         pl.col(columns_to_keep).first()
     )
 
+    single_values_df = single_values_df.with_columns(
+        [pl.col(col).cast(pl.Float64) for col in columns_to_keep]
+    )
+
     return single_values_df
 
 
@@ -566,6 +570,7 @@ def set_marker_shape(
             colors[m3_index] = "green"
         except IndexError:
             print(f"M3 {m3} not in list of times")
+
     if np.isfinite(m4):
         try:
             m4_index = np.where(times_of_point == m4)[0][0]
