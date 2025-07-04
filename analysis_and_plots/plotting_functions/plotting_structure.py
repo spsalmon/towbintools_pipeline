@@ -455,6 +455,10 @@ def _get_values_at_molt(filemap, column, ecdysis_time_step):
         .squeeze()
     )
 
+    # handle a edge case where there is only one point in the filemap
+    if values_at_ecdysis.ndim == 1:
+        values_at_ecdysis = values_at_ecdysis[np.newaxis, :]
+
     # Set all values at molt at the same index as nan ecdysis to nan
     nan_mask = np.isnan(ecdysis_time_step)
     values_at_ecdysis[nan_mask] = np.nan
@@ -484,6 +488,11 @@ def _get_death_and_arrest(filemap):
         .to_numpy()
         .squeeze()
     )
+
+    # handle a edge case where there is only one point in the filemap
+    if death_and_arrest.ndim == 1:
+        death_and_arrest = death_and_arrest[np.newaxis, :]
+
     death = death_and_arrest[:, 0].astype(float)
     arrest = death_and_arrest[:, 1].astype(bool)
     return death[:, np.newaxis], arrest[:, np.newaxis]
