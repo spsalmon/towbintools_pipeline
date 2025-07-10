@@ -297,6 +297,8 @@ def process_feature_at_molt_columns(
     )
 
     for feature_column in feature_columns:
+        # convert the feature column to float
+        filemap = filemap.with_columns(pl.col(feature_column).cast(pl.Float64))
         series = separate_column_by_point(filemap, feature_column)
         feature_at_ecdysis_columns = [
             f"{feature_column}_at_{ecdys}" for ecdys in ECDYSIS_COLUMNS

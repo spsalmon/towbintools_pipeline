@@ -49,8 +49,12 @@ OPTIONS_MAP = {
     ],
     "molt_detection": [
         "rerun_molt_detection",
-        "molt_detection_volume",
+        "molt_detection_method",
+        "molt_detection_columns",
+        "molt_detection_model_path",
+        "molt_detection_volume",  # deprecated, use "molt_detection_columns" instead
         "molt_detection_worm_type",
+        "molt_detection_batch_size",
     ],
     "fluorescence_quantification": [
         "rerun_fluorescence_quantification",
@@ -96,6 +100,12 @@ DEFAULT_OPTIONS = {
     },
     "molt_detection": {
         "rerun_molt_detection": [False],
+        "molt_detection_method": ["legacy"],
+        "molt_detection_model_path": ["./models/molt_detection_model.ckpt"],
+        "molt_detection_batch_size": [1],
+        "molt_detection_volume": [
+            None
+        ],  # deprecated, use "molt_detection_columns" instead, this is for backward compatibility
     },
     "fluorescence_quantification": {
         "rerun_fluorescence_quantification": [False],

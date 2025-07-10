@@ -94,7 +94,7 @@ def main(input_pickle, output_pickle, config, n_jobs):
             raise ValueError(
                 "model_path must be set in the config file for deep learning segmentation."
             )
-        # Load the model
+
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         model = load_segmentation_model_from_checkpoint(config["model_path"]).to(device)
 
@@ -119,7 +119,6 @@ def main(input_pickle, output_pickle, config, n_jobs):
             collate_fn=dataset.collate_fn,
         )
 
-        # Make predictions
         model.eval()
 
         def save_prediction(prediction, output_path):
@@ -141,13 +140,11 @@ def main(input_pickle, output_pickle, config, n_jobs):
                 predictions = np.squeeze(predictions) > 0.5
                 predictions = predictions.astype(np.uint8)
 
-                # Reshape predictions to original shape
                 predictions = reshape_images_to_original_shape(
                     predictions, image_shapes, padded_or_cropped="pad"
                 )
 
                 with parallel_config(backend="threading", n_jobs=n_jobs // 2):
-                    # Save predictions
                     Parallel()(
                         delayed(save_prediction)(prediction, output_path)
                         for prediction, output_path in zip(predictions, output_files)

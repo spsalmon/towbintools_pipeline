@@ -88,7 +88,7 @@ def main():
 
     # Load experiment filemap
     experiment_filemap = pd.read_csv(
-        os.path.join(report_subdir, "analysis_filemap.csv")
+        os.path.join(report_subdir, "analysis_filemap.csv"), low_memory=False
     )
 
     current_block_index = progress_tracker["current_block_index"]
