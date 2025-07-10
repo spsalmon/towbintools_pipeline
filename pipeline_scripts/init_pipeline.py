@@ -84,7 +84,8 @@ def main(config, temp_dir_basename, temp_dir, pad=None):
         )
     else:
         experiment_filemap = pd.read_csv(
-            os.path.join(report_subdir, "analysis_filemap.csv")
+            os.path.join(report_subdir, "analysis_filemap.csv"),
+            low_memory=False,
         )
         experiment_filemap = experiment_filemap.replace(np.nan, "", regex=True)
 
@@ -133,6 +134,7 @@ current = building_blocks[0]
 current_building_block, current_pad = current["block"], current["pad"]
 
 experiment_filemap = pd.read_csv(
-    os.path.join(config["report_subdir"], "analysis_filemap.csv")
+    os.path.join(config["report_subdir"], "analysis_filemap.csv"),
+    low_memory=False,
 )
 current_building_block.run(experiment_filemap, config, pad=current_pad)

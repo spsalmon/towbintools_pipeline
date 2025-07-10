@@ -10,6 +10,7 @@ dependencies:
   - plotly
   - ipykernel
   - polars
+  - pyarrow
   - bottleneck
   - numcodecs<0.16
   - pip
