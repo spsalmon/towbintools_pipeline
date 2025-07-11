@@ -422,14 +422,17 @@ def get_deviation_from_model(
         values_one = values_one[correct_indices]
         values_two = values_two[correct_indices]
 
-        log_expected_series_two = model.predict(np.log(values_one).reshape(-1, 1))
+        if values_one.size == 0 or values_two.size == 0:
+            deviations.append(np.array([]))
+        else:
+            log_expected_series_two = model.predict(np.log(values_one).reshape(-1, 1))
 
-        deviation = np.exp(np.log(values_two) - log_expected_series_two) - 1
+            deviation = np.exp(np.log(values_two) - log_expected_series_two) - 1
 
-        if percentage:
-            deviation = deviation * 100
+            if percentage:
+                deviation = deviation * 100
 
-        deviations.append(deviation)
+            deviations.append(deviation)
 
     # Pad deviations to the same length with np.nan so they can be stacked into an array
     max_len = max(len(dev) for dev in deviations)
