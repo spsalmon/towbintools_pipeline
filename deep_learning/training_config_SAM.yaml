@@ -1,30 +1,30 @@
-# image_directories: ["/mnt/towbin.data/shared/spsalmon/towbinlab_segmentation_database/pharynx/good_images"]
-# mask_directories: ["/mnt/towbin.data/shared/spsalmon/towbinlab_segmentation_database/pharynx/binarized_and_cleaned_masks/"]
+image_directories: ["/mnt/towbin.data/shared/spsalmon/screen_analysis_segmentation_database/adult_pharynxes/good_images"]
+mask_directories: ["/mnt/towbin.data/shared/spsalmon/screen_analysis_segmentation_database/adult_pharynxes/binarized_and_cleaned_masks"]
 
 # training_filemap: '/mnt/external.data/TowbinLab/plenart/20221020_Ti2_10x_green_bacteria_wbt150_small_chambers_good/analysis/report/training_filemap.csv'
 
-training_dataframes: ['/mnt/towbin.data/shared/spsalmon/towbinlab_segmentation_database/initial_annotations/pharynx/datasets/training_dataframe.csv',
-                      '/mnt/towbin.data/shared/spsalmon/towbinlab_segmentation_database/squid_fine_tuning/pharynx/datasets/training_dataframe.csv']
+# training_dataframes: ['/mnt/towbin.data/shared/spsalmon/towbinlab_segmentation_database/initial_annotations/pharynx/datasets/training_dataframe.csv',
+#                       '/mnt/towbin.data/shared/spsalmon/towbinlab_segmentation_database/squid_fine_tuning/pharynx/datasets/training_dataframe.csv']
 
-validation_dataframes: ['/mnt/towbin.data/shared/spsalmon/towbinlab_segmentation_database/initial_annotations/pharynx/datasets/validation_dataframe.csv',
-                      '/mnt/towbin.data/shared/spsalmon/towbinlab_segmentation_database/squid_fine_tuning/pharynx/datasets/validation_dataframe.csv']
+# validation_dataframes: ['/mnt/towbin.data/shared/spsalmon/towbinlab_segmentation_database/initial_annotations/pharynx/datasets/validation_dataframe.csv',
+#                       '/mnt/towbin.data/shared/spsalmon/towbinlab_segmentation_database/squid_fine_tuning/pharynx/datasets/validation_dataframe.csv']
 
-test_dataframes: ['/mnt/towbin.data/shared/spsalmon/towbinlab_segmentation_database/initial_annotations/pharynx/datasets/test_dataframe.csv',
-                      '/mnt/towbin.data/shared/spsalmon/towbinlab_segmentation_database/squid_fine_tuning/pharynx/datasets/test_dataframe.csv']
+# test_dataframes: ['/mnt/towbin.data/shared/spsalmon/towbinlab_segmentation_database/initial_annotations/pharynx/datasets/test_dataframe.csv',
+#                       '/mnt/towbin.data/shared/spsalmon/towbinlab_segmentation_database/squid_fine_tuning/pharynx/datasets/test_dataframe.csv']
 
-save_dir: '/mnt/towbin.data/shared/spsalmon/towbinlab_segmentation_database/models/pharynx/'
-model_name: 'pharynx_model_squid_ti2'
+save_dir: '/mnt/towbin.data/shared/spsalmon/screen_analysis_segmentation_database/models'
+model_name: 'aldult_pharynxes_screen_model'
 
 pretrained: True
 
 continue_training_from_checkpoint: null
 
-n_classes: 1
+n_classes: 2
 channels_to_segment: [0]
 
 architecture: 'UnetPlusPlus'
 pretrained_encoder: 'efficientnet-b4'
-pretrained_weights: 'image-micronet'
+pretrained_weights: 'imagenet'
 
 deep_supervision: False
 
@@ -34,14 +34,14 @@ normalization_parameters: {'type': 'percentile', 'lo': 1, 'hi': 99, 'axis': [-2,
 train_on_tiles: True
 tiler_config: {'tile_size':[1024, 1024], 'tile_step':[256, 256]}
 
-loss: 'FocalTversky'
+loss: 'MultiClassFocalLoss'
 value_to_ignore: -1
 
-max_epochs: 1000
+max_epochs: 100
 batch_size: 24
 accumulate_grad_batches: 2
 num_workers: 16
 
 save_best_k_models: 1
-train_val_split_ratio: 0.25
+train_val_split_ratio: 0.20
 train_test_split_ratio: 0.1
