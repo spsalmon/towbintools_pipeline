@@ -6,6 +6,7 @@ import pandas as pd
 import pytorch_lightning as pl
 import pytorch_lightning.callbacks as callbacks
 import pytorch_lightning.loggers as pl_loggers
+import torch
 import torch.nn as nn
 import yaml
 from towbintools.deep_learning.deep_learning_tools import (
@@ -23,6 +24,7 @@ from towbintools.deep_learning.utils.dataset import (
 )
 from towbintools.deep_learning.utils.loss import BCELossWithIgnore
 from towbintools.deep_learning.utils.loss import FocalTverskyLoss
+from towbintools.deep_learning.utils.loss import MultiClassFocalLoss
 
 
 def get_args():
@@ -57,6 +59,12 @@ value_to_ignore = config.get("value_to_ignore", None)
 
 if loss == "FocalTversky":
     criterion = FocalTverskyLoss(ignore_index=value_to_ignore)
+elif loss == "MultiClassFocalLoss":
+    criterion = MultiClassFocalLoss(
+        alpha=torch.tensor([0.1] + [0.75] * (n_classes)),
+        gamma=2.0,
+        ignore_index=value_to_ignore,
+    )
 elif loss == "BCE":
     criterion = BCELossWithIgnore(ignore_index=value_to_ignore)
 elif loss == "CrossEntropy":
@@ -140,6 +148,8 @@ elif image_directories is not None and mask_directories is not None:
         validation_set_ratio=train_val_split_ratio,
         test_set_ratio=train_test_split_ratio,
     )
+
+    print(train_loader.dataset.image_slicers)
 
 elif training_dataframes is not None and validation_dataframes is not None:
     # combine the training dataframes together
