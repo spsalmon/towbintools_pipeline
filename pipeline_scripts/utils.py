@@ -83,30 +83,28 @@ def sync_backup_folder(dir, backup_dir):
                 shutil.copy2(src_file, dst_file)
 
 
-def get_experiment_pads(config):
+def get_experiment_subdirs(config):
     experiment_dir = config["experiment_dir"]
     raw_subdir = os.path.join(experiment_dir, "raw")
-    pads = [
-        f
-        for f in os.listdir(raw_subdir)
-        if os.path.isdir(os.path.join(raw_subdir, f)) and "pad" in f
+    subdirs = [
+        f for f in os.listdir(raw_subdir) if os.path.isdir(os.path.join(raw_subdir, f))
     ]
-    return pads
+    return sorted(subdirs)
 
 
-def get_and_create_folders_pad(config, pad):
-    experiment_dir = config["experiment_dir"]
-    try:
-        analysis_dir_name = config["analysis_dir_name"]
-    except KeyError:
-        analysis_dir_name = "analysis"
+def get_and_create_folders_subdir(config, subdir):
+    (
+        experiment_dir,
+        raw_subdir,
+        analysis_subdir,
+        report_subdir,
+        pipeline_backup_dir,
+    ) = get_and_create_folders(config)
 
-    raw_subdir = os.path.join(experiment_dir, "raw", pad)
-    analysis_subdir = os.path.join(experiment_dir, analysis_dir_name)
-    os.makedirs(analysis_subdir, exist_ok=True)
-    report_subdir = os.path.join(analysis_subdir, "report", pad)
+    raw_subdir = os.path.join(raw_subdir, subdir)
+    report_subdir = os.path.join(report_subdir, subdir)
     os.makedirs(report_subdir, exist_ok=True)
-    pipeline_backup_dir = os.path.join(report_subdir, "pipeline_backup")
+    pipeline_backup_dir = os.path.join(pipeline_backup_dir, subdir)
     os.makedirs(pipeline_backup_dir, exist_ok=True)
 
     return (
@@ -120,12 +118,10 @@ def get_and_create_folders_pad(config, pad):
 
 def get_and_create_folders(config):
     experiment_dir = config["experiment_dir"]
-    try:
-        analysis_dir_name = config["analysis_dir_name"]
-    except KeyError:
-        analysis_dir_name = "analysis"
+    analysis_dir_name = config.get("analysis_dir_name", "analysis")
+    raw_dir_name = config.get("raw_dir_name", "raw")
 
-    raw_subdir = os.path.join(experiment_dir, "raw")
+    raw_subdir = os.path.join(experiment_dir, raw_dir_name)
     analysis_subdir = os.path.join(experiment_dir, analysis_dir_name)
     os.makedirs(analysis_subdir, exist_ok=True)
     report_subdir = os.path.join(analysis_subdir, "report")
@@ -184,7 +180,7 @@ def get_output_name(
     config,
     input_name,
     task_name,
-    pad=None,
+    subdir=None,
     channels=None,
     return_subdir=True,
     add_raw=False,
@@ -211,8 +207,8 @@ def get_output_name(
 
     if return_subdir:
         output_name = os.path.join(analysis_subdir, output_name)
-        if pad is not None:
-            output_name = os.path.join(output_name, pad)
+        if subdir is not None:
+            output_name = os.path.join(output_name, subdir)
         os.makedirs(output_name, exist_ok=True)
     else:
         output_name = os.path.join(report_subdir, f"{output_name}.csv")
