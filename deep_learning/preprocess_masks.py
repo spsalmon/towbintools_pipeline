@@ -75,7 +75,7 @@ def binarize_and_clean_mask(mask_file, img_file, output_dir, img_output_dir):
 
 
 def binarize_and_clean_mask_with_border(
-    mask_file, img_file, output_dir, img_output_dir, border_size=5
+    mask_file, img_file, output_dir, img_output_dir, border_size=10
 ):
     mask = read_tiff_file(mask_file)
 

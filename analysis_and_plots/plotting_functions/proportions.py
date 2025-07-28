@@ -432,7 +432,11 @@ def get_deviation_from_model(
             if percentage:
                 deviation = deviation * 100
 
-            deviations.append(deviation)
+            # Create full-length array with NaNs, then fill in the valid values
+            full_deviation = np.full(len(correct_indices), np.nan)
+            full_deviation[correct_indices] = deviation
+
+            deviations.append(full_deviation)
 
     # Pad deviations to the same length with np.nan so they can be stacked into an array
     max_len = max(len(dev) for dev in deviations)

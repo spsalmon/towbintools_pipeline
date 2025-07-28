@@ -40,15 +40,22 @@ def cleanup_temp_pickles(pickle_dir, keep_paths):
 
 
 def update_experiment_filemap(
-    experiment_filemap, config, result, previous_block, previous_pad, report_subdir
+    experiment_filemap, config, result, previous_block, previous_subdir, report_subdir
 ):
     """Update experiment_filemap based on previous block's return type."""
     if previous_block.return_type == "subdir":
-        # The column name is always the same regardless of previous_pad
+        # The column name is always the same regardless of previous_subdir
         column_name = f'{config["analysis_dir_name"]}/{os.path.basename(os.path.normpath(result))}'
-        experiment_filemap = add_dir_to_experiment_filemap(
-            experiment_filemap, result, column_name
-        )
+        no_timepoint = config.get("no_timepoint", False)
+        print(config)
+        if no_timepoint or ("Time" not in experiment_filemap.columns):
+            experiment_filemap[column_name] = sorted(
+                [os.path.join(result, f) for f in os.listdir(result)]
+            )
+        else:
+            experiment_filemap = add_dir_to_experiment_filemap(
+                experiment_filemap, result, column_name
+            )
         experiment_filemap.to_csv(
             os.path.join(report_subdir, "analysis_filemap.csv"), index=False
         )
@@ -71,25 +78,14 @@ def main():
 
     # Prepare pickle paths
     pickle_dir = os.path.join(temp_dir, "pickles")
-    config_pickle_path = os.path.join(pickle_dir, "config.pkl")
+    # config_pickle_path = os.path.join(pickle_dir, "config.pkl")
     progress_pickle_path = os.path.join(pickle_dir, "progress_tracker.pkl")
 
     # Cleanup unnecessary pickles
-    cleanup_temp_pickles(pickle_dir, [config_pickle_path, progress_pickle_path])
+    cleanup_temp_pickles(pickle_dir, [progress_pickle_path])
 
-    # Load config and progress tracker
-    config, progress_tracker = load_pickles(config_pickle_path, progress_pickle_path)
-
-    report_subdir = config["report_subdir"]
-    pipeline_backup_dir = config["pipeline_backup_dir"]
-
-    # Sync backup folder
-    sync_backup_folder(config["temp_dir"], pipeline_backup_dir)
-
-    # Load experiment filemap
-    experiment_filemap = pd.read_csv(
-        os.path.join(report_subdir, "analysis_filemap.csv"), low_memory=False
-    )
+    # Load progress tracker
+    progress_tracker = load_pickles(progress_pickle_path)[0]
 
     current_block_index = progress_tracker["current_block_index"]
     building_blocks = progress_tracker["building_blocks"]
@@ -101,22 +97,49 @@ def main():
     # Update experiment_filemap with previous block's result
     if current_block_index > 0:
         previous = building_blocks[current_block_index - 1]
-        previous_block, previous_pad = previous["block"], previous["pad"]
+        previous_block, previous_subdir, previous_config = (
+            previous["block"],
+            previous["subdir"],
+            previous["config"],
+        )
+
+        report_subdir = previous_config["report_subdir"]
+        pipeline_backup_dir = previous_config["pipeline_backup_dir"]
+
+        # Sync backup folder
+        sync_backup_folder(previous_config["temp_dir"], pipeline_backup_dir)
+
+        # Load experiment filemap
+        experiment_filemap = pd.read_csv(
+            os.path.join(report_subdir, "analysis_filemap.csv"), low_memory=False
+        )
+
         experiment_filemap = update_experiment_filemap(
             experiment_filemap,
-            config,
+            previous_config,
             result,
             previous_block,
-            previous_pad,
+            previous_subdir,
             report_subdir,
         )
 
     # Run current block if available
     if current_block_index < len(building_blocks):
         current = building_blocks[current_block_index]
-        current_building_block, current_pad = current["block"], current["pad"]
+        current_building_block, current_subdir, current_config = (
+            current["block"],
+            current["subdir"],
+            current["config"],
+        )
+        report_subdir = current_config["report_subdir"]
+        experiment_filemap = pd.read_csv(
+            os.path.join(report_subdir, "analysis_filemap.csv"),
+            low_memory=False,
+        )
         print(f"Running {current_building_block} ...")
-        result = current_building_block.run(experiment_filemap, config, pad=current_pad)
+        result = current_building_block.run(
+            experiment_filemap, current_config, subdir=current_subdir
+        )
     else:
         print("End of the pipeline!")
 

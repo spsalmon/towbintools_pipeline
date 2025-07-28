@@ -106,13 +106,13 @@ def run_detect_molts_deep_learning(
 
     worm_type_data = separate_column_by_point(analysis_filemap, worm_type_column)
 
-    hatch_times = []
+    hatch_indices = []
     for i, worm_type_series in enumerate(worm_type_data):
         hatch_time = find_hatch_time(
             worm_type_series,
         )
-        hatch_times.append(hatch_time)
-    hatch_times = np.array(hatch_times)
+        hatch_indices.append(hatch_time)
+    hatch_indices = np.array(hatch_indices)
 
     molt_detection_data = []
     for column in molt_detection_columns:
@@ -153,7 +153,7 @@ def run_detect_molts_deep_learning(
         collate_fn=dataset.collate_fn,
     )
 
-    molts = []
+    molts_indices = []
     with torch.no_grad():
         for batch in tqdm(dataloader):
             x, invalid_series_index, original_shapes = batch
@@ -163,15 +163,15 @@ def run_detect_molts_deep_learning(
 
             for j, heatmap in enumerate(heatmaps):
                 if j in invalid_series_index:
-                    molts.append(
+                    molts_indices.append(
                         [np.nan] * 4
                     )  # series was invalid so no molts could be detected
                 else:
                     m = heatmap_to_keypoints_1D(heatmap, height_threshold=0.5)
                     print(f"Molts detected : {m}")
-                    molts.append(m)
+                    molts_indices.append(m)
 
-    molts = np.array(molts)
+    molts_indices = np.array(molts_indices)
 
     # Create a DataFrame with the results
     points = (
@@ -179,13 +179,34 @@ def run_detect_molts_deep_learning(
         .to_numpy()
         .flatten()
     )
+    times = separate_column_by_point(analysis_filemap, "Time")
+
+    hatch_times = []
+    molt_times = []
+    for i, time in enumerate(times):
+        hatch = hatch_indices[i]
+        molts = molts_indices[i]
+        molt_times_of_point = []
+        if np.isnan(hatch):
+            hatch_times.append(np.nan)
+        else:
+            hatch_times.append(time[int(hatch)])
+        for m in molts:
+            if np.isnan(m):
+                molt_times_of_point.append(np.nan)
+            else:
+                molt_times_of_point.append(time[int(m)])
+        molt_times.append(molt_times_of_point)
+
+    molt_times = np.array(molt_times)
+
     molt_columns = ["M1", "M2", "M3", "M4"]
     molt_data = {
         "Point": points,
         "HatchTime": hatch_times,
     }
     for i, column in enumerate(molt_columns):
-        molt_data[column] = molts[:, i]
+        molt_data[column] = molt_times[:, i]
     molts_dataframe = pd.DataFrame(molt_data)
     return molts_dataframe
 

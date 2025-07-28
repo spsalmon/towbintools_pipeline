@@ -125,7 +125,6 @@ class BuildingBlock(ABC):
         self.name = name
         self.options = options
         self.block_config = block_config
-        # self.script_path = script_path
         self.return_type = return_type
         self.script_path = script_path
         self.requires_gpu = requires_gpu
@@ -134,7 +133,7 @@ class BuildingBlock(ABC):
         return f"{self.name}: {self.block_config}"
 
     @abstractmethod
-    def get_output_name(self, config, pad):
+    def get_output_name(self, config, subdir):
         pass
 
     @abstractmethod
@@ -161,13 +160,13 @@ class BuildingBlock(ABC):
             )
         return command
 
-    def run(self, experiment_filemap, config, pad=None):
+    def run(self, experiment_filemap, config, subdir=None):
         block_config = self.block_config
         micromamba_path = config.get("micromamba_path", "~/.local/bin/micromamba")
         temp_dir = config["temp_dir"]
 
         if self.return_type == "subdir":
-            subdir = self.get_output_name(config, pad)
+            subdir = self.get_output_name(config, subdir)
             input_files, output_files = self.get_input_and_output_files(
                 config, experiment_filemap, subdir
             )
@@ -222,7 +221,7 @@ class BuildingBlock(ABC):
             return subdir
 
         elif self.return_type == "csv":
-            output_file = self.get_output_name(config, pad)
+            output_file = self.get_output_name(config, subdir)
             input_files, _ = self.get_input_and_output_files(
                 config, experiment_filemap, config["analysis_subdir"]
             )
@@ -288,13 +287,13 @@ class SegmentationBuildingBlock(BuildingBlock):
             requires_gpu,
         )
 
-    def get_output_name(self, config, pad):
+    def get_output_name(self, config, subdir):
         return get_output_name(
             config,
             self.block_config["segmentation_column"],
             "seg",
             channels=self.block_config["segmentation_channels"],
-            pad=pad,
+            subdir=subdir,
             return_subdir=True,
             add_raw=False,
             custom_suffix=self.block_config["segmentation_name_suffix"],
@@ -329,12 +328,12 @@ class StraighteningBuildingBlock(BuildingBlock):
             script_path,
         )
 
-    def get_output_name(self, config, pad):
+    def get_output_name(self, config, subdir):
         return get_output_name(
             config,
             self.block_config["straightening_source"][0],
             "str",
-            pad=pad,
+            subdir=subdir,
             channels=self.block_config["straightening_source"][1],
             return_subdir=True,
             add_raw=True,
@@ -392,12 +391,12 @@ class MorphologyComputationBuildingBlock(BuildingBlock):
             script_path,
         )
 
-    def get_output_name(self, config, pad):
+    def get_output_name(self, config, subdir):
         return get_output_name(
             config,
             self.block_config["morphology_computation_masks"],
             "morphology",
-            pad=pad,
+            subdir=subdir,
             return_subdir=False,
         )
 
@@ -430,14 +429,14 @@ class ClassificationBuildingBlock(BuildingBlock):
             script_path,
         )
 
-    def get_output_name(self, config, pad):
+    def get_output_name(self, config, subdir):
         model_name = os.path.basename(os.path.normpath(self.block_config["classifier"]))
         model_name = model_name.split("_classifier")[0]
         return get_output_name(
             config,
             self.block_config["classification_source"],
             model_name,
-            pad=pad,
+            subdir=subdir,
             return_subdir=False,
         )
 
@@ -465,7 +464,7 @@ class MoltDetectionBuildingBlock(BuildingBlock):
             script_path,
         )
 
-    def get_output_name(self, config, pad):
+    def get_output_name(self, config, subdir):
         return os.path.join(config["report_subdir"], "ecdysis.csv")
 
     def get_input_and_output_files(self, config, experiment_filemap, subdir):
@@ -483,7 +482,7 @@ class FluorescenceQuantificationBuildingBlock(BuildingBlock):
             script_path,
         )
 
-    def get_output_name(self, config, pad):
+    def get_output_name(self, config, subdir):
         fluorescence_quantification_source = self.block_config[
             "fluorescence_quantification_source"
         ][0]
@@ -545,21 +544,25 @@ class CustomBuildingBlock(BuildingBlock):
             script_path,
         )
 
-    def get_output_name(self, config, pad):
+    def get_output_name(self, config, subdir):
         custom_script_name = self.block_config["custom_script_name"]
         analysis_subdir = config["analysis_subdir"]
         report_subdir = config["report_subdir"]
 
         if self.return_type == "subdir":
             output = os.path.join(analysis_subdir, custom_script_name)
-        if pad is not None:
-            output = os.path.join(output, pad)
+        if subdir is not None:
+            output = os.path.join(output, subdir)
 
         elif self.return_type == "csv":
-            if pad is not None:
-                output = os.path.join(report_subdir, f"{pad}_{custom_script_name}.csv")
+            if subdir is not None:
+                output = os.path.join(
+                    report_subdir, f"{subdir}_{custom_script_name}.csv"
+                )
             else:
-                output = os.path.join(report_subdir, f"{pad}_{custom_script_name}.csv")
+                output = os.path.join(
+                    report_subdir, f"{subdir}_{custom_script_name}.csv"
+                )
 
         return output
 

@@ -29,6 +29,8 @@ dependencies:
     - bioio
     - bioio-ome-tiff
     - bioio-ome-zarr
+    - crc32c # missing dependency for bioio-ome-tiff
+    - microfilm
     - towbintools
     - shiny
     - shinywidgets
