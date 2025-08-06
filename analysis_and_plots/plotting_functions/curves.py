@@ -72,7 +72,7 @@ def plot_aggregated_series(
     handles, labels = plt.gca().get_legend_handles_labels()
     by_label = dict(zip(labels, handles))
     plt.legend(by_label.values(), by_label.keys())
-    plt.xlabel("Time (h)")
+    plt.xlabel("time (h)")
     plt.yscale("log" if log_scale else "linear")
     if y_axis_label is not None:
         plt.ylabel(y_axis_label)

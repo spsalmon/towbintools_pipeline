@@ -88,26 +88,13 @@ def get_condition_filemaps_images(
             infer_schema_length=10000,
             null_values=["np.nan", "[nan]", ""],
         )
-        filemap = filemap.select(
-            pl.col("*").filter(
-                lambda col: col.name.startswith("raw") or "analysis" in col.name
-            )
-        )
+        selected_columns = ["Time", "Point"]
+        selected_columns += [
+            col for col in filemap.columns if col.startswith("raw") or "analysis" in col
+        ]
+        filemap = filemap.select(pl.col(selected_columns))
         filemaps[filemap_path] = filemap
     return filemaps
-
-
-def keep_selected_columns(
-    filemap_dict: dict[str, Any], columns_to_keep
-) -> dict[str, Any]:
-    columns = columns_to_keep.copy()
-    if "Point" not in columns:
-        columns.append("Point")
-    if "Time" not in columns:
-        columns.append("Time")
-    for key, filemap in filemap_dict.items():
-        filemap_dict[key] = filemap.select(pl.col(columns))
-    return filemap_dict
 
 
 def filter_non_worm_data(
@@ -164,9 +151,6 @@ def get_image_paths_of_time_point(point, time, filemap, image_columns):
         .tolist()
     )
 
-    if isinstance(image_paths, str):
-        image_paths = [image_paths]
-
     return image_paths
 
 
@@ -188,6 +172,7 @@ def get_images_ecdysis(
     scalebar_thickness: float = 0.02,
     scalebar_font_size: int = 12,
     scalebar_location: str = "lower right",
+    projection_type: str = "max",
 ):
     paths_dict = {}
 
@@ -291,6 +276,7 @@ def get_images_ecdysis(
                     scalebar_size_in_units=scalebar_size,
                     scalebar_thickness=scalebar_thickness,
                     scalebar_kwargs=scalebar_kwargs,
+                    proj_type=projection_type,
                 )
                 plt.show()
 

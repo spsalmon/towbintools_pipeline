@@ -425,8 +425,13 @@ def get_deviation_from_model(
         if values_one.size == 0 or values_two.size == 0:
             deviations.append(np.array([]))
         else:
-            log_expected_series_two = model.predict(np.log(values_one).reshape(-1, 1))
-
+            try:
+                log_expected_series_two = model.predict(
+                    np.log(values_one).reshape(-1, 1)
+                )
+            except AttributeError:
+                # Continuous models do not have predict method, use the model directly
+                log_expected_series_two = model(np.log(values_one))
             deviation = np.exp(np.log(values_two) - log_expected_series_two) - 1
 
             if percentage:
@@ -599,6 +604,7 @@ def plot_continuous_deviation_from_model(
     legend=None,
     x_axis_label=None,
     y_axis_label=None,
+    sort_values=False,
 ):
     color_palette = get_colors(
         conditions_to_plot,
@@ -638,9 +644,12 @@ def plot_continuous_deviation_from_model(
             percentage=deviation_as_percentage,
         )
 
-        sorted_indices = np.argsort(rescaled_column_one_values)
-        rescaled_column_one_values = rescaled_column_one_values[sorted_indices]
-        residuals = residuals[sorted_indices]
+        if sort_values:
+            sorted_indices = np.argsort(rescaled_column_one_values, axis=1)
+            rescaled_column_one_values = np.take_along_axis(
+                rescaled_column_one_values, sorted_indices, axis=1
+            )
+            residuals = np.take_along_axis(residuals, sorted_indices, axis=1)
 
         average_column_one_values = np.nanmean(rescaled_column_one_values, axis=0)
         average_residuals = np.nanmean(residuals, axis=0)
