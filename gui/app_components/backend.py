@@ -150,7 +150,7 @@ def populate_column_choices(filemap):
     except IndexError:
         print("No worm_type column found in the filemap, creating a placeholder.")
         worm_type_column = "placeholder_worm_type"
-        filemap["placeholder_worm_type"] = "worm"
+        filemap = filemap.with_columns(pl.lit("worm").alias(worm_type_column))
 
     default_plotted_column = [
         column
@@ -218,6 +218,10 @@ def get_time_and_ecdysis(filemap):
     )
 
     time = separate_column_by_point(filemap, "Time").astype(float)
+
+    if "ExperimentTime" not in filemap.columns:
+        filemap = filemap.with_columns(pl.lit(np.nan).alias("ExperimentTime"))
+
     experiment_time = separate_column_by_point(filemap, "ExperimentTime").astype(float)
 
     if np.ndim(ecdysis_time) < 2:
