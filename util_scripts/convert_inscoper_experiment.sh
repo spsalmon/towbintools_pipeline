@@ -3,7 +3,7 @@
 ulimit -s unlimited  # Stack size
 export ARG_MAX=$(getconf ARG_MAX)  # Check current limit
 
-EXPERIMENT_DIR="/mnt/towbin.data/shared/spsalmon/20250404_ZIVA_40x_397_405_yap_dynamics"
+EXPERIMENT_DIR="/mnt/towbin.data/shared/igheor/20250408_ZIVA_40x_vhp1_mStayGold_470_471_25C"
 
 declare -A FOLDER_MAPPING
 FOLDER_MAPPING["images"]="raw"
