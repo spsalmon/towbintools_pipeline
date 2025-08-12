@@ -26,6 +26,7 @@ dependencies:
   - tox
 
   - pip:
+    - nvidia-cublas-cu12 < 12.8
     - bioio
     - bioio-ome-tiff
     - bioio-ome-zarr
