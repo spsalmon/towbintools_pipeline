@@ -186,7 +186,7 @@ def create_molt_annotator(ecdysis_list_id, custom_columns_choices):
                 ui.input_checkbox("log_scale", "Log scale", value=True),
                 ui.input_file(
                     "import_file",
-                    "Import Molts",
+                    "Import Annotations",
                     accept=[".csv", ".mat"],
                     multiple=False,
                 ),
@@ -508,7 +508,7 @@ def main_server(
 
     @reactive.Effect
     @reactive.event(input.import_file)
-    def import_molts():
+    def import_annotations():
         file = input.import_file()
         point = int(current_point_index())
         if file is None:
@@ -532,8 +532,6 @@ def main_server(
             )
 
             work_df_columns = [
-                "Time",
-                "Point",
                 "Death",
                 "Ignore",
                 "Arrest",
@@ -543,35 +541,42 @@ def main_server(
                 col for col in work_df_columns if col not in imported_df.columns
             ]
 
+            current_work_df = work_df()
+
             for col in missing_work_df_columns:
-                if col in work_df().columns:
-                    default_value = work_df().select(pl.col(col)).to_numpy().squeeze()
+                if col in current_work_df.columns:
+                    value = current_work_df.select(pl.col(col)).to_numpy().squeeze()
+
                 else:
                     if col == "Death":
-                        default_value = np.nan
+                        value = np.nan
                     elif col == "Ignore":
-                        default_value = False
+                        value = False
                     elif col == "Arrest":
-                        default_value = False
+                        value = False
                     else:
-                        default_value = np.nan
+                        value = np.nan
 
-                imported_df = imported_df.with_columns(pl.lit(default_value).alias(col))
+                imported_df = imported_df.with_columns(pl.lit(value).alias(col))
 
-            # Find missing feature-at-molt columns
-            current_single_values_df = single_values_of_point()
+            necessary_columns = ["ExperimentTime"] + feature_columns
             missing_columns = [
-                col
-                for col in current_single_values_df.columns
-                if col not in imported_df.columns
+                col for col in necessary_columns if col not in imported_df.columns
             ]
+
+            for col in missing_columns:
+                value = filemap.select(pl.col(col)).to_numpy().squeeze()
+                imported_df = imported_df.with_columns(pl.lit(value).alias(col))
 
             imported_df = process_feature_at_molt_columns(
                 imported_df,
-                missing_columns,
+                feature_columns,
                 worm_type_column,
                 recompute_features_at_molt=False,
             )
+
+            new_work_df = imported_df.select(pl.col(columns_to_get_unique))
+            work_df.set(new_work_df)
 
         elif datapath.endswith(".mat"):
             matlab_report = sio.loadmat(datapath, chars_as_strings=False)
@@ -619,6 +624,8 @@ def main_server(
             )
 
         import_single_values_df = build_single_values_df(imported_df)
+
+        print(f"imported dataframe : {import_single_values_df}")
         import_single_values_df = import_single_values_df.partition_by(
             "Point", maintain_order=True
         )
