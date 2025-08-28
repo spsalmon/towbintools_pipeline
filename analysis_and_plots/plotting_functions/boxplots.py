@@ -226,6 +226,78 @@ def _annotate_significance(
     annotator.apply_and_annotate()
 
 
+def _add_metric_text(
+    df,
+    conditions_to_plot,
+    column,
+    ax,
+    event_index,
+    test="Mann-Whitney",
+    y_offset_pct=0.05,
+    decimal_places=2,
+):
+    test_metrics = {
+        "Mann-Whitney": ("median", "M"),
+        "Levene": ("std", "σ"),
+        "t-test": ("mean", "μ"),
+        "Kruskal-Wallis": ("median", "M"),
+        "Welch": ("mean", "μ"),
+        "Wilcoxon": ("median", "M"),
+        "Feltz-Miller": ("cv", "CV"),
+        "MSLR": ("cv", "CV"),
+    }
+
+    if test not in test_metrics:
+        raise ValueError(
+            f"Test '{test}' not supported. Available tests: {list(test_metrics.keys())}"
+        )
+
+    metric_type, symbol = test_metrics[test]
+
+    data = df[df["Order"] == event_index]
+
+    y_min, y_max = ax.get_ylim()
+    y_range = y_max - y_min
+    y_position = y_min - (y_range * y_offset_pct)
+
+    for i, condition in enumerate(conditions_to_plot):
+        condition_data = data[data["Condition"] == condition][column]
+
+        if len(condition_data) == 0 or condition_data.isna().all():
+            continue
+
+        if metric_type == "mean":
+            metric_value = condition_data.mean()
+        elif metric_type == "median":
+            metric_value = condition_data.median()
+        elif metric_type == "std":
+            metric_value = condition_data.std()
+        elif metric_type == "cv":
+            metric_value = condition_data.std() / condition_data.mean()
+        if np.isnan(metric_value):
+            continue
+
+        text = f"{symbol} = {metric_value:.{decimal_places}f}"
+
+        ax.text(
+            i,
+            y_position,
+            text,
+            ha="center",
+            va="top",
+            weight="bold",
+            bbox=dict(
+                boxstyle="round,pad=0.3",
+                facecolor="white",
+                edgecolor="black",
+                linestyle="-.",
+                alpha=0.8,
+            ),
+        )
+
+    ax.set_ylim(y_position - (y_range * 0.02), y_max)
+
+
 def _plot_violinplot(
     df,
     conditions_to_plot,
@@ -235,6 +307,7 @@ def _plot_violinplot(
     titles,
     share_y_axis,
     plot_significance,
+    show_metric,
     significance_pairs,
     test="Mann-Whitney",
     hide_outliers=True,
@@ -319,6 +392,16 @@ def _plot_violinplot(
                 test=test,
             )
 
+            if show_metric:
+                _add_metric_text(
+                    df,
+                    conditions_to_plot,
+                    column,
+                    violinplot,
+                    event_index,
+                    test=test,
+                )
+
         min_y, max_y = current_ax.get_ylim()
         y_min.append(min_y)
         y_max.append(max_y)
@@ -335,6 +418,7 @@ def _plot_boxplot(
     titles,
     share_y_axis,
     plot_significance,
+    show_metric,
     significance_pairs,
     hide_outliers=True,
     test="Mann-Whitney",
@@ -420,6 +504,16 @@ def _plot_boxplot(
                 test=test,
             )
 
+            if show_metric:
+                _add_metric_text(
+                    df,
+                    conditions_to_plot,
+                    column,
+                    boxplot,
+                    event_index,
+                    test=test,
+                )
+
         min_y, max_y = current_ax.get_ylim()
         y_min.append(min_y)
         y_max.append(max_y)
@@ -487,6 +581,7 @@ def violinplot(
     figsize: tuple = None,
     colors=None,
     plot_significance: bool = False,
+    show_metric: bool = False,
     significance_pairs=None,
     significance_test: str = "Mann-Whitney",
     legend=None,
@@ -540,6 +635,7 @@ def violinplot(
         titles,
         share_y_axis,
         plot_significance,
+        show_metric,
         significance_pairs,
         hide_outliers=hide_outliers,
         test=significance_test,
@@ -576,6 +672,7 @@ def boxplot(
     figsize: tuple = None,
     colors=None,
     plot_significance: bool = False,
+    show_metric: bool = False,
     significance_pairs=None,
     significance_test: str = "Mann-Whitney",
     legend=None,
@@ -629,6 +726,7 @@ def boxplot(
         titles,
         share_y_axis,
         plot_significance,
+        show_metric,
         significance_pairs,
         hide_outliers,
         test=significance_test,
