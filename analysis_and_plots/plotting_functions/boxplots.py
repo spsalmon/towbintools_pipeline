@@ -22,6 +22,7 @@ def _setup_figure(
     df,
     figsize,
     titles,
+    # log_scale,
 ):
     # Determine figure size
     if figsize is None:
@@ -232,9 +233,10 @@ def _add_metric_text(
     column,
     ax,
     event_index,
+    log_scale,
     test="Mann-Whitney",
-    y_offset_pct=0.05,
-    decimal_places=2,
+    y_offset_pct=0.1,
+    significant_digits=3,
 ):
     test_metrics = {
         "Mann-Whitney": ("median", "M"),
@@ -262,6 +264,9 @@ def _add_metric_text(
 
     for i, condition in enumerate(conditions_to_plot):
         condition_data = data[data["Condition"] == condition][column]
+        if log_scale:
+            # transform back to avoid incorrect statistics
+            condition_data = np.exp(condition_data)
 
         if len(condition_data) == 0 or condition_data.isna().all():
             continue
@@ -273,11 +278,13 @@ def _add_metric_text(
         elif metric_type == "std":
             metric_value = condition_data.std()
         elif metric_type == "cv":
-            metric_value = condition_data.std() / condition_data.mean()
+            metric_value = condition_data.std() / condition_data.mean() * 100
         if np.isnan(metric_value):
             continue
 
-        text = f"{symbol} = {metric_value:.{decimal_places}f}"
+        text = f"{symbol} = {metric_value:.{significant_digits}g}"
+        if metric_type == "cv":
+            text += " %"
 
         ax.text(
             i,
@@ -295,7 +302,7 @@ def _add_metric_text(
             ),
         )
 
-    ax.set_ylim(y_position - (y_range * 0.02), y_max)
+    ax.set_ylim(y_position - (y_range * 0.04), y_max)
 
 
 def _plot_violinplot(
@@ -309,6 +316,7 @@ def _plot_violinplot(
     plot_significance,
     show_metric,
     significance_pairs,
+    log_scale,
     test="Mann-Whitney",
     hide_outliers=True,
 ):
@@ -399,6 +407,7 @@ def _plot_violinplot(
                     column,
                     violinplot,
                     event_index,
+                    log_scale,
                     test=test,
                 )
 
@@ -420,6 +429,7 @@ def _plot_boxplot(
     plot_significance,
     show_metric,
     significance_pairs,
+    log_scale,
     hide_outliers=True,
     test="Mann-Whitney",
 ):
@@ -511,6 +521,7 @@ def _plot_boxplot(
                     column,
                     boxplot,
                     event_index,
+                    log_scale,
                     test=test,
                 )
 
@@ -637,6 +648,7 @@ def violinplot(
         plot_significance,
         show_metric,
         significance_pairs,
+        log_scale,
         hide_outliers=hide_outliers,
         test=significance_test,
     )
@@ -729,6 +741,7 @@ def boxplot(
         show_metric,
         significance_pairs,
         hide_outliers,
+        log_scale,
         test=significance_test,
     )
 
@@ -832,6 +845,7 @@ def violinplot_larval_stage(
         share_y_axis,
         plot_significance,
         significance_pairs,
+        log_scale,
         hide_outliers=hide_outliers,
         test=significance_test,
     )
@@ -934,6 +948,7 @@ def boxplot_larval_stage(
         plot_significance,
         significance_pairs,
         hide_outliers,
+        log_scale,
         test=significance_test,
     )
 
