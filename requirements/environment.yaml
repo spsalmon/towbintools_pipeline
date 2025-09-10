@@ -28,6 +28,7 @@ dependencies:
   - pip:
     - nvidia-cublas-cu12 < 12.8
     - bioio
+    - bioio-nd2
     - bioio-ome-tiff
     - bioio-ome-zarr
     - crc32c # missing dependency for bioio-ome-tiff
