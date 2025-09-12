@@ -25,6 +25,7 @@ from towbintools.deep_learning.utils.dataset import (
 from towbintools.deep_learning.utils.loss import BCELossWithIgnore
 from towbintools.deep_learning.utils.loss import FocalTverskyLoss
 from towbintools.deep_learning.utils.loss import MultiClassFocalLoss
+from towbintools.deep_learning.utils.util import create_lightweight_checkpoint
 
 
 def get_args():
@@ -251,3 +252,8 @@ trainer = pl.Trainer(
 )
 trainer.fit(model=model, train_dataloaders=train_loader, val_dataloaders=val_loader)
 print(checkpoint_callback.best_model_path)
+
+create_lightweight_checkpoint(
+    input_path=checkpoint_callback.best_model_path,
+    output_path=os.path.join(model_save_dir, "best_light.ckpt"),
+)
