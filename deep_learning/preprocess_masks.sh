@@ -7,8 +7,8 @@
 #SBATCH -t 1:00:00
 #SBATCH --mem=32GB
 
-DATABASE_PATH="/mnt/towbin.data/shared/spsalmon/screen_analysis_segmentation_database/adult_pharynxes/"
-PREPROCESSING_TYPE="binarize_with_border"  # Change this to the desired preprocessing type
+DATABASE_PATH="/mnt/towbin.data/shared/spsalmon/towbinlab_segmentation_database/datasets/initial_annotations/body/"
+PREPROCESSING_TYPE="binarize"  # Change this to the desired preprocessing type
 
 
 # Run the Python script with the specified or default configuration file

@@ -1,0 +1,57 @@
+# training_dataframes: [
+#   '/mnt/towbin.data/shared/spsalmon/towbinlab_segmentation_database/datasets/initial_annotations/pharynx/sets/training_dataframe.csv',
+#   '/mnt/towbin.data/shared/spsalmon/towbinlab_segmentation_database/datasets/squid_fine_tuning/pharynx/sets/training_dataframe.csv',
+# ]
+
+# validation_dataframes: [
+#   '/mnt/towbin.data/shared/spsalmon/towbinlab_segmentation_database/datasets/initial_annotations/pharynx/sets/validation_dataframe.csv',
+#   '/mnt/towbin.data/shared/spsalmon/towbinlab_segmentation_database/datasets/squid_fine_tuning/pharynx/sets/validation_dataframe.csv',
+# ]
+
+# test_dataframes: [
+#   '/mnt/towbin.data/shared/spsalmon/towbinlab_segmentation_database/datasets/initial_annotations/pharynx/sets/test_dataframe.csv',
+#   '/mnt/towbin.data/shared/spsalmon/towbinlab_segmentation_database/datasets/squid_fine_tuning/pharynx/sets/test_dataframe.csv',
+# ]
+
+image_directories: [
+  "/mnt/towbin.data/shared/spsalmon/towbinlab_segmentation_database/datasets/initial_annotations/pharynx/good_images",
+  "/mnt/towbin.data/shared/spsalmon/towbinlab_segmentation_database/datasets/squid_fine_tuning/pharynx/good_images",
+]
+mask_directories: [
+  "/mnt/towbin.data/shared/spsalmon/towbinlab_segmentation_database/datasets/initial_annotations/pharynx/binarized_and_cleaned_masks",
+  "/mnt/towbin.data/shared/spsalmon/towbinlab_segmentation_database/datasets/squid_fine_tuning/pharynx/binarized_and_cleaned_masks",
+]
+
+save_dir: '/mnt/towbin.data/shared/spsalmon/towbinlab_segmentation_database/models/pharynx/'
+model_name: 'newer_bigger_model_pharynx'
+
+pretrained: True
+
+continue_training_from_checkpoint: null
+
+n_classes: 1
+channels_to_segment: [0]
+
+architecture: 'UPerNet'
+pretrained_encoder: 'mit_b3'
+pretrained_weights: 'imagenet'
+
+deep_supervision: False
+
+learning_rate: 1.0e-4
+normalization_parameters: {'type': 'percentile', 'lo': 1, 'hi': 99, 'axis': [-2, -1]}
+
+train_on_tiles: True
+tiler_config: {'tile_size':[1024, 1024], 'tile_step':[256, 256]}
+
+loss: 'FocalTversky'
+value_to_ignore: -1
+
+max_epochs: 500
+batch_size: 24
+accumulate_grad_batches: 2
+num_workers: 16
+
+save_best_k_models: 1
+train_val_split_ratio: 0.20
+train_test_split_ratio: 0.1
