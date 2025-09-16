@@ -1,7 +1,9 @@
 import argparse
 import os
+import random
 import shutil
 
+import numpy as np
 import pandas as pd
 import pytorch_lightning as pl
 import pytorch_lightning.callbacks as callbacks
@@ -26,6 +28,20 @@ from towbintools.deep_learning.utils.loss import BCELossWithIgnore
 from towbintools.deep_learning.utils.loss import FocalTverskyLoss
 from towbintools.deep_learning.utils.loss import MultiClassFocalLoss
 from towbintools.deep_learning.utils.util import create_lightweight_checkpoint
+
+seed = 42
+random.seed(seed)
+
+# NumPy
+np.random.seed(seed)
+
+# PyTorch
+torch.manual_seed(seed)
+torch.cuda.manual_seed(seed)
+torch.cuda.manual_seed_all(seed)  # For multi-GPU
+
+# PyTorch Lightning
+pl.seed_everything(seed, workers=True)
 
 
 def get_args():
@@ -57,6 +73,7 @@ deep_supervision = config.get("deep_supervision", False)
 learning_rate = config.get("learning_rate", 1e-4)
 loss = config.get("loss", "FocalTversky")
 value_to_ignore = config.get("value_to_ignore", None)
+deterministic = config.get("deterministic", False)
 
 if loss == "FocalTversky":
     criterion = FocalTverskyLoss(ignore_index=value_to_ignore)
@@ -166,14 +183,14 @@ elif training_dataframes is not None and validation_dataframes is not None:
     combined_training_dataframe = pd.concat(training_df, ignore_index=True)
     combined_validation_dataframe = pd.concat(validation_df, ignore_index=True)
 
-    os.makedirs(os.path.join(model_save_dir, "dataframe_backup"), exist_ok=True)
+    os.makedirs(os.path.join(model_save_dir, "database_backup"), exist_ok=True)
     # backup the dataframes
     combined_training_dataframe.to_csv(
-        os.path.join(model_save_dir, "dataframe_backup", "training_dataframe.csv"),
+        os.path.join(model_save_dir, "database_backup", "training_dataframe.csv"),
         index=False,
     )
     combined_validation_dataframe.to_csv(
-        os.path.join(model_save_dir, "dataframe_backup", "validation_dataframe.csv"),
+        os.path.join(model_save_dir, "database_backup", "validation_dataframe.csv"),
         index=False,
     )
 
@@ -186,7 +203,7 @@ elif training_dataframes is not None and validation_dataframes is not None:
 
         combined_test_dataframe = pd.concat(test_df, ignore_index=True)
         combined_test_dataframe.to_csv(
-            os.path.join(model_save_dir, "dataframe_backup", "test_dataframe.csv"),
+            os.path.join(model_save_dir, "database_backup", "test_dataframe.csv"),
             index=False,
         )
 
@@ -235,7 +252,7 @@ else:
 checkpoint_callback = callbacks.ModelCheckpoint(
     dirpath=model_save_dir, save_top_k=save_best_k_models, monitor="val_loss"
 )
-swa_callback = callbacks.StochasticWeightAveraging(swa_lrs=1e-2)
+swa_callback = callbacks.StochasticWeightAveraging(swa_lrs=1e-5)
 
 # configure logger
 logger = pl_loggers.TensorBoardLogger(model_save_dir)
@@ -248,6 +265,7 @@ trainer = pl.Trainer(
     accumulate_grad_batches=accumulate_grad_batches,
     gradient_clip_val=0.5,
     detect_anomaly=False,
+    deterministic=deterministic,
     logger=logger,
 )
 trainer.fit(model=model, train_dataloaders=train_loader, val_dataloaders=val_loader)

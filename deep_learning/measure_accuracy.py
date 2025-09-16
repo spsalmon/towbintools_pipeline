@@ -22,8 +22,8 @@ from tqdm import tqdm
 
 device = "cuda" if torch.cuda.is_available() else "cpu"
 
-# model_dir = "/mnt/towbin.data/shared/spsalmon/towbinlab_segmentation_database/models/body/newer_bigger_model/"
-model_dir = "/mnt/towbin.data/shared/spsalmon/towbinlab_segmentation_database/models/body/SAMannotations_singleclass_UnetPlusPlus_efficientnet-b4_image-micronet_FocalTversky/"
+model_dir = "/mnt/towbin.data/shared/spsalmon/towbinlab_segmentation_database/models/paper/body/towbintools_light"
+
 model_name = "best_light.ckpt"
 model_path = os.path.join(model_dir, model_name)
 
@@ -114,7 +114,7 @@ with torch.no_grad():
 
 ground_truth_mask_paths = df["mask"].values
 prediction_mask_paths = [
-    os.path.join(output_path, os.path.basename(f)) for f in os.listdir(output_path)
+    os.path.join(output_path, os.path.basename(img_path)) for img_path in image_paths
 ]
 
 files_df = pd.DataFrame(
@@ -125,9 +125,10 @@ files_df = pd.DataFrame(
     }
 )
 
-sorted_image_paths = sorted(files_df["image"].values)
-sorted_ground_truth_paths = sorted(files_df["ground_truth"].values)
-sorted_prediction_paths = sorted(files_df["prediction"].values)
+files_df_sorted = files_df.sort_values(by="image")
+sorted_image_paths = files_df_sorted["image"].values
+sorted_ground_truth_paths = files_df_sorted["ground_truth"].values
+sorted_prediction_paths = files_df_sorted["prediction"].values
 
 
 def process_image(ground_truth_path, pred_path, image_path):
