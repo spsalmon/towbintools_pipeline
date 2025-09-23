@@ -1,18 +1,18 @@
 training_dataframes:
-  - '/mnt/towbin.data/shared/spsalmon/towbinlab_segmentation_database/towbintools_paper/body/training_dataframe.csv'
+  - '/mnt/towbin.data/shared/spsalmon/towbinlab_segmentation_database/towbintools_paper/pharynx/training_dataframe.csv'
 
 validation_dataframes:
-  - '/mnt/towbin.data/shared/spsalmon/towbinlab_segmentation_database/towbintools_paper/body/validation_dataframe.csv'
+  - '/mnt/towbin.data/shared/spsalmon/towbinlab_segmentation_database/towbintools_paper/pharynx/validation_dataframe.csv'
 
 test_dataframes:
-  - '/mnt/towbin.data/shared/spsalmon/towbinlab_segmentation_database/towbintools_paper/body/test_dataframe.csv'
+  - '/mnt/towbin.data/shared/spsalmon/towbinlab_segmentation_database/towbintools_paper/pharynx/test_dataframe.csv'
 
-save_dir: '/mnt/towbin.data/shared/spsalmon/towbinlab_segmentation_database/models/paper/body/'
+save_dir: '/mnt/towbin.data/shared/spsalmon/towbinlab_segmentation_database/models/paper/pharynx/'
 model_name: 'towbintools_vit'
 
 pretrained: True
 
-continue_training_from_checkpoint: null
+continue_training_from_checkpoint: '/mnt/towbin.data/shared/spsalmon/towbinlab_segmentation_database/models/paper/body/towbintools_vit/best_light.ckpt'
 
 n_classes: 1
 channels_to_segment: [0]
@@ -32,7 +32,7 @@ tiler_config: {'tile_size':[1024, 1024], 'tile_step':[256, 256]}
 loss: 'FocalTversky'
 value_to_ignore: -1
 
-max_epochs: 1000
+max_epochs: 500
 batch_size: 8
 accumulate_grad_batches: 3
 num_workers: 24
