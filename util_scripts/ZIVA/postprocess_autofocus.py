@@ -90,6 +90,14 @@ def get_args() -> argparse.Namespace:
         help="Path to the output directory",
     )
 
+    parser.add_argument(
+        "--channel",
+        dest="channel",
+        type=int,
+        required=True,
+        help="Channel index to use for best plane extraction (0-based index)",
+    )
+
     # Parse the arguments and return the resulting namespace object
     return parser.parse_args()
 
@@ -98,9 +106,11 @@ if __name__ == "__main__":
     args = get_args()
     input_dir = args.input_dir
     output_dir = args.output_dir
+    channel = args.channel
 
     measure = "normalized_variance"
-    channel = [1]
+    channel = [channel]
+
     norm_each_plane = False
     contrast_augmentation = False
 

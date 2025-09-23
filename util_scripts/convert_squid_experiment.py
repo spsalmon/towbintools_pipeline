@@ -167,7 +167,7 @@ def merge_and_rename_images(source_dir, output_dir, overwrite=False):
 
 if __name__ == "__main__":
     experiment_dir = (
-        "/mnt/towbin.data/shared/spsalmon/20250721_SQUID_10x_527_528_529_yap_aid"
+        "/mnt/towbin.data/shared/spsalmon/20250918_SQUID_10x_yapAID_F79G_527_557"
     )
     source_dir = os.path.join(experiment_dir, "squid_raw")
     output_dir = os.path.join(experiment_dir, "raw")

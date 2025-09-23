@@ -22,7 +22,7 @@ from tqdm import tqdm
 
 device = "cuda" if torch.cuda.is_available() else "cpu"
 
-model_dir = "/mnt/towbin.data/shared/spsalmon/towbinlab_segmentation_database/models/paper/body/towbintools_light"
+model_dir = "/mnt/towbin.data/shared/spsalmon/towbinlab_segmentation_database/models/paper/body/towbintools_medium"
 
 model_name = "best_light.ckpt"
 model_path = os.path.join(model_dir, model_name)
@@ -175,6 +175,8 @@ print(f"Median F1: {results_df['f1'].median()}")
 print(f"Median IoU: {results_df['iou'].median()}")
 print(f"Std F1: {results_df['f1'].std()}")
 print(f"Std IoU: {results_df['iou'].std()}")
+print(f"Ste F1: {results_df['f1'].std() / np.sqrt(len(results_df))}")
+print(f"Ste IoU: {results_df['iou'].std() / np.sqrt(len(results_df))}")
 
 print("\n")
 print("##### ON TI2 #####")
@@ -185,6 +187,8 @@ print(f"Median F1: {ti2_df['f1'].median()}")
 print(f"Median IoU: {ti2_df['iou'].median()}")
 print(f"Std F1: {ti2_df['f1'].std()}")
 print(f"Std IoU: {ti2_df['iou'].std()}")
+print(f"Ste F1: {ti2_df['f1'].std() / np.sqrt(len(ti2_df))}")
+print(f"Ste IoU: {ti2_df['iou'].std() / np.sqrt(len(ti2_df))}")
 
 print("\n")
 
@@ -196,3 +200,5 @@ print(f"Median F1: {squid_df['f1'].median()}")
 print(f"Median IoU: {squid_df['iou'].median()}")
 print(f"Std F1: {squid_df['f1'].std()}")
 print(f"Std IoU: {squid_df['iou'].std()}")
+print(f"Ste F1: {squid_df['f1'].std() / np.sqrt(len(squid_df))}")
+print(f"Ste IoU: {squid_df['iou'].std() / np.sqrt(len(squid_df))}")
