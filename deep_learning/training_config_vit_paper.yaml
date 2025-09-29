@@ -1,13 +1,13 @@
 training_dataframes:
-  - '/mnt/towbin.data/shared/spsalmon/towbinlab_segmentation_database/towbintools_paper/pharynx/training_dataframe.csv'
+  - '/mnt/towbin.data/shared/spsalmon/towbinlab_segmentation_database/towbintools_paper/germline/training_dataframe.csv'
 
 validation_dataframes:
-  - '/mnt/towbin.data/shared/spsalmon/towbinlab_segmentation_database/towbintools_paper/pharynx/validation_dataframe.csv'
+  - '/mnt/towbin.data/shared/spsalmon/towbinlab_segmentation_database/towbintools_paper/germline/validation_dataframe.csv'
 
 test_dataframes:
-  - '/mnt/towbin.data/shared/spsalmon/towbinlab_segmentation_database/towbintools_paper/pharynx/test_dataframe.csv'
+  - '/mnt/towbin.data/shared/spsalmon/towbinlab_segmentation_database/towbintools_paper/germline/test_dataframe.csv'
 
-save_dir: '/mnt/towbin.data/shared/spsalmon/towbinlab_segmentation_database/models/paper/pharynx/'
+save_dir: '/mnt/towbin.data/shared/spsalmon/towbinlab_segmentation_database/models/paper/germline/'
 model_name: 'towbintools_vit'
 
 pretrained: True
