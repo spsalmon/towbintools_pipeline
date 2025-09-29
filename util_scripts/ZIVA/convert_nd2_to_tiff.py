@@ -63,7 +63,7 @@ def convert_nd2_to_tiff(input_path, output_dir):
         size_c=old_pixels.size_c,
         size_t=old_pixels.size_t,
         size_z=old_pixels.size_z,
-        dimension_order=old_pixels.dimension_order,
+        dimension_order="XYCZT",
         physical_size_x=old_pixels.physical_size_x,
         physical_size_y=old_pixels.physical_size_y,
         id=0,
@@ -77,9 +77,9 @@ def convert_nd2_to_tiff(input_path, output_dir):
     ome = ome_types.OME(images=[image], instruments=instrument)
 
     OmeTiffWriter.save(
-        img.get_image_data("ZCYX"),
+        img.get_image_data("TZCYX"),
         output_path,
-        dim_order="ZCYX",
+        dim_order="TZCYX",
         ome_xml=ome,
         tifffile_kwargs={
             "compression": "zlib",
@@ -99,6 +99,6 @@ if __name__ == "__main__":
         os.path.join(input_dir, f) for f in os.listdir(input_dir) if f.endswith(".nd2")
     ]
 
-    Parallel(n_jobs=-1, prefer="processes")(
+    Parallel(n_jobs=1, prefer="processes")(
         delayed(convert_nd2_to_tiff)(f, output_dir) for f in tqdm(nd2_files)
     )
