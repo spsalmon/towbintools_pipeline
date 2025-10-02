@@ -1,13 +1,21 @@
+# image_directories:
+#   - "/mnt/towbin.data/shared/spsalmon/towbinlab_segmentation_database/datasets/squid_brightfield_dataset/body/good_images"
+#   - "/mnt/towbin.data/shared/spsalmon/towbinlab_segmentation_database/datasets/brightfield_finetuning/body/good_images"
+
+# mask_directories:
+#   - "/mnt/towbin.data/shared/spsalmon/towbinlab_segmentation_database/datasets/squid_brightfield_dataset/body/binarized_and_cleaned_masks"
+#   - "/mnt/towbin.data/shared/spsalmon/towbinlab_segmentation_database/datasets/brightfield_finetuning/body/binarized_and_cleaned_masks"
+
 training_dataframes:
-  - '/mnt/towbin.data/shared/spsalmon/towbinlab_segmentation_database/towbintools_paper/germline/training_dataframe.csv'
+  - '/mnt/towbin.data/shared/spsalmon/towbinlab_segmentation_database/towbintools_paper/body_bf/training_dataframe.csv'
 
 validation_dataframes:
-  - '/mnt/towbin.data/shared/spsalmon/towbinlab_segmentation_database/towbintools_paper/germline/validation_dataframe.csv'
+  - '/mnt/towbin.data/shared/spsalmon/towbinlab_segmentation_database/towbintools_paper/body_bf/validation_dataframe.csv'
 
 test_dataframes:
-  - '/mnt/towbin.data/shared/spsalmon/towbinlab_segmentation_database/towbintools_paper/germline/test_dataframe.csv'
+  - '/mnt/towbin.data/shared/spsalmon/towbinlab_segmentation_database/towbintools_paper/body_bf/test_dataframe.csv'
 
-save_dir: '/mnt/towbin.data/shared/spsalmon/towbinlab_segmentation_database/models/paper/germline/'
+save_dir: '/mnt/towbin.data/shared/spsalmon/towbinlab_segmentation_database/models/paper/body_bf/'
 model_name: 'towbintools_medium'
 
 pretrained: True

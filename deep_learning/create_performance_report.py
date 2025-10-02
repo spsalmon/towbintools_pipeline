@@ -65,14 +65,19 @@ def process_image(ground_truth_path, pred_path, image_path):
 
 device = "cuda" if torch.cuda.is_available() else "cpu"
 
-model_collection_dir = "/mnt/towbin.data/shared/spsalmon/towbinlab_segmentation_database/models/paper/pharynx"
+model_collection_dir = "/mnt/towbin.data/shared/spsalmon/towbinlab_segmentation_database/models/paper/body_bf"
 
 models = os.listdir(model_collection_dir)
 model_directories = [
     m for m in models if os.path.isdir(os.path.join(model_collection_dir, m))
 ]
-
-model_paths = [os.path.join(model_collection_dir, m, "best_light.ckpt") for m in models]
+# remove the directories that do not contain a model
+model_directories = [
+    m
+    for m in model_directories
+    if os.path.exists(os.path.join(model_collection_dir, m, "best_light.ckpt"))
+    and os.path.exists(os.path.join(model_collection_dir, m, "database_backup"))
+]
 
 
 def process_model(model_dir):
