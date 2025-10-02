@@ -97,6 +97,10 @@ chmod +x ~/towbintools_pipeline/install_pipeline.sh
 ```
 
 ```bash
+cd ~/towbintools_pipeline
+```
+
+```bash
 ~/towbintools_pipeline/install_pipeline.sh
 ```
 

@@ -7,7 +7,7 @@
 #SBATCH -t 1:00:00
 #SBATCH --mem=32GB
 
-DATABASE_PATH="/mnt/towbin.data/shared/spsalmon/towbinlab_segmentation_database/datasets/initial_annotations/body/"
+DATABASE_PATH="/mnt/towbin.data/shared/spsalmon/towbinlab_segmentation_database/datasets/brightfield_finetuning/body/"
 PREPROCESSING_TYPE="binarize"  # Change this to the desired preprocessing type
 
 
