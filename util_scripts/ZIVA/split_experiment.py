@@ -6,12 +6,10 @@ from joblib import delayed
 from joblib import Parallel
 from tqdm import tqdm
 
-experiment_dir = (
-    "/mnt/towbin.data/shared/spsalmon/20250904_170830_573_ZIVA_40x_397_405_yap_gfp/"
-)
+experiment_dir = "/mnt/towbin.data/shared/spsalmon/20250929_161842_172_ZIVA_60x_443_stardist_training/"
 image_dir = os.path.join(experiment_dir, "raw")
 channels_to_output = {
-    "GFP,mCherry,GFP,mCherry": "raw",
+    "DIA,DIA,GFP,mCherry": "raw",
     "GFP,mCherry": "raw_zstack",
 }
 
