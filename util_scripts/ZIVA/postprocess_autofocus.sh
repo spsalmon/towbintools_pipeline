@@ -5,8 +5,8 @@
 #SBATCH -t 12:00:00
 #SBATCH --mem=64G
 
-INPUT_DIR="/mnt/towbin.data/shared/spsalmon/20250904_170830_573_ZIVA_40x_397_405_yap_gfp/raw/"
-OUTPUT_DIR="/mnt/towbin.data/shared/spsalmon/20250904_170830_573_ZIVA_40x_397_405_yap_gfp/raw_best_plane/"
-CHANNEL=1
+INPUT_DIR="/mnt/towbin.data/shared/spradhan/20250929_embryogenesis_316_0uM_500uM_P0_20x_Orca_III/raw/"
+OUTPUT_DIR="/mnt/towbin.data/shared/spradhan/20250929_embryogenesis_316_0uM_500uM_P0_20x_Orca_III/raw_best_plane/"
+CHANNEL=0
 
 ~/.local/bin/micromamba run -n towbintools python3 postprocess_autofocus.py --input-dir "$INPUT_DIR" --output-dir "$OUTPUT_DIR" --channel "$CHANNEL"
