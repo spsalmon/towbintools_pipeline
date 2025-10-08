@@ -18,6 +18,7 @@ def extract_best_plane_and_save(
     image_path, output_path, measure, norm_each_plane, contrast_augmentation, channel=0
 ):
     zstack = read_tiff_file(image_path)
+
     _, best_plane = find_best_plane(
         zstack,
         measure=measure,
@@ -37,7 +38,7 @@ def extract_best_plane_and_save(
         size_c=old_pixels.size_c,
         size_t=old_pixels.size_t,
         size_z=1,
-        dimension_order=old_pixels.dimension_order,
+        dimension_order="XYCZT",
         physical_size_x=old_pixels.physical_size_x,
         physical_size_y=old_pixels.physical_size_y,
         id=0,
@@ -52,7 +53,7 @@ def extract_best_plane_and_save(
     OmeTiffWriter.save(
         best_plane,
         output_path,
-        dim_order="ZCYX",
+        dim_order="TZCYX",
         ome_xml=ome,
         tifffile_kwargs={
             "compression": "zlib",
@@ -68,13 +69,11 @@ def get_args() -> argparse.Namespace:
     Returns:
         argparse.Namespace: The namespace object containing the parsed arguments.
     """
-    # Create a parser and set the formatter class to ArgumentDefaultsHelpFormatter
     parser = argparse.ArgumentParser(
         description="Extract the best plane from a z-stack.",
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,
     )
 
-    # Add the arguments to the parser
     parser.add_argument(
         "--input-dir",
         dest="input_dir",
@@ -98,7 +97,6 @@ def get_args() -> argparse.Namespace:
         help="Channel index to use for best plane extraction (0-based index)",
     )
 
-    # Parse the arguments and return the resulting namespace object
     return parser.parse_args()
 
 
