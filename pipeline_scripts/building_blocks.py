@@ -217,7 +217,6 @@ class BuildingBlock(ABC):
                     linker_command=linker_command,
                 )
 
-            # sync_backup_folder(config["temp_dir"], pipeline_backup_dir)
             return subdir
 
         elif self.return_type == "csv":
@@ -258,7 +257,19 @@ class BuildingBlock(ABC):
                     linker_command=linker_command,
                 )
 
-            # sync_backup_folder(config["temp_dir"], pipeline_backup_dir)
+            else:
+                linker_command = create_linker_command(
+                    micromamba_path, temp_dir, output_file
+                )
+                run_command(
+                    "# No input files found, skipping this building block.",
+                    self.name,
+                    config,
+                    requires_gpu=False,
+                    run_linker=True,
+                    linker_command=linker_command,
+                )
+
             return output_file
 
 
