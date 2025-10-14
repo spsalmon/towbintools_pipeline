@@ -152,11 +152,19 @@ def populate_column_choices(filemap):
         worm_type_column = "placeholder_worm_type"
         filemap = filemap.with_columns(pl.lit("worm").alias(worm_type_column))
 
-    default_plotted_column = [
-        column
-        for column in filemap.columns
-        if "volume" in column and "_at_" not in column
-    ][0]
+    try:
+        default_plotted_column = [
+            column
+            for column in filemap.columns
+            if "volume" in column and "_at_" not in column
+        ][0]
+    except IndexError:
+        try:
+            default_plotted_column = feature_columns[0]
+        except IndexError:
+            default_plotted_column = "placeholder_feature"
+            filemap = filemap.with_columns(pl.lit(np.nan).alias(default_plotted_column))
+            print("No feature column found in the filemap, creating a placeholder.")
 
     segmentation_columns = [
         column for column in filemap.columns if "seg" in column and "str" not in column
@@ -170,6 +178,7 @@ def populate_column_choices(filemap):
     overlay_segmentation_choices = ["None"] + segmentation_columns
 
     return (
+        filemap,
         feature_columns,
         custom_columns_choices,
         worm_type_column,

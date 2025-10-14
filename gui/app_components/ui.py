@@ -345,6 +345,7 @@ def initialize_ui(filemap, recompute_features_at_molt=False):
     list_channels = ["None"] + [f"Channel {i+1}" for i in range(n_channels)]
 
     (
+        filemap,
         feature_columns,
         custom_columns_choices,
         worm_type_column,
@@ -1095,7 +1096,9 @@ def main_server(
         if len(segmentation_of_point) > 0:
             segmentation_path = segmentation_of_point[idx]
             segmentation = image_handling.read_tiff_file(segmentation_path)
-            ax.imshow(segmentation.squeeze(), cmap="gray", alpha=0.3)
+            segmentation = segmentation.squeeze()
+            masked = np.ma.masked_array(segmentation, mask=(segmentation == 0))
+            ax.imshow(masked, alpha=0.5, cmap="autumn", interpolation="none")
 
         # disable axis
         ax.axis("off")
