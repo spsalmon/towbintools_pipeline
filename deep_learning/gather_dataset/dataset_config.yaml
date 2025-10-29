@@ -6,7 +6,7 @@ database_path: "/mnt/towbin.data/shared/spsalmon/towbinlab_segmentation_database
 database_configs: {
   'body': {
       'size': 1000,
-      'stage_proportions': {'adult': 0.5, 'larvae': 0.5},
+      'stage_proportions': {'adult': 0.5, 'larva': 0.5},
       'scope_proportions': {'squid': 1.0},
       'channel': [1],
       'strains': [],
@@ -14,7 +14,7 @@ database_configs: {
   },
   'germline': {
       'size': 1000,
-      'stage_proportions': {'adult': 0.5, 'larvae': 0.5},
+      'stage_proportions': {'adult': 0.5, 'larva': 0.5},
       'scope_proportions': {'squid': 1.0},
       'channel': [0],
       'strains': [],

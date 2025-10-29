@@ -2,11 +2,11 @@ import argparse
 import os
 
 import numpy as np
+import polars as pl
 import yaml
 
 # import re
 # import shutil
-# import pandas as pd
 # from joblib import delayed
 # from joblib import Parallel
 # from tifffile import imwrite
@@ -34,7 +34,7 @@ def process_strains(strains):
     return correct_strains
 
 
-def get_analysis_filemap(experiment_path):
+def get_analysis_filemap(experiment_path, get_annotated_only=False):
     directories = [
         os.path.join(experiment_path, d)
         for d in os.listdir(experiment_path)
@@ -46,22 +46,30 @@ def get_analysis_filemap(experiment_path):
 
     report_directories = [d for d in report_directories if os.path.isdir(d)]
 
+    filemap_files = []
     for report_dir in report_directories:
         files = [os.path.join(report_dir, f) for f in os.listdir(report_dir)]
-        filemap_files = [f for f in files if "analysis_filemap_annotated" in f]
+        if get_annotated_only:
+            files = [f for f in files if "analysis_filemap_annotated" in f]
+        else:
+            files = [f for f in files if "analysis_filemap" in f]
         # mat_files = [f for f in files if f.endswith(".mat")]
         # return the filemap that was created last
         if filemap_files:
             filemap_files.sort(key=lambda x: os.path.getctime(x))
-            return os.path.join(report_dir, filemap_files[-1])
-        # check for converted experiments
-        # elif mat_files:
-        #     filemap_files = [f for f in files if "analysis_filemap" in f]
-        #     if filemap_files:
-        #         filemap_files.sort(key=lambda x: os.path.getctime(x))
-        #         filemap = pd.read_csv(filemap_files[-1], low_memory=False)
-        #         if "HatchTime" in filemap.columns and "raw" in filemap.columns:
-        #             return os.path.join(report_dir, filemap_files[-1])
+            filemap_files.append(os.path.join(report_dir, filemap_files[-1]))
+
+    if filemap_files:
+        filemap_files.sort(key=lambda x: os.path.getctime(x))
+        return os.path.join(report_dir, filemap_files[-1])
+    # check for converted experiments
+    # elif mat_files:
+    #     filemap_files = [f for f in files if "analysis_filemap" in f]
+    #     if filemap_files:
+    #         filemap_files.sort(key=lambda x: os.path.getctime(x))
+    #         filemap = pd.read_csv(filemap_files[-1], low_memory=False)
+    #         if "HatchTime" in filemap.columns and "raw" in filemap.columns:
+    #             return os.path.join(report_dir, filemap_files[-1])
     return None
 
 
@@ -73,6 +81,7 @@ def find_all_relevant_filemaps(
     valid_scopes_expanded,
     keywords_to_exclude,
     database_config,
+    get_annotated_only=False,
 ):
     filemaps = []
     strains = process_strains(database_config.get("strains", []))
@@ -90,13 +99,13 @@ def find_all_relevant_filemaps(
 
         # check if the experiment is in the list of experiments to always include
         if experiment_name in experiments_to_always_include:
-            filemap = get_analysis_filemap(exp)
+            filemap = get_analysis_filemap(exp, get_annotated_only=get_annotated_only)
             if filemap:
                 filemaps.append(filemap)
                 continue
 
         if any(keyword in experiment_name for keyword in keywords_to_include):
-            filemap = get_analysis_filemap(exp)
+            filemap = get_analysis_filemap(exp, get_annotated_only=get_annotated_only)
             if filemap:
                 filemaps.append(filemap)
                 continue
@@ -117,12 +126,104 @@ def find_all_relevant_filemaps(
         if not any(strain in experiment_name for strain in strains) and strains:
             continue
 
-        filemap = get_analysis_filemap(exp)
+        filemap = get_analysis_filemap(exp, get_annotated_only=get_annotated_only)
 
         if filemap:
             filemaps.append(filemap)
 
     return filemaps
+
+
+def pick_within_larval_stage(filemap, ls_beg, ls_end, n_picks=1):
+    try:
+        if np.isnan(ls_beg) or np.isnan(ls_end):
+            return None, None
+
+        filemap_of_stage = filemap.filter(
+            (pl.col("Time") >= ls_beg) & (pl.col("Time") <= ls_end)
+        )
+
+        if filemap_of_stage.height > 0:
+            picks = min(n_picks, filemap_of_stage.height)
+            picked_filemap = filemap_of_stage.sample(picks, with_replacement=False)
+            picked_images = picked_filemap.select(pl.col("raw")).to_series().to_list()
+
+            return picked_images
+        else:
+            return []
+    except Exception as e:
+        print(
+            f"Error in picking image within larval stage: {ls_beg}, {ls_end}. Error: {e}"
+        )
+        return []
+
+
+def get_images_from_filemap(
+    filemap_path,
+    database_config,
+    valid_scopes_expanded,
+    extra_adulthood_time=40,
+    n_picks=10,
+):
+    experiment_name = filemap_path.split("/")[-4]
+    filemap_df = pl.read_csv(filemap_path)
+
+    filemaps_of_points = filemap_df.partition_by("Point")
+    stage_proportions = database_config.get("stage_proportions", None)
+    microscope = [scope for scope in valid_scopes_expanded if scope in experiment_name][
+        0
+    ]
+    database = pl.DataFrame()
+    for filemap in filemaps_of_points:
+        point = filemap.select(pl.col("Point")).row(0)[0]
+        if "larva" in stage_proportions.keys() and "adult" in stage_proportions.keys():
+            # handle experiments where only m4 is annotated
+            m4 = filemap.select(pl.col("M4")).row(0)[0]
+
+            if m4 is None or np.isnan(m4):
+                continue
+
+            times = [0, m4, m4 + extra_adulthood_time]
+            stages = ["larva", "adult"]
+
+        elif (
+            "L1" in stage_proportions.keys()
+            and "L2" in stage_proportions.keys()
+            and "L3" in stage_proportions.keys()
+            and "L4" in stage_proportions.keys()
+            and "adult" in stage_proportions.keys()
+        ):
+            # handle experiments where all larval stages are annotated
+
+            (hatch_time, m1, m2, m3, m4) = filemap.select(
+                pl.cols(["HatchTime", "M1", "M2", "M3", "M4"])
+            ).row(0)
+
+            times = [0, hatch_time, m1, m2, m3, m4, m4 + extra_adulthood_time]
+            stages = ["egg", "L1", "L2", "L3", "L4", "adult"]
+
+        for i, stage in enumerate(stages):
+            stage_beg = times[i]
+            stage_end = times[i + 1]
+
+            images = pick_within_larval_stage(
+                filemap, stage_beg, stage_end, n_picks=n_picks
+            )
+            if images:  # Will be a list when n_picks > 1
+                for img in images:
+                    img = img.replace(
+                        "external.data/TowbinLab", "towbin.data/shared"
+                    )  # fixes the path for old experiments
+                    row = {
+                        "Point": point,
+                        "Image": img,
+                        "Stage": stage,
+                        "Microscope": microscope,
+                        "Experiment": experiment_name,
+                    }
+                    database = database.vstack(pl.DataFrame([row]))
+
+    return database
 
 
 config_path = get_args().config
@@ -180,6 +281,7 @@ experiment_directories = list(set(experiment_directories))
 # filter experiment directories based on the criteria and get their filemaps
 for database_name, database_config in database_configs.items():
     print(f"Processing database: {database_name}")
+    get_annotated_only = database_config.get("stage_proportions", None) is not None
     filemaps = find_all_relevant_filemaps(
         experiment_directories,
         experiments_to_always_include,
@@ -188,6 +290,10 @@ for database_name, database_config in database_configs.items():
         valid_scopes_expanded,
         keywords_to_exclude,
         database_config,
+        get_annotated_only=get_annotated_only,
     )
+
+    for filemap in filemaps:
+        print(filemap)
 
     print(f"Found {len(filemaps)} valid experiments")
