@@ -1,19 +1,16 @@
 import argparse
 import os
+import shutil
 
 import numpy as np
 import polars as pl
 import yaml
+from joblib import delayed
+from joblib import Parallel
+from tifffile import imwrite
+from towbintools.foundation.image_handling import read_tiff_file
+from tqdm import tqdm
 
-# import re
-# import shutil
-# from joblib import delayed
-# from joblib import Parallel
-# from tifffile import imwrite
-# from towbintools.foundation.image_handling import read_tiff_file
-
-# set random seed for reproducibility
-# np.random.seed(42)
 np.random.seed(387799)
 
 
@@ -27,6 +24,8 @@ def get_args():
 def process_strains(strains):
     # to be correct the strain number needs to be followed by a separator like -, _ or space
     correct_strains = []
+    if strains is None:
+        return correct_strains
     for strain in strains:
         correct_strains.append(strain + "-")
         correct_strains.append(strain + "_")
@@ -53,11 +52,12 @@ def get_analysis_filemap(experiment_path, get_annotated_only=False):
             files = [f for f in files if "analysis_filemap_annotated" in f]
         else:
             files = [f for f in files if "analysis_filemap" in f]
+
         # mat_files = [f for f in files if f.endswith(".mat")]
         # return the filemap that was created last
-        if filemap_files:
+        if files:
             filemap_files.sort(key=lambda x: os.path.getctime(x))
-            filemap_files.append(os.path.join(report_dir, filemap_files[-1]))
+            filemap_files.append(os.path.join(report_dir, files[-1]))
 
     if filemap_files:
         filemap_files.sort(key=lambda x: os.path.getctime(x))
@@ -137,7 +137,7 @@ def find_all_relevant_filemaps(
 def pick_within_larval_stage(filemap, ls_beg, ls_end, n_picks=1):
     try:
         if np.isnan(ls_beg) or np.isnan(ls_end):
-            return None, None
+            return []
 
         filemap_of_stage = filemap.filter(
             (pl.col("Time") >= ls_beg) & (pl.col("Time") <= ls_end)
@@ -165,6 +165,7 @@ def get_images_from_filemap(
     extra_adulthood_time=40,
     n_picks=10,
 ):
+    global variation_to_unified_scope_name
     experiment_name = filemap_path.split("/")[-4]
     filemap_df = pl.read_csv(filemap_path)
 
@@ -173,6 +174,8 @@ def get_images_from_filemap(
     microscope = [scope for scope in valid_scopes_expanded if scope in experiment_name][
         0
     ]
+
+    microscope = variation_to_unified_scope_name.get(microscope, microscope)
     database = pl.DataFrame()
     for filemap in filemaps_of_points:
         point = filemap.select(pl.col("Point")).row(0)[0]
@@ -209,7 +212,8 @@ def get_images_from_filemap(
             images = pick_within_larval_stage(
                 filemap, stage_beg, stage_end, n_picks=n_picks
             )
-            if images:  # Will be a list when n_picks > 1
+            rows = []
+            if images:
                 for img in images:
                     img = img.replace(
                         "external.data/TowbinLab", "towbin.data/shared"
@@ -221,9 +225,44 @@ def get_images_from_filemap(
                         "Microscope": microscope,
                         "Experiment": experiment_name,
                     }
-                    database = database.vstack(pl.DataFrame([row]))
+                    rows.append(row)
+
+            database = database.vstack(pl.DataFrame(rows))
 
     return database
+
+
+def calculate_image_combinations(database_size, scope_proportions, stage_proportions):
+    """Calculate number of images needed for each scope and stage combination."""
+    combinations = {}
+
+    # Calculate for each scope and stage combination
+    for scope, scope_prop in scope_proportions.items():
+        combinations[scope] = {}
+        for stage, stage_prop in stage_proportions.items():
+            n_images = int(database_size * scope_prop * stage_prop)
+            combinations[scope][stage] = n_images
+
+    return combinations
+
+
+def process_row(row, output_dir, channel):
+    image_path = row["Image"]
+    image = read_tiff_file(image_path)
+    channel = channel[0] if isinstance(channel, list) else channel
+    if channel >= image.shape[0]:
+        channel = image.shape[0] - 1
+    image = image[channel, :, :]  # select the channel
+    image_name = row["OutputName"]
+    # save the image
+    imwrite(os.path.join(output_dir, image_name), image, compression="zlib")
+
+
+def extract_images(database, output_dir, channel):
+    Parallel(n_jobs=32)(
+        delayed(process_row)(row, output_dir, channel)
+        for _, row in tqdm(database.iterrows())
+    )
 
 
 config_path = get_args().config
@@ -243,6 +282,7 @@ keywords_to_include = config.get("keywords_to_include", [])
 experiments_to_consider = config.get("experiments_to_consider", [])
 experiments_to_always_include = config.get("experiments_to_always_include", [])
 experiments_to_exclude = config.get("experiments_to_exclude", [])
+n_picks_per_stage = config.get("n_picks_per_stage", 10)
 
 valid_scopes_expanded = []
 for scope in valid_scopes:
@@ -250,6 +290,12 @@ for scope in valid_scopes:
         valid_scopes_expanded.extend(scopes_alt_names[scope])
     else:
         valid_scopes_expanded.append(scope)
+
+# Create mapping from variations to standard names
+variation_to_unified_scope_name = {}
+for microscope, variations in scopes_alt_names.items():
+    for variation in variations:
+        variation_to_unified_scope_name[variation] = microscope
 
 os.makedirs(database_path, exist_ok=True)
 for sub_db in database_configs.keys():
@@ -280,7 +326,6 @@ experiment_directories = list(set(experiment_directories))
 
 # filter experiment directories based on the criteria and get their filemaps
 for database_name, database_config in database_configs.items():
-    print(f"Processing database: {database_name}")
     get_annotated_only = database_config.get("stage_proportions", None) is not None
     filemaps = find_all_relevant_filemaps(
         experiment_directories,
@@ -293,7 +338,68 @@ for database_name, database_config in database_configs.items():
         get_annotated_only=get_annotated_only,
     )
 
+    database = pl.DataFrame()
     for filemap in filemaps:
-        print(filemap)
+        database = database.vstack(
+            get_images_from_filemap(
+                filemap,
+                database_config,
+                valid_scopes_expanded,
+                extra_adulthood_time=extra_adulthood_time,
+                n_picks=n_picks_per_stage,
+            )
+        )
 
-    print(f"Found {len(filemaps)} valid experiments")
+    combinations = calculate_image_combinations(
+        database_size=database_config.get("size", database.height),
+        scope_proportions=database_config.get("scope_proportions", {}),
+        stage_proportions=database_config.get("stage_proportions", {}),
+    )
+
+    dataset = pl.DataFrame()
+    for scope, stages in combinations.items():
+        for stage, n_images in stages.items():
+            try:
+                combination_images = database.filter(
+                    (pl.col("Microscope") == scope) & (pl.col("Stage") == stage)
+                )
+                n = min(n_images, combination_images.height)
+                combination_images = combination_images.sample(
+                    n, with_replacement=False
+                )
+
+                dataset = dataset.vstack(combination_images)
+            except Exception as e:
+                print(
+                    f"Warning: Could not sample {n_images} images for {scope}, stage {stage}, error: {e}"
+                )
+                continue
+
+    dataset = dataset.sample(fraction=1, shuffle=True)  # shuffle the dataset
+
+    def get_output_name(i, row):
+        return f'image_{i}_{row["Microscope"]}_{row["Stage"]}.tif'
+
+    dataset = dataset.with_columns(pl.arange(0, dataset.height).alias("Index"))
+
+    dataset = dataset.with_columns(
+        pl.struct(["Index", "Microscope", "Stage"])
+        .map_elements(lambda x: get_output_name(x["Index"], x), return_dtype=pl.String)
+        .alias("OutputName")
+    )
+
+    dataset = dataset.select(pl.exclude("Index", "Point"))
+    dataset.write_csv(
+        os.path.join(
+            database_path, database_name, f"{database_name}_dataset_filemap.csv"
+        )
+    )
+    dataset = dataset.to_pandas()
+
+    extract_images(
+        dataset,
+        output_dir=os.path.join(database_path, database_name, "images"),
+        channel=database_config.get("channel", 0),
+    )
+
+shutil.copy(config_path, os.path.join(database_path, "dataset_config.yaml"))
