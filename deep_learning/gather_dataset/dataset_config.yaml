@@ -1,7 +1,7 @@
 storage_path: "/mnt/towbin.data/shared"
 valid_subdirectories: ["plenart"]
 
-database_path: "/mnt/towbin.data/shared/spsalmon/towbinlab_segmentation_database/lifespan"
+database_path: "/mnt/towbin.data/shared/spsalmon/towbinlab_segmentation_database/datasets/lifespan"
 
 database_configs: {
   'body': {
@@ -9,21 +9,22 @@ database_configs: {
       'stage_proportions': {'adult': 0.5, 'larva': 0.5},
       'scope_proportions': {'squid': 1.0},
       'channel': [1],
-      'strains': [],
+      'strains': null,
       'magnification': "10x",
   },
-  'germline': {
+  'brightfield': {
       'size': 1000,
       'stage_proportions': {'adult': 0.5, 'larva': 0.5},
       'scope_proportions': {'squid': 1.0},
-      'channel': [0],
-      'strains': [],
+      'channel': [2],
+      'strains': null,
       'magnification': "10x",
   },
 }
 
 # sets a limit on how far after M4 images will be included
 extra_adulthood_time: 40
+n_picks_per_stage: 5
 
 valid_scopes: ["squid"]
 scopes_alt_names: {
@@ -38,6 +39,7 @@ keywords_to_include: ["lifespan"]
 experiments_to_consider: [
   '/mnt/towbin.data/shared/plenart/20251508_lifespan_squid_10x_wBT318_wBT486_25°C_small',
   '/mnt/towbin.data/shared/plenart/20250407_lifespan_squid_10x_wBT546_wBT547_auxin_20_degrees',
+  '/mnt/towbin.data/shared/imarang/20251909_squid_10x_wBT318_wBT486_25_degrees'
 ]
 
 experient_to_always_include: []
