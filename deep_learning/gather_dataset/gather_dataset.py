@@ -175,10 +175,36 @@ def get_images_from_filemap(
         0
     ]
 
+    print(f"Microscope found: {microscope} in experiment {experiment_name}")
+
     microscope = variation_to_unified_scope_name.get(microscope, microscope)
     database = pl.DataFrame()
     for filemap in filemaps_of_points:
         point = filemap.select(pl.col("Point")).row(0)[0]
+        if stage_proportions is None:
+            # if no stage proportions are defined
+            rows = []
+            images = (
+                filemap.sample(min(n_picks, filemap.height), with_replacement=False)
+                .select(pl.col("raw"))
+                .to_series()
+                .to_list()
+            )
+            for img in images:
+                img = img.replace(
+                    "external.data/TowbinLab", "towbin.data/shared"
+                )  # fixes the path for old experiments
+                row = {
+                    "Point": point,
+                    "Image": img,
+                    "Stage": "unknown",
+                    "Microscope": microscope,
+                    "Experiment": experiment_name,
+                }
+                rows.append(row)
+
+            database = database.vstack(pl.DataFrame(rows))
+            continue
         if "larva" in stage_proportions.keys() and "adult" in stage_proportions.keys():
             # handle experiments where only m4 is annotated
             m4 = filemap.select(pl.col("M4")).row(0)[0]
@@ -239,9 +265,13 @@ def calculate_image_combinations(database_size, scope_proportions, stage_proport
     # Calculate for each scope and stage combination
     for scope, scope_prop in scope_proportions.items():
         combinations[scope] = {}
-        for stage, stage_prop in stage_proportions.items():
-            n_images = int(database_size * scope_prop * stage_prop)
-            combinations[scope][stage] = n_images
+        if not stage_proportions:
+            n_images = int(database_size * scope_prop)
+            combinations[scope]["unknown"] = n_images
+        else:
+            for stage, stage_prop in stage_proportions.items():
+                n_images = int(database_size * scope_prop * stage_prop)
+                combinations[scope][stage] = n_images
 
     return combinations
 

@@ -275,7 +275,7 @@ class BuildingBlock(ABC):
 
 class SegmentationBuildingBlock(BuildingBlock):
     def __init__(self, block_config):
-        NON_LEARNING_METHODS = ["double_threshold", "edge_based"]
+        NON_LEARNING_METHODS = ["double_threshold", "edge_based", "threshold"]
         LEARNING_BASED_METHODS = ["deep_learning", "ilastik"]
 
         if block_config["segmentation_method"] in NON_LEARNING_METHODS:

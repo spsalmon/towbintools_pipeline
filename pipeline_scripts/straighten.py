@@ -11,6 +11,7 @@ from scipy.ndimage import binary_fill_holes  # noqa: E402
 from tifffile import imwrite  # noqa: E402
 from towbintools.foundation import binary_image, image_handling  # noqa: E402
 from towbintools.straightening import Warper  # noqa: E402
+from towbintools.foundation.image_handling import check_if_stack  # noqa: E402
 
 # from threadpoolctl import threadpool_limits, threadpool_info
 
@@ -54,6 +55,11 @@ def mask_preprocessing(mask):
 
 
 def image_preprocessing(image, keep_biggest_object=False):
+    if isinstance(image, dict):
+        for key in image:
+            image[key] = image_preprocessing(image[key], keep_biggest_object)
+        return image
+
     if image.ndim == 2:
         if (np.unique(image).size == 2) and keep_biggest_object:
             image = binary_image.get_biggest_object(image)
@@ -71,7 +77,7 @@ def straighten_and_save(
     source_image_channels,
     mask_path,
     output_path,
-    is_zstack=False,
+    is_stack=False,
     channel_to_allign=[2],
     keep_biggest_object=False,
 ):
@@ -83,16 +89,21 @@ def straighten_and_save(
     mask = mask_preprocessing(mask)
 
     if source_image_path == mask_path:
-        image = image_preprocessing(mask, keep_biggest_object)
+        preprocessed_mask = image_preprocessing(mask, keep_biggest_object)
+        if is_stack:
+            # Create dictionary structure for stack images
+            image = {"allign": preprocessed_mask, "straighten": preprocessed_mask}
+        else:
+            image = preprocessed_mask
     else:
         logger.debug(f"Accessing {source_image_path}")
         image = get_image(
-            source_image_path, mask, is_zstack, channel_to_allign, source_image_channels
+            source_image_path, mask, is_stack, channel_to_allign, source_image_channels
         )
         image = image_preprocessing(image, keep_biggest_object)
 
     try:
-        if is_zstack:
+        if is_stack:
             straightened_image = straighten_zstack_image(image, mask)
         else:
             straightened_image = straighten_2D_image(image, mask)
@@ -101,8 +112,8 @@ def straighten_and_save(
             f"Straightening failed for {source_image_path} with error: {e}"
         )
         straightened_image = np.zeros_like(mask).astype(np.uint8)
-        # add empty channel dimension if is_zstack is True
-        if is_zstack:
+        # add empty channel dimension if is_stack is True
+        if is_stack:
             straightened_image = straightened_image[:, np.newaxis, ...]
 
     if straightened_image.ndim == 2:
@@ -133,13 +144,13 @@ def straighten_and_save(
 
 
 def get_image(
-    source_image_path, mask, is_zstack, channel_to_allign, source_image_channels
+    source_image_path, mask, is_stack, channel_to_allign, source_image_channels
 ):
     """Get the image to be straightened."""
     if source_image_path is None:
         return mask
 
-    if is_zstack:
+    if is_stack:
         full_image = image_handling.read_tiff_file(source_image_path)
         return {
             "allign": full_image[:, channel_to_allign, ...].squeeze(),
@@ -153,7 +164,7 @@ def get_image(
 
 def straighten_zstack_image(image, mask):
     """Straighten each plane of a zstack image."""
-    if np.unique(image).size == 2:
+    if np.unique(image["straighten"]).size == 2:
         interpolation_order = 0
     else:
         interpolation_order = 1
@@ -222,16 +233,12 @@ def main(input_pickle, output_pickle, config, n_jobs):
     mask_files = [f["mask_path"] for f in input_files]
     os.makedirs(os.path.dirname(output_files[0]), exist_ok=True)
 
-    try:
-        is_zstack = image_handling.check_if_zstack(source_files[0])
-    except Exception as e:
-        logging.exception(
-            f"Error checking if the image is a zstack: {e}. Assuming it is not a zstack."
-        )
-        is_zstack = False
-
+    is_stack, (z_dim, t_dim) = check_if_stack(source_files[0])
+    assert not (
+        t_dim > 1 and z_dim > 1
+    ), "4D images with both time and z dimensions are not supported yet."
     keep_biggest_object = config.get("keep_biggest_object", False)
-    channel_to_allign = config.get("channel_to_allign", [2])
+    channel_to_allign = config.get("channel_to_allign", None)
 
     with parallel_config(backend="loky", n_jobs=n_jobs, inner_max_num_threads=1):
         Parallel()(
@@ -240,7 +247,7 @@ def main(input_pickle, output_pickle, config, n_jobs):
                 config["straightening_source"][1],
                 mask_file,
                 output_path,
-                is_zstack=is_zstack,
+                is_stack=is_stack,
                 channel_to_allign=channel_to_allign,
                 keep_biggest_object=keep_biggest_object,
             )

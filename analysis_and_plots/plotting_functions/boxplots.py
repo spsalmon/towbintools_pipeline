@@ -587,7 +587,7 @@ def violinplot(
     conditions_struct,
     column,
     conditions_to_plot,
-    remove_first=False,
+    events_to_plot=None,
     log_scale: bool = True,
     figsize: tuple = None,
     colors=None,
@@ -611,17 +611,12 @@ def violinplot(
     for condition_id in conditions_to_plot:
         condition_dict = conditions_struct[condition_id]
         data = condition_dict[column]
-        number_of_events = data.shape[1]
-        if remove_first and number_of_events > 1:
-            range_start = 1
-        elif not remove_first and number_of_events > 1:
-            range_start = 0
-        else:
-            range_start = 0
+        if not events_to_plot:
+            events_to_plot = range(conditions_struct[condition_id][column].shape[1])
 
-        for j in range(range_start, data.shape[1]):
-            order = j if not remove_first else j - 1
+        for idx, j in enumerate(events_to_plot):
             for value in data[:, j]:
+                order = idx
                 data_list.append(
                     {
                         "Condition": condition_id,
@@ -629,6 +624,7 @@ def violinplot(
                         column: np.log(value) if log_scale else value,
                     }
                 )
+
     df = pd.DataFrame(data_list)
 
     fig, ax = _setup_figure(
@@ -679,7 +675,7 @@ def boxplot(
     conditions_struct,
     column,
     conditions_to_plot,
-    remove_first=False,
+    events_to_plot=None,
     log_scale: bool = True,
     figsize: tuple = None,
     colors=None,
@@ -703,17 +699,12 @@ def boxplot(
     for condition_id in conditions_to_plot:
         condition_dict = conditions_struct[condition_id]
         data = condition_dict[column]
-        number_of_events = data.shape[1]
-        if remove_first and number_of_events > 1:
-            range_start = 1
-        elif not remove_first and number_of_events > 1:
-            range_start = 0
-        else:
-            range_start = 0
+        if not events_to_plot:
+            events_to_plot = range(conditions_struct[condition_id][column].shape[1])
 
-        for j in range(range_start, data.shape[1]):
+        for idx, j in enumerate(events_to_plot):
             for value in data[:, j]:
-                order = j if not remove_first else j - 1
+                order = idx
                 data_list.append(
                     {
                         "Condition": condition_id,
@@ -721,6 +712,7 @@ def boxplot(
                         column: np.log(value) if log_scale else value,
                     }
                 )
+
     df = pd.DataFrame(data_list)
 
     fig, ax = _setup_figure(

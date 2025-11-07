@@ -225,6 +225,9 @@ def create_temp_folders(temp_dir):
 def process_row_input_output_files(row, columns, output_dir, rerun):
     input_file = [row[column] for column in columns]
 
+    if np.any(pd.isnull(input_file)):
+        return None, None
+
     try:
         output_file = os.path.join(output_dir, os.path.basename(row[columns[0]]))
     except Exception as e:
@@ -295,13 +298,13 @@ def get_experiment_time_from_filemap(experiment_filemap):
     grouped = experiment_filemap.groupby("Point")
     # get the date of the raw where Time is 0
     try:
-        first_time = grouped.apply(lambda x: x[x["Time"] == 0].iloc[0]["date"])
+        first_time = grouped.apply(lambda x: x.loc[x["Time"] == 0, "date"].iloc[0])
     except IndexError:
         print(
             "### Error: Time 0 not found for all points, experiment time will be computed from lowest Time value for each point.###"
         )
         first_time = grouped.apply(
-            lambda x: x[x["Time"] == x["Time"].min()].iloc[0]["date"]
+            lambda x: x.loc[x["Time"] == x["Time"].min(), "date"].iloc[0]
         )
 
     # iterate over each point and calculate the time difference
@@ -319,38 +322,52 @@ def get_experiment_time_from_filemap(experiment_filemap):
 
 
 def get_experiment_time_from_filemap_parallel(experiment_filemap):
-    # copy the filemap to avoid modifying the original
     experiment_filemap = experiment_filemap.copy()
 
     with parallel_config(backend="multiprocessing", n_jobs=-1):
         date_result = Parallel()(
             delayed(get_acquisition_date)(raw) for raw in experiment_filemap["raw"]
         )
-    experiment_filemap["date"] = date_result
-    # in case all acquisition dates are None, return a None filled ExperimentTime column
+    experiment_filemap["date"] = pd.Series(date_result, index=experiment_filemap.index)
+
+    experiment_filemap["date"] = pd.to_datetime(experiment_filemap["date"], utc=True)
+
+    # ensure no timezone info is present
+    if (
+        hasattr(experiment_filemap["date"].dtype, "tz")
+        and experiment_filemap["date"].dt.tz is not None
+    ):
+        experiment_filemap["date"] = experiment_filemap["date"].dt.tz_localize(None)
+
     if experiment_filemap["date"].isnull().all():
         return pd.Series([np.nan] * len(experiment_filemap))
-    # grouped by Point value, calculate the time difference between the first time and all other times
-    grouped = experiment_filemap.groupby("Point")
-    # get the date of the raw where Time is 0
+
     try:
-        first_time = grouped.apply(lambda x: x[x["Time"] == 0].iloc[0]["date"])
-    except IndexError:
+        first_time = (
+            experiment_filemap[experiment_filemap["Time"] == 0]
+            .groupby("Point")["date"]
+            .first()
+        )
+    except KeyError:
         print(
             "### Error: Time 0 not found for all points, experiment time will be computed from lowest Time value for each point.###"
         )
-        first_time = grouped.apply(
-            lambda x: x[x["Time"] == x["Time"].min()].iloc[0]["date"]
-        )
-    # iterate over each point and calculate the time difference
+        first_time = experiment_filemap.loc[
+            experiment_filemap.groupby("Point")["Time"].idxmin()
+        ].set_index("Point")["date"]
+
+    if hasattr(first_time.dtype, "tz") and first_time.dt.tz is not None:
+        first_time = first_time.dt.tz_localize(None)
+
     with parallel_config(backend="loky", n_jobs=-1):
         experiment_time = Parallel()(
             delayed(calculate_experiment_time)(point, experiment_filemap, first_time)
             for point in experiment_filemap["Point"].unique()
         )
+
     experiment_time = pd.concat(experiment_time)
     experiment_filemap["ExperimentTime"] = experiment_time
-    # keep only the ExperimentTime column
+
     return experiment_filemap["ExperimentTime"]
 
 
@@ -358,9 +375,19 @@ def calculate_experiment_time(point, experiment_filemap, first_time):
     point_indices = experiment_filemap["Point"] == point
     point_data = experiment_filemap.loc[point_indices]
     try:
-        return round((point_data["date"] - first_time[point]).dt.total_seconds())
+        dates = pd.to_datetime(
+            pd.Series(point_data["date"].values, index=point_data.index)
+        )
+        first_time_point = pd.to_datetime(first_time[point])
+        return round((dates - first_time_point).dt.total_seconds())
     except KeyError:
         print(f"### Error calculating experiment time for point {point} ###")
+        return pd.Series([np.nan] * len(point_data))
+    except Exception as e:
+        print(
+            f"### Unexpected error calculating experiment time for point {point}: {e} ###"
+        )
+        print(f"dates: {dates}, first_time: {first_time[point]}")
         return pd.Series([np.nan] * len(point_data))
 
 
