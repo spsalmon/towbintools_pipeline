@@ -23,12 +23,34 @@ def get_args():
         required=True,
         help="Type of preprocessing to apply.",
     )
+    parser.add_argument(
+        "--keep_only_biggest_object",
+        type=bool,
+        default=False,
+        help="Whether to keep only the biggest object in the mask.",
+    )
     return parser.parse_args()
+
+
+def get_biggest_connected_component(mask):
+    if np.sum(mask) > 0:
+        # keep only the largest connected component
+        _, labels, stats, _ = cv2.connectedComponentsWithStats(mask, connectivity=4)
+        try:
+            stats = stats[1:]  # we can ignore 0 as it's that background
+            biggest_label = np.argmax(stats[:, cv2.CC_STAT_AREA]) + 1
+            return biggest_label, (labels == biggest_label).astype(np.uint8)
+
+        except ValueError:
+            return 0, np.zeros_like(mask)
+    else:
+        return 0, mask
 
 
 args = get_args()
 database_path = args.database_path
 preprocessing_type = args.preprocessing_type
+keep_only_biggest_object = args.keep_only_biggest_object
 
 img_dir = "images"
 mask_dir = "masks"
@@ -55,10 +77,15 @@ os.makedirs(output_dir, exist_ok=True)
 os.makedirs(img_output_dir, exist_ok=True)
 
 
-def binarize_and_clean_mask(mask_file, img_file, output_dir, img_output_dir):
+def binarize_and_clean_mask(
+    mask_file, img_file, output_dir, img_output_dir, keep_only_biggest_object=False
+):
     mask = read_tiff_file(mask_file)
     mask = mask > 0
     mask = remove_small_objects(mask.astype(bool), min_size=10).astype(np.uint8)
+
+    if keep_only_biggest_object:
+        _, mask = get_biggest_connected_component(mask)
 
     if mask.sum() == 0:
         print(f"Empty mask: {mask_file}")
@@ -123,7 +150,11 @@ def binarize_and_clean_mask_with_border(
 if preprocessing_type == "binarize":
     masks = Parallel(n_jobs=-1)(
         delayed(binarize_and_clean_mask)(
-            mask_file, img_file, output_dir, img_output_dir
+            mask_file,
+            img_file,
+            output_dir,
+            img_output_dir,
+            keep_only_biggest_object,
         )
         for mask_file, img_file in zip(mask_files, img_files)
     )

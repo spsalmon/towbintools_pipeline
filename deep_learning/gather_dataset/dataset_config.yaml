@@ -1,45 +1,36 @@
 storage_path: "/mnt/towbin.data/shared"
-valid_subdirectories: ["plenart"]
+valid_subdirectories: ["spsalmon"]
 
-database_path: "/mnt/towbin.data/shared/spsalmon/towbinlab_segmentation_database/datasets/lifespan"
+database_path: "/mnt/towbin.data/shared/spsalmon/towbinlab_segmentation_database/datasets/60x_brightfield"
 
 database_configs: {
-  'body': {
-      'size': 1000,
-      'stage_proportions': {'adult': 0.5, 'larva': 0.5},
-      'scope_proportions': {'squid': 1.0},
-      'channel': [1],
-      'strains': null,
-      'magnification': "10x",
-  },
   'brightfield': {
       'size': 1000,
-      'stage_proportions': {'adult': 0.5, 'larva': 0.5},
-      'scope_proportions': {'squid': 1.0},
-      'channel': [2],
+      'stage_proportions': null,
+      'scope_proportions': {'ziva': 1.0},
+      'channel': [0],
       'strains': null,
-      'magnification': "10x",
+      'magnification': "60x",
   },
 }
 
 # sets a limit on how far after M4 images will be included
 extra_adulthood_time: 40
-n_picks_per_stage: 5
+n_picks_per_stage: 50
 
-valid_scopes: ["squid"]
+valid_scopes: ["ziva"]
 scopes_alt_names: {
   'crest': ['Crest', 'crest', 'CREST'],
   'squid': ['Squid', 'squid', 'SQUID'],
-  'ti2': ['Ti2', 'ti2', 'TI2', 'orca', 'Orca', 'ORCA']
+  'ti2': ['Ti2', 'ti2', 'TI2', 'orca', 'Orca', 'ORCA'],
+  'ziva': ['ziva', 'ZIVA', 'Ziva']
 }
 
 keywords_to_exclude: ["exclude", "fail", "failure", "crash"]
 keywords_to_include: ["lifespan"]
 
 experiments_to_consider: [
-  '/mnt/towbin.data/shared/plenart/20251508_lifespan_squid_10x_wBT318_wBT486_25°C_small',
-  '/mnt/towbin.data/shared/plenart/20250407_lifespan_squid_10x_wBT546_wBT547_auxin_20_degrees',
-  '/mnt/towbin.data/shared/imarang/20251909_squid_10x_wBT318_wBT486_25_degrees'
+  "/mnt/towbin.data/shared/spsalmon/20251023_115945_091_ZIVA_60x_397_405_yap_dynamics"
 ]
 
 experient_to_always_include: []
