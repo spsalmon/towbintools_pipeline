@@ -687,6 +687,9 @@ def combine_experiments(
             for key, value in all_conditions_struct[idx].items():
                 if key not in conditions_info_keys:
                     if isinstance(value, np.ndarray):
+                        if key not in base_condition:
+                            base_condition[key] = value
+                            continue
                         if value.shape[1] > base_condition[key].shape[1]:
                             base_condition[key] = np.pad(
                                 base_condition[key],
