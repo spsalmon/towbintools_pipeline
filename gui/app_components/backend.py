@@ -56,7 +56,7 @@ def open_filemap(filemap_path, open_annotated=True):
     filemap = pl.read_csv(
         filemap_path,
         infer_schema_length=10000,
-        null_values=["np.nan", "[nan]", ""],
+        null_values=["np.nan", "[nan]", "", "NaN", "nan", "NA", "N/A"],
     )
 
     # Backup the filemap
