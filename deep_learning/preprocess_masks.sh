@@ -11,6 +11,8 @@ DATABASE_PATH="/mnt/towbin.data/shared/spsalmon/towbinlab_segmentation_database/
 PREPROCESSING_TYPE="binarize"  # Change this to the desired preprocessing type
 KEEP_ONLY_BIGGEST_OBJECT=true
 
-
-# Run the Python script with the specified or default configuration file
-~/.local/bin/micromamba run -n towbintools python3 preprocess_masks.py --database_path "$DATABASE_PATH" --preprocessing_type "$PREPROCESSING_TYPE" --keep_only_biggest_object "$KEEP_ONLY_BIGGEST_OBJECT"
+if [ "$KEEP_ONLY_BIGGEST_OBJECT" = true ]; then
+    ~/.local/bin/micromamba run -n towbintools python3 preprocess_masks.py --database_path "$DATABASE_PATH" --preprocessing_type "$PREPROCESSING_TYPE" --keep_only_biggest_object
+else
+    ~/.local/bin/micromamba run -n towbintools python3 preprocess_masks.py --database_path "$DATABASE_PATH" --preprocessing_type "$PREPROCESSING_TYPE"
+fi

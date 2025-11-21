@@ -78,10 +78,13 @@ def straighten_and_save(
     mask_path,
     output_path,
     is_stack=False,
-    channel_to_allign=[2],
+    channel_to_allign=None,
     keep_biggest_object=False,
 ):
     """Straighten image and save to output_path."""
+
+    if channel_to_allign is None and source_image_channels is not None:
+        channel_to_allign = source_image_channels[0]
 
     logger = start_logger_if_necessary()
     logger.debug(f"Accessing {mask_path}")
@@ -233,7 +236,9 @@ def main(input_pickle, output_pickle, config, n_jobs):
     mask_files = [f["mask_path"] for f in input_files]
     os.makedirs(os.path.dirname(output_files[0]), exist_ok=True)
 
-    is_stack, (z_dim, t_dim) = check_if_stack(source_files[0])
+    is_stack, (z_dim, t_dim) = check_if_stack(
+        source_files[0], channels_to_keep=config["straightening_source"][1]
+    )
     assert not (
         t_dim > 1 and z_dim > 1
     ), "4D images with both time and z dimensions are not supported yet."

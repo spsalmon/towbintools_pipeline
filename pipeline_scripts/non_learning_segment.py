@@ -80,7 +80,12 @@ def main(input_pickle, output_pickle, config, n_jobs):
     input_files, output_files = utils.load_pickles(input_pickle, output_pickle)
     os.makedirs(os.path.dirname(output_files[0]), exist_ok=True)
 
-    is_stack, (z_dim, t_dim) = check_if_stack(input_files[0][0])
+    segmentation_channels = config.get("segmentation_channels", None)
+    segmentation_method = config.get("segmentation_method", None)
+
+    is_stack, (z_dim, t_dim) = check_if_stack(
+        input_files[0][0], channels_to_keep=segmentation_channels
+    )
 
     assert not (
         t_dim > 1 and z_dim > 1
@@ -91,8 +96,8 @@ def main(input_pickle, output_pickle, config, n_jobs):
                 delayed(segment_and_save)(
                     input_file,
                     output_path,
-                    method=config["segmentation_method"],
-                    channels=config["segmentation_channels"],
+                    method=segmentation_method,
+                    channels=segmentation_channels,
                     is_stack=is_stack,
                     pixelsize=config["pixelsize"],
                     gaussian_filter_sigma=config["gaussian_filter_sigma"],
@@ -104,8 +109,8 @@ def main(input_pickle, output_pickle, config, n_jobs):
             segment_and_save(
                 input_file,
                 output_path,
-                method=config["segmentation_method"],
-                channels=config["segmentation_channels"],
+                method=segmentation_method,
+                channels=segmentation_channels,
                 is_stack=is_stack,
                 pixelsize=config["pixelsize"],
                 gaussian_filter_sigma=config["gaussian_filter_sigma"],
