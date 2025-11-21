@@ -84,7 +84,11 @@ def main(input_pickle, output_pickle, config, n_jobs):
     input_files, output_files = utils.load_pickles(input_pickle, output_pickle)
     os.makedirs(os.path.dirname(output_files[0]), exist_ok=True)
 
-    is_stack, (z_dim, t_dim) = image_handling.check_if_stack(input_files[0][0])
+    segmentation_channels = config.get("segmentation_channels", None)
+
+    is_stack, (z_dim, t_dim) = image_handling.check_if_stack(
+        input_files[0][0], channels_to_keep=segmentation_channels
+    )
 
     assert not (
         t_dim > 1 and z_dim > 1
@@ -110,7 +114,7 @@ def main(input_pickle, output_pickle, config, n_jobs):
 
         if not is_stack:
             dataset = SegmentationPredictionDataset(
-                input_files, config["segmentation_channels"], preprocessing_fn
+                input_files, segmentation_channels, preprocessing_fn
             )
             dataloader = DataLoader(
                 dataset,
@@ -144,7 +148,7 @@ def main(input_pickle, output_pickle, config, n_jobs):
             for input_file, output_file in zip(input_files, output_files):
                 dataset = StackPredictionDataset(
                     input_file[0],
-                    channels=config["segmentation_channels"],
+                    channels=segmentation_channels,
                     transform=preprocessing_fn,
                     enforce_divisibility_by=32,
                     pad_or_crop="pad",

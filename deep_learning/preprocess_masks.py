@@ -25,8 +25,7 @@ def get_args():
     )
     parser.add_argument(
         "--keep_only_biggest_object",
-        type=bool,
-        default=False,
+        action="store_true",
         help="Whether to keep only the biggest object in the mask.",
     )
     return parser.parse_args()
