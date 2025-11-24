@@ -1,5 +1,6 @@
 experiment_dir: "/mnt/towbin.data/shared/spsalmon/pipeline_test_folder/"
 analysis_dir_name: "analysis"
+raw_dir_name: "raw_test"
 
 #########################################################################################################
 ################################# IMAGE ANALYSIS PIPELINE CONFIGURATION #################################
@@ -18,7 +19,7 @@ rerun_fluorescence_quantification: [False]
 rerun_custom_script: [False]
 
 # segmentation parameters
-segmentation_column: ['raw']
+segmentation_column: ['raw_test']
 segmentation_name_suffix: [null]
 segmentation_method: ["deep_learning"]
 segmentation_channels: [[1]]
@@ -29,12 +30,8 @@ pixelsize: [0.65]
 gaussian_filter_sigma: [1]
 
 # deep learning segmentation parameters
-model_path: [/mnt/towbin.data/shared/spsalmon/towbinlab_segmentation_database/models/body/SAMannotations_singleclass_UnetPlusPlus_efficientnet-b4_image-micronet_FocalTversky/epoch=587-step=16464.ckpt]
+model_path: [/mnt/towbin.data/shared/spsalmon/towbinlab_segmentation_database/models/paper/body/towbintools_medium/best_light.ckpt]
 batch_size: [32]
-
-# ilastik segmentation parameters
-ilastik_project_path: ["/home/igheor/towbintools_pipeline/models/pharynx_str_noCPR.ilp"]
-ilastik_result_channel: [0]
 
 # straightening parameters
 straightening_source: [['analysis/ch2_seg', null]]
@@ -43,7 +40,7 @@ keep_biggest_object: [False]
 
 # morphology computation parameters
 morphology_computation_masks: ['analysis/ch2_seg_str']
-morphological_features: [['length', 'area', 'volume', 'width_mean', 'width_median', 'width_std', 'width_cv', 'width_skew', 'width_kurtosis']]
+morphological_features: [['length', 'area', 'volume', 'width_mean',]]
 
 # classification parameters
 classification_source: ['analysis/ch2_seg_str']

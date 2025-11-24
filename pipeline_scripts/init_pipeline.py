@@ -74,6 +74,8 @@ def main(global_config, temp_dir_basename, temp_dir, subdir=None):
     config = global_config.copy()
 
     config["raw_subdir"] = raw_subdir
+    raw_dir_name = os.path.basename(os.path.normpath(raw_subdir))
+    config["raw_dir_name"] = raw_dir_name
     config["analysis_subdir"] = analysis_subdir
     config["report_subdir"] = report_subdir
     config["pipeline_backup_dir"] = pipeline_backup_dir
@@ -94,7 +96,7 @@ def main(global_config, temp_dir_basename, temp_dir, subdir=None):
             )
             config["no_timepoints"] = True
 
-        experiment_filemap.rename(columns={"ImagePath": raw_subdir}, inplace=True)
+        experiment_filemap.rename(columns={"ImagePath": raw_dir_name}, inplace=True)
         experiment_filemap.to_csv(
             os.path.join(report_subdir, "analysis_filemap.csv"), index=False
         )
