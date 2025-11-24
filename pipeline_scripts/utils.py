@@ -190,7 +190,7 @@ def get_output_name(
 ):
     analysis_subdir = config["analysis_subdir"]
     report_subdir = config["report_subdir"]
-    raw_subdir = config["raw_subdir"]
+    raw_dir_name = config.get("raw_dir_name", "raw")
 
     output_name = ""
     if channels is not None:
@@ -199,7 +199,7 @@ def get_output_name(
                 output_name += f"ch{channel+1}_"
         else:
             output_name += f"ch{channels+1}_"
-    if input_name != raw_subdir or add_raw:
+    if input_name != raw_dir_name or add_raw:
         output_name += os.path.basename(os.path.normpath(input_name)) + "_"
     output_name += task_name
     if suffix is not None:
@@ -292,11 +292,12 @@ def add_dir_to_experiment_filemap(experiment_filemap, dir_path, subdir_name):
 
 def get_experiment_time_from_filemap(experiment_filemap, config):
     experiment_filemap = experiment_filemap.copy()
-    raw_subdir = config["raw_subdir"]
+    raw_dir_name = config.get("raw_dir_name", "raw")
 
     with parallel_config(backend="multiprocessing", n_jobs=-1):
         date_result = Parallel()(
-            delayed(get_acquisition_date)(raw) for raw in experiment_filemap[raw_subdir]
+            delayed(get_acquisition_date)(raw)
+            for raw in experiment_filemap[raw_dir_name]
         )
     experiment_filemap["date"] = pd.Series(date_result, index=experiment_filemap.index)
 
