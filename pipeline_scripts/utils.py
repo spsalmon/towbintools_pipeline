@@ -85,7 +85,8 @@ def sync_backup_folder(dir, backup_dir):
 
 def get_experiment_subdirs(config):
     experiment_dir = config["experiment_dir"]
-    raw_subdir = os.path.join(experiment_dir, "raw")
+    raw_dir = config.get("raw_dir_name", "raw")
+    raw_subdir = os.path.join(experiment_dir, raw_dir)
     subdirs = [
         f for f in os.listdir(raw_subdir) if os.path.isdir(os.path.join(raw_subdir, f))
     ]
@@ -189,6 +190,7 @@ def get_output_name(
 ):
     analysis_subdir = config["analysis_subdir"]
     report_subdir = config["report_subdir"]
+    raw_subdir = config["raw_subdir"]
 
     output_name = ""
     if channels is not None:
@@ -197,7 +199,7 @@ def get_output_name(
                 output_name += f"ch{channel+1}_"
         else:
             output_name += f"ch{channels+1}_"
-    if input_name != "raw" or add_raw:
+    if input_name != raw_subdir or add_raw:
         output_name += os.path.basename(os.path.normpath(input_name)) + "_"
     output_name += task_name
     if suffix is not None:
@@ -288,45 +290,13 @@ def add_dir_to_experiment_filemap(experiment_filemap, dir_path, subdir_name):
     return experiment_filemap
 
 
-def get_experiment_time_from_filemap(experiment_filemap):
-    experiment_filemap["date"] = experiment_filemap["raw"].apply(get_acquisition_date)
-
-    # in case all acquisition dates are None, return a nan filled ExperimentTime column
-    if experiment_filemap["date"].isnull().all():
-        return pd.Series([np.nan] * len(experiment_filemap))
-    # grouped by Point value, calculate the time difference between the first time and all other times
-    grouped = experiment_filemap.groupby("Point")
-    # get the date of the raw where Time is 0
-    try:
-        first_time = grouped.apply(lambda x: x.loc[x["Time"] == 0, "date"].iloc[0])
-    except IndexError:
-        print(
-            "### Error: Time 0 not found for all points, experiment time will be computed from lowest Time value for each point.###"
-        )
-        first_time = grouped.apply(
-            lambda x: x.loc[x["Time"] == x["Time"].min(), "date"].iloc[0]
-        )
-
-    # iterate over each point and calculate the time difference
-    for point in experiment_filemap["Point"].unique():
-        print(f"### Processing point {point} ###")
-        # Use .loc to ensure you're modifying the original DataFrame
-        point_indices = experiment_filemap["Point"] == point
-        point_data = experiment_filemap.loc[point_indices]
-        experiment_filemap.loc[point_indices, "ExperimentTime"] = (
-            point_data["date"] - first_time[point]
-        ).dt.total_seconds()
-
-    # keep only the ExperimentTime column
-    return experiment_filemap["ExperimentTime"]
-
-
-def get_experiment_time_from_filemap_parallel(experiment_filemap):
+def get_experiment_time_from_filemap(experiment_filemap, config):
     experiment_filemap = experiment_filemap.copy()
+    raw_subdir = config["raw_subdir"]
 
     with parallel_config(backend="multiprocessing", n_jobs=-1):
         date_result = Parallel()(
-            delayed(get_acquisition_date)(raw) for raw in experiment_filemap["raw"]
+            delayed(get_acquisition_date)(raw) for raw in experiment_filemap[raw_subdir]
         )
     experiment_filemap["date"] = pd.Series(date_result, index=experiment_filemap.index)
 

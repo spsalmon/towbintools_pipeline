@@ -16,7 +16,7 @@ os.makedirs(report_directory, exist_ok=True)
 
 filemap = get_dir_filemap(raw_dir)
 # change name of ImagePath column to raw
-filemap = filemap.rename(columns={"ImagePath": "raw"})
+filemap = filemap.rename(columns={"ImagePath": raw_dir_name})
 # add a worm type column filled with 'worm'
 filemap["ch2_seg_str_worm_type"] = "worm"
 # add a volume column filled with 2

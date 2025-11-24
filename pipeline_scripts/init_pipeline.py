@@ -11,7 +11,7 @@ from pipeline_scripts.utils import create_temp_folders
 from pipeline_scripts.utils import get_and_create_folders
 from pipeline_scripts.utils import get_and_create_folders_subdir
 from pipeline_scripts.utils import get_experiment_subdirs
-from pipeline_scripts.utils import get_experiment_time_from_filemap_parallel
+from pipeline_scripts.utils import get_experiment_time_from_filemap
 from pipeline_scripts.utils import pickle_objects
 from pipeline_scripts.utils import sync_backup_folder
 
@@ -94,7 +94,7 @@ def main(global_config, temp_dir_basename, temp_dir, subdir=None):
             )
             config["no_timepoints"] = True
 
-        experiment_filemap.rename(columns={"ImagePath": "raw"}, inplace=True)
+        experiment_filemap.rename(columns={"ImagePath": raw_subdir}, inplace=True)
         experiment_filemap.to_csv(
             os.path.join(report_subdir, "analysis_filemap.csv"), index=False
         )
@@ -110,9 +110,9 @@ def main(global_config, temp_dir_basename, temp_dir, subdir=None):
     if "ExperimentTime" not in experiment_filemap.columns:
         if extract_experiment_time:
             print("### Calculating ExperimentTime ###")
-            experiment_filemap[
-                "ExperimentTime"
-            ] = get_experiment_time_from_filemap_parallel(experiment_filemap)
+            experiment_filemap["ExperimentTime"] = get_experiment_time_from_filemap(
+                experiment_filemap, config
+            )
             experiment_filemap.to_csv(
                 os.path.join(report_subdir, "analysis_filemap.csv"), index=False
             )
