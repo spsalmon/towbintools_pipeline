@@ -84,6 +84,7 @@ def main(global_config, temp_dir_basename, temp_dir, subdir=None):
     sync_backup_folder(temp_dir, pipeline_backup_dir)
 
     extract_experiment_time = config.get("get_experiment_time", True)
+    overwrite_annotated = config.get("overwrite_annotated_filemap", False)
 
     if not os.path.exists(os.path.join(report_subdir, "analysis_filemap.csv")):
         experiment_filemap = file_handling.get_dir_filemap(raw_subdir)
@@ -97,16 +98,25 @@ def main(global_config, temp_dir_basename, temp_dir, subdir=None):
             config["no_timepoints"] = True
 
         experiment_filemap.rename(columns={"ImagePath": raw_dir_name}, inplace=True)
-        experiment_filemap.to_csv(
-            os.path.join(report_subdir, "analysis_filemap.csv"), index=False
-        )
+        filemap_path = os.path.join(report_subdir, "analysis_filemap.csv")
+        experiment_filemap = experiment_filemap.replace(np.nan, "", regex=True)
+        experiment_filemap.to_csv(filemap_path, index=False)
 
     else:
+        if overwrite_annotated and os.path.exists(
+            os.path.join(report_subdir, "analysis_filemap_annotated.csv")
+        ):
+            filemap_path = os.path.join(report_subdir, "analysis_filemap_annotated.csv")
+        else:
+            filemap_path = os.path.join(report_subdir, "analysis_filemap.csv")
+
         experiment_filemap = pd.read_csv(
-            os.path.join(report_subdir, "analysis_filemap.csv"),
+            filemap_path,
             low_memory=False,
         )
         experiment_filemap = experiment_filemap.replace(np.nan, "", regex=True)
+
+    config["filemap_path"] = filemap_path
 
     # if the ExperimentTime column is not present, create it
     if "ExperimentTime" not in experiment_filemap.columns:
@@ -115,14 +125,10 @@ def main(global_config, temp_dir_basename, temp_dir, subdir=None):
             experiment_filemap["ExperimentTime"] = get_experiment_time_from_filemap(
                 experiment_filemap, config
             )
-            experiment_filemap.to_csv(
-                os.path.join(report_subdir, "analysis_filemap.csv"), index=False
-            )
+            experiment_filemap.to_csv(config["filemap_path"], index=False)
         else:
             experiment_filemap["ExperimentTime"] = np.nan
-            experiment_filemap.to_csv(
-                os.path.join(report_subdir, "analysis_filemap.csv"), index=False
-            )
+            experiment_filemap.to_csv(config["filemap_path"], index=False)
 
     print("Building the config of the building blocks ...")
 
@@ -161,7 +167,7 @@ current_building_block, current_subdir, current_config = (
 )
 
 experiment_filemap = pd.read_csv(
-    os.path.join(current_config["report_subdir"], "analysis_filemap.csv"),
+    current_config["filemap_path"],
     low_memory=False,
 )
 current_building_block.run(experiment_filemap, current_config, subdir=current_subdir)
