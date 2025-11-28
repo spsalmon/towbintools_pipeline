@@ -7,7 +7,6 @@ from joblib import delayed
 from joblib import Parallel
 from joblib import parallel_config
 from towbintools.foundation import image_handling
-from towbintools.quantification import compute_background_fluorescence
 from towbintools.quantification import compute_fluorescence_in_mask
 
 
@@ -24,10 +23,17 @@ def quantify_fluorescence_from_file_path(
     )
     mask = image_handling.read_tiff_file(mask_path)
 
-    fluo = compute_fluorescence_in_mask(source_image, mask, aggregation=aggregation)
-    fluo_std = compute_fluorescence_in_mask(source_image, mask, aggregation="std")
-    background_fluo = compute_background_fluorescence(
-        source_image, mask, aggregation=background_aggregation
+    fluo = compute_fluorescence_in_mask(
+        source_image,
+        mask,
+        aggregation=aggregation,
+        background_aggregation=background_aggregation,
+    )
+    fluo_std = compute_fluorescence_in_mask(
+        source_image,
+        mask,
+        aggregation="std",
+        background_aggregation=background_aggregation,
     )
     time_pattern = re.compile(r"Time(\d+)")
     point_pattern = re.compile(r"Point(\d+)")
@@ -43,7 +49,6 @@ def quantify_fluorescence_from_file_path(
             "Point": point,
             "FluoAggregation": fluo,
             "FluoStd": fluo_std,
-            "BackgroundFluo": background_fluo,
         }
     else:
         raise ValueError("Could not extract time and point from file name.")
@@ -82,7 +87,6 @@ def main(input_pickle, output_file, config, n_jobs):
         columns={
             "FluoAggregation": f"{fluo_source}_fluo_{aggregation}_on_{mask_column}",
             "FluoStd": f"{fluo_source}_fluo_std_on_{mask_column}",
-            "BackgroundFluo": f"{fluo_source}_fluo_background_{background_aggregation}_on_{mask_column}",
         },
         inplace=True,
     )
