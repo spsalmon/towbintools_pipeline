@@ -360,14 +360,11 @@ class StraighteningBuildingBlock(BuildingBlock):
         for column in columns:
             if column not in experiment_filemap.columns:
                 try:
-                    report_subdir = config["report_subdir"]
                     column_subdir = os.path.join(config["experiment_dir"], column)
                     experiment_filemap = add_dir_to_experiment_filemap(
                         experiment_filemap, column_subdir, column
                     )
-                    experiment_filemap.to_csv(
-                        os.path.join(report_subdir, "analysis_filemap.csv"), index=False
-                    )
+                    experiment_filemap.to_csv(config["filemap_path"], index=False)
                 except Exception as e:
                     print(e)
                     print(

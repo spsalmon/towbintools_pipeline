@@ -56,17 +56,15 @@ def update_experiment_filemap(
             experiment_filemap = add_dir_to_experiment_filemap(
                 experiment_filemap, result, column_name
             )
-        experiment_filemap.to_csv(
-            os.path.join(report_subdir, "analysis_filemap.csv"), index=False
-        )
+        experiment_filemap.to_csv(config["filemap_path"], index=False)
     elif previous_block.return_type == "csv":
         if previous_block.name == "molt_detection":
             experiment_filemap = merge_and_save_csv(
-                experiment_filemap, report_subdir, result, merge_cols=["Point"]
+                experiment_filemap, config["filemap_path"], result, merge_cols=["Point"]
             )
         else:
             experiment_filemap = merge_and_save_csv(
-                experiment_filemap, report_subdir, result
+                experiment_filemap, config["filemap_path"], result
             )
     return experiment_filemap
 
@@ -111,7 +109,7 @@ def main():
 
         # Load experiment filemap
         experiment_filemap = pd.read_csv(
-            os.path.join(report_subdir, "analysis_filemap.csv"), low_memory=False
+            previous_config["filemap_path"], low_memory=False
         )
 
         experiment_filemap = update_experiment_filemap(
@@ -131,9 +129,8 @@ def main():
             current["subdir"],
             current["config"],
         )
-        report_subdir = current_config["report_subdir"]
         experiment_filemap = pd.read_csv(
-            os.path.join(report_subdir, "analysis_filemap.csv"),
+            current_config["filemap_path"],
             low_memory=False,
         )
         print(f"Running {current_building_block} ...")

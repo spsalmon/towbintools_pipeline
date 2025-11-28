@@ -517,6 +517,7 @@ def main_server(
 
         (
             _,
+            _,
             custom_columns_choices,
             worm_type_column,
             _,

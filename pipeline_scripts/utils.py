@@ -527,7 +527,7 @@ def basic_get_args() -> argparse.Namespace:
 
 def rename_merge_and_save_csv(
     experiment_filemap,
-    report_subdir,
+    filemap_path,
     csv_file,
     column_name_old,
     column_name_new,
@@ -538,14 +538,12 @@ def rename_merge_and_save_csv(
     if column_name_new in experiment_filemap.columns:
         experiment_filemap.drop(columns=[column_name_new], inplace=True)
     experiment_filemap = experiment_filemap.merge(dataframe, on=merge_cols, how="left")
-    experiment_filemap.to_csv(
-        os.path.join(report_subdir, "analysis_filemap.csv"), index=False
-    )
+    experiment_filemap.to_csv(filemap_path, index=False)
     return experiment_filemap
 
 
 def merge_and_save_csv(
-    experiment_filemap, report_subdir, csv_file, merge_cols=["Time", "Point"]
+    experiment_filemap, filemap_path, csv_file, merge_cols=["Time", "Point"]
 ):
     dataframe = pd.read_csv(csv_file)
     new_columns = [
@@ -557,7 +555,5 @@ def merge_and_save_csv(
         if column in experiment_filemap.columns:
             experiment_filemap.drop(columns=[column], inplace=True)
     experiment_filemap = experiment_filemap.merge(dataframe, on=merge_cols, how="left")
-    experiment_filemap.to_csv(
-        os.path.join(report_subdir, "analysis_filemap.csv"), index=False
-    )
+    experiment_filemap.to_csv(filemap_path, index=False)
     return experiment_filemap
