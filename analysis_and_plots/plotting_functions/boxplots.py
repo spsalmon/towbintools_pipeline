@@ -366,7 +366,7 @@ def _plot_violinplot(
                     column,
                 ] = np.nan
 
-        sns.stripplot(
+        sns.swarmplot(
             data=df[df["Order"] == event_index],
             x="Condition",
             order=conditions_to_plot,
@@ -374,7 +374,7 @@ def _plot_violinplot(
             ax=current_ax,
             alpha=0.5,
             color="black",
-            dodge=True,
+            dodge=False,
         )
 
         current_ax.set_xlabel("")
@@ -479,7 +479,7 @@ def _plot_boxplot(
                     column,
                 ] = np.nan
 
-        sns.stripplot(
+        sns.swarmplot(
             data=df[df["Order"] == event_index],
             x="Condition",
             order=conditions_to_plot,
@@ -487,7 +487,7 @@ def _plot_boxplot(
             ax=current_ax,
             alpha=0.5,
             color="black",
-            dodge=True,
+            dodge=False,
         )
 
         current_ax.set_xlabel("")
