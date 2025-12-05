@@ -1,6 +1,7 @@
 import os
 import re
 
+import numpy as np
 import pandas as pd
 import utils
 from joblib import delayed
@@ -23,18 +24,24 @@ def quantify_fluorescence_from_file_path(
     )
     mask = image_handling.read_tiff_file(mask_path)
 
-    fluo = compute_fluorescence_in_mask(
-        source_image,
-        mask,
-        aggregation=aggregation,
-        background_aggregation=background_aggregation,
-    )
-    fluo_std = compute_fluorescence_in_mask(
-        source_image,
-        mask,
-        aggregation="std",
-        background_aggregation=background_aggregation,
-    )
+    try:
+        fluo = compute_fluorescence_in_mask(
+            source_image,
+            mask,
+            aggregation=aggregation,
+            background_aggregation=background_aggregation,
+        )
+        fluo_std = compute_fluorescence_in_mask(
+            source_image,
+            mask,
+            aggregation="std",
+            background_aggregation=background_aggregation,
+        )
+    except Exception as e:
+        print(f"Error processing {source_image_path} with mask {mask_path}: {e}")
+        fluo = np.nan
+        fluo_std = np.nan
+
     time_pattern = re.compile(r"Time(\d+)")
     point_pattern = re.compile(r"Point(\d+)")
 

@@ -442,6 +442,14 @@ def _get_values_at_molt(filemap, column, ecdysis_time_step):
     ecdysis = ["HatchTime", "M1", "M2", "M3", "M4"]
     columns_at_ecdysis = [f"{column}_at_{e}" for e in ecdysis]
     column_list = ["Point"] + columns_at_ecdysis
+
+    # if the column_at_ecdysis does not exist, create it
+    for col in columns_at_ecdysis:
+        if col not in filemap.columns:
+            filemap = filemap.with_columns(
+                pl.lit(np.nan).alias(col),
+            )
+
     filemap = filemap.select(pl.col(column_list))
 
     values_at_ecdysis = (

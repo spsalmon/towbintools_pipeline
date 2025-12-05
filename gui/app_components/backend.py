@@ -309,6 +309,9 @@ def process_feature_at_molt_columns(
         filemap.select(pl.col("Point")).unique(maintain_order=True).to_numpy().squeeze()
     )
 
+    if unique_points.ndim == 0:
+        unique_points = np.array([unique_points])
+
     for feature_column in feature_columns:
         # convert the feature column to float
         filemap = filemap.with_columns(pl.col(feature_column).cast(pl.Float64))
@@ -476,6 +479,9 @@ def _compute_series_at_molt(
     time,
     recompute_values_at_molt=False,
 ):
+    if series_at_ecdysis.ndim < 2:
+        series_at_ecdysis = series_at_ecdysis[np.newaxis, :]
+
     new_series_at_ecdysis = series_at_ecdysis.copy()
 
     nan_indexes_values_mask = np.isnan(series_at_ecdysis)
@@ -512,6 +518,7 @@ def _compute_series_at_molt(
             worm_types[i],
         )
 
+        print(new_series_at_ecdysis[i])
         new_series_at_ecdysis[i][idx_values_to_recompute] = recomputed_values
 
     return new_series_at_ecdysis
