@@ -9,7 +9,7 @@
 #SBATCH --gres=gpu:rtx6000:1
 
 # Default configuration file
-DEFAULT_CONFIG_FILE="./training_config.yaml"
+DEFAULT_CONFIG_FILE="./segmentation_training_config.yaml"
 CONFIG_FILE="$DEFAULT_CONFIG_FILE"
 
 # Function to show usage
@@ -40,4 +40,4 @@ if [ ! -f "$CONFIG_FILE" ]; then
 fi
 
 # Run the Python script with the specified or default configuration file
-CUDA_LAUNCH_BLOCKING=1 ~/.local/bin/micromamba run -n towbintools python3 train_your_model.py -c "$CONFIG_FILE"
+CUDA_LAUNCH_BLOCKING=1 ~/.local/bin/micromamba run -n towbintools python3 train_your_segmentation_model.py -c "$CONFIG_FILE"

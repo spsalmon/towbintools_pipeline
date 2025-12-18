@@ -166,7 +166,20 @@ def _annotate_significance(
     event_index,
     plot_type="boxplot",
     test="Mann-Whitney",
+    verbose=True,
 ):
+    # Filter data for the current event
+    df_filtered = df[df["Order"] == event_index]
+
+    # Print non-NaN counts for each condition
+    print(f"\nSample sizes (non-NaN) for event index {event_index}, column '{column}':")
+    if verbose:
+        for condition in conditions_to_plot:
+            condition_data = df_filtered[df_filtered["Condition"] == condition][column]
+            n = condition_data.notna().sum()
+            print(f"Condition {condition}: n={n}")
+
+    # Original code continues...
     if significance_pairs is None:
         pairs = list(combinations(df["Condition"].unique(), 2))
     else:
@@ -174,25 +187,24 @@ def _annotate_significance(
     annotator = Annotator(
         ax=boxplot,
         pairs=pairs,
-        data=df[df["Order"] == event_index],
+        data=df_filtered,
         x="Condition",
         order=conditions_to_plot,
         y=column,
         plot=plot_type,
     )
-
     if test in STATANNOTATIONS_TESTS:
         if test != "Mann-Whitney":
             annotator.configure(
                 test=test,
                 text_format="simple",
                 loc="inside",
-                verbose=False,
+                verbose=verbose,
                 test_short_name=test.capitalize(),
             )
         else:
             annotator.configure(
-                test=test, text_format="star", loc="inside", verbose=False
+                test=test, text_format="star", loc="inside", verbose=verbose
             )
     else:
         if test == "Feltz-Miller":
@@ -200,25 +212,22 @@ def _annotate_significance(
             custom_short_name = "Feltz-Miller"
             custom_func = feltz_miller_asymptotic_cv_test
             custom_test = StatTest(custom_func, custom_long_name, custom_short_name)
-
             annotator.configure(
                 test=custom_test,
                 text_format="simple",
                 loc="inside",
-                verbose=False,
+                verbose=verbose,
             )
-
         elif test == "MSLR":
             custom_long_name = "Modified Signed Likelihood Ratio Test"
             custom_short_name = "MSLR"
             custom_func = mslr_test
             custom_test = StatTest(custom_func, custom_long_name, custom_short_name)
-
             annotator.configure(
                 test=custom_test,
                 text_format="simple",
                 loc="inside",
-                verbose=False,
+                verbose=verbose,
             )
         else:
             raise ValueError(
@@ -363,11 +372,20 @@ def _plot_violinplot(
                     (df["Order"] == event_index)
                     & (df["Condition"] == condition)
                     & (df[column].isin(outliers[column])),
-                    column,
-                ] = np.nan
+                    "Outlier",
+                ] = True
+
+        plot_df = df.copy()
+        if hide_outliers:
+            plot_df.loc[
+                (plot_df["Order"] == event_index)
+                & (plot_df["Condition"] == condition)
+                & (plot_df[column].isin(outliers[column])),
+                column,
+            ] = np.nan
 
         sns.swarmplot(
-            data=df[df["Order"] == event_index],
+            data=plot_df[plot_df["Order"] == event_index],
             x="Condition",
             order=conditions_to_plot,
             y=column,
@@ -432,6 +450,7 @@ def _plot_boxplot(
     log_scale,
     hide_outliers=True,
     test="Mann-Whitney",
+    return_data=False,
 ):
     y_min, y_max = [], []
     for event_index in range(df["Order"].nunique()):
@@ -476,11 +495,19 @@ def _plot_boxplot(
                     (df["Order"] == event_index)
                     & (df["Condition"] == condition)
                     & (df[column].isin(outliers[column])),
-                    column,
-                ] = np.nan
+                    "Outlier",
+                ] = True
 
+        plot_df = df.copy()
+        if hide_outliers:
+            plot_df.loc[
+                (plot_df["Order"] == event_index)
+                & (plot_df["Condition"] == condition)
+                & (plot_df[column].isin(outliers[column])),
+                column,
+            ] = True
         sns.swarmplot(
-            data=df[df["Order"] == event_index],
+            data=plot_df[plot_df["Order"] == event_index],
             x="Condition",
             order=conditions_to_plot,
             y=column,
@@ -600,6 +627,7 @@ def violinplot(
     titles=None,
     share_y_axis: bool = False,
     hide_outliers: bool = True,
+    return_data: bool = False,
 ):
     color_palette = get_colors(
         conditions_to_plot,
@@ -621,6 +649,7 @@ def violinplot(
                     {
                         "Condition": condition_id,
                         "Order": order,
+                        "Description": condition_dict["description"],
                         column: np.log(value) if log_scale else value,
                     }
                 )
@@ -668,6 +697,9 @@ def violinplot(
     fig = plt.gcf()
     plt.show()
 
+    if return_data:
+        return fig, df
+
     return fig
 
 
@@ -688,6 +720,7 @@ def boxplot(
     titles=None,
     share_y_axis: bool = False,
     hide_outliers: bool = True,
+    return_data: bool = False,
 ):
     color_palette = get_colors(
         conditions_to_plot,
@@ -709,6 +742,7 @@ def boxplot(
                     {
                         "Condition": condition_id,
                         "Order": order,
+                        "Description": condition_dict["description"],
                         column: np.log(value) if log_scale else value,
                     }
                 )
@@ -755,6 +789,9 @@ def boxplot(
 
     fig = plt.gcf()
     plt.show()
+
+    if return_data:
+        return fig, df
 
     return fig
 
