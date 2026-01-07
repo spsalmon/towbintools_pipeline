@@ -29,7 +29,7 @@ FEATURES_TO_COMPUTE_AT_MOLT = get_features_to_compute_at_molt()
 KEY_CONVERSION_MAP = {
     "vol": "volume",
     "len": "length",
-    "strClass": "worm_type",
+    "strClass": "qc",
     "ecdys": "ecdysis",
 }
 
@@ -60,7 +60,7 @@ def molt_annotation_buttons_server(
     molt_time,
     value_at_molt,
     molt_name,
-    worm_type_column,
+    qc_column,
     use_experiment_time=False,
 ):
     @output
@@ -81,7 +81,7 @@ def molt_annotation_buttons_server(
                 molt_name,
                 new_molt,
                 new_molt_index,
-                worm_type_column,
+                qc_column,
                 experiment_time=use_experiment_time,
             )
         )
@@ -106,7 +106,7 @@ def molt_annotation_buttons_server(
                 molt_name,
                 new_molt,
                 new_molt_index,
-                worm_type_column,
+                qc_column,
                 experiment_time=use_experiment_time,
             )
         )
@@ -348,7 +348,7 @@ def initialize_ui(filemap, recompute_features_at_molt=False):
         filemap,
         feature_columns,
         custom_columns_choices,
-        worm_type_column,
+        qc_column,
         default_plotted_column,
         overlay_segmentation_choices,
     ) = populate_column_choices(filemap)
@@ -356,7 +356,7 @@ def initialize_ui(filemap, recompute_features_at_molt=False):
     filemap = process_feature_at_molt_columns(
         filemap,
         feature_columns,
-        worm_type_column,
+        qc_column,
         recompute_features_at_molt=recompute_features_at_molt,
     )
 
@@ -378,7 +378,7 @@ def initialize_ui(filemap, recompute_features_at_molt=False):
         custom_columns_choices,
         points,
         times,
-        worm_type_column,
+        qc_column,
         default_plotted_column,
     )
 
@@ -393,7 +393,7 @@ def main_server(
     times=None,
     feature_columns=None,
     custom_columns_choices=None,
-    worm_type_column=None,
+    qc_column=None,
     default_plotted_column=None,
 ):
     use_experiment_time = check_use_experiment_time(filemap)
@@ -475,7 +475,7 @@ def main_server(
             molt_time,
             value_at_molt,
             molt_name=molt_name,
-            worm_type_column=worm_type_column,
+            qc_column=qc_column,
             use_experiment_time=use_experiment_time,
         )
         for molt_name, molt_time, value_at_molt in zip(
@@ -519,7 +519,7 @@ def main_server(
             _,
             _,
             custom_columns_choices,
-            worm_type_column,
+            qc_column,
             _,
             _,
         ) = populate_column_choices(filemap)
@@ -573,7 +573,7 @@ def main_server(
             imported_df = process_feature_at_molt_columns(
                 imported_df,
                 feature_columns,
-                worm_type_column,
+                qc_column,
                 recompute_features_at_molt=False,
             )
 
@@ -621,7 +621,7 @@ def main_server(
             imported_df = process_feature_at_molt_columns(
                 updated_filemap,
                 feature_columns,
-                worm_type_column,
+                qc_column,
                 recompute_features_at_molt=True,
             )
 
@@ -1114,7 +1114,7 @@ def main_server(
                 [
                     "Time",
                     input.column_to_plot(),
-                    worm_type_column,
+                    qc_column,
                     "HatchTime",
                     "M1",
                     "M2",
@@ -1209,7 +1209,7 @@ def main_server(
                 [
                     "Time",
                     input.column_to_plot(),
-                    worm_type_column,
+                    qc_column,
                     "HatchTime",
                     "M1",
                     "M2",
@@ -1220,15 +1220,13 @@ def main_server(
         )
 
         times_of_point = data_of_point.select(pl.col("Time")).to_numpy().squeeze()
-        worm_types_of_point = (
-            data_of_point.select(pl.col(worm_type_column)).to_numpy().squeeze()
-        )
+        qcs_of_point = data_of_point.select(pl.col(qc_column)).to_numpy().squeeze()
 
         custom_annotations_of_point = custom_column_values()
         markers = set_marker_shape(
             times_of_point,
             current_time_index(),
-            worm_types_of_point,
+            qcs_of_point,
             hatch(),
             m1(),
             m2(),

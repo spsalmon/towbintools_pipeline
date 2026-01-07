@@ -41,11 +41,17 @@ OPTIONS_MAP = {
         "pixelsize",
         "morphological_features",
     ],
-    "classification": [
-        "rerun_classification",
-        "classification_source",
-        "classifier",
-        "pixelsize",
+    # "classification": [
+    #     "rerun_classification",
+    #     "classification_source",
+    #     "classifier",
+    #     "pixelsize",
+    # ],
+    "quality_control": [
+        "rerun_quality_control",
+        "qc_images",
+        "qc_masks",
+        "qc_model_path",
     ],
     "molt_detection": [
         "rerun_molt_detection",
@@ -95,9 +101,12 @@ DEFAULT_OPTIONS = {
         "rerun_morphology_computation": [False],
         "morphological_features": [["volume", "length", "area"]],
     },
-    "classification": {
-        "rerun_classification": [False],
+    "quality_control": {
+        "rerun_quality_control": [False],
     },
+    # "classification": {
+    #     "rerun_classification": [False],
+    # },
     "molt_detection": {
         "rerun_molt_detection": [False],
         "molt_detection_method": ["legacy"],
@@ -388,6 +397,58 @@ class StraighteningBuildingBlock(BuildingBlock):
         return input_files, straightening_output_files
 
 
+class QualityControlBuildingBlock(BuildingBlock):
+    def __init__(self, block_config):
+        script_path = "./pipeline_scripts/quality_control.py"
+        super().__init__(
+            "quality_control",
+            OPTIONS_MAP["quality_control"],
+            block_config,
+            "csv",
+            script_path,
+        )
+        self.mask_only = (
+            block_config["qc_images"] is None or block_config["qc_images"][0] is None
+        )
+
+    def get_output_name(self, config, subdir):
+        return get_output_name(
+            config,
+            self.block_config["qc_masks"],
+            "qc",
+            subdir=subdir,
+            return_subdir=False,
+            add_raw=False,
+        )
+
+    def get_input_and_output_files(self, config, experiment_filemap, subdir):
+        block_config = self.block_config
+        if self.mask_only:
+            columns = [block_config["qc_masks"]]
+        else:
+            columns = [block_config["qc_images"][0], block_config["qc_masks"]]
+
+        input_files, _ = get_input_and_output_files_parallel(
+            experiment_filemap,
+            columns,
+            subdir,
+        )
+
+        if len(input_files) != 0:
+            if self.mask_only:
+                input_files = [
+                    {"image_path": None, "mask_path": mask_path[0]}
+                    for mask_path in input_files
+                ]
+            else:
+                input_files = [
+                    {"image_path": image_path, "mask_path": mask_path}
+                    for image_path, mask_path in input_files
+                ]
+
+        return input_files, None
+
+
 class MorphologyComputationBuildingBlock(BuildingBlock):
     def __init__(self, block_config):
         script_path = "./pipeline_scripts/compute_morphology.py"
@@ -418,7 +479,6 @@ class MorphologyComputationBuildingBlock(BuildingBlock):
             experiment_filemap,
             morphology_computation_masks,
             analysis_subdir,
-            rerun=True,
         )
 
         input_files = [input_file[0] for input_file in input_files]
@@ -426,39 +486,39 @@ class MorphologyComputationBuildingBlock(BuildingBlock):
         return input_files, None
 
 
-class ClassificationBuildingBlock(BuildingBlock):
-    def __init__(self, block_config):
-        script_path = "./pipeline_scripts/classify.py"
-        super().__init__(
-            "classification",
-            OPTIONS_MAP["classification"],
-            block_config,
-            "csv",
-            script_path,
-        )
+# class ClassificationBuildingBlock(BuildingBlock):
+#     def __init__(self, block_config):
+#         script_path = "./pipeline_scripts/classify.py"
+#         super().__init__(
+#             "classification",
+#             OPTIONS_MAP["classification"],
+#             block_config,
+#             "csv",
+#             script_path,
+#         )
 
-    def get_output_name(self, config, subdir):
-        model_name = os.path.basename(os.path.normpath(self.block_config["classifier"]))
-        model_name = model_name.split("_classifier")[0]
-        return get_output_name(
-            config,
-            self.block_config["classification_source"],
-            model_name,
-            subdir=subdir,
-            return_subdir=False,
-        )
+#     def get_output_name(self, config, subdir):
+#         model_name = os.path.basename(os.path.normpath(self.block_config["classifier"]))
+#         model_name = model_name.split("_classifier")[0]
+#         return get_output_name(
+#             config,
+#             self.block_config["classification_source"],
+#             model_name,
+#             subdir=subdir,
+#             return_subdir=False,
+#         )
 
-    def get_input_and_output_files(self, config, experiment_filemap, subdir):
-        classification_source = [self.block_config["classification_source"]]
-        analysis_subdir = config["analysis_subdir"]
+#     def get_input_and_output_files(self, config, experiment_filemap, subdir):
+#         classification_source = [self.block_config["classification_source"]]
+#         analysis_subdir = config["analysis_subdir"]
 
-        input_files, _ = get_input_and_output_files_parallel(
-            experiment_filemap, classification_source, analysis_subdir, rerun=True
-        )
+#         input_files, _ = get_input_and_output_files_parallel(
+#             experiment_filemap, classification_source, analysis_subdir
+#         )
 
-        input_files = [input_file[0] for input_file in input_files]
+#         input_files = [input_file[0] for input_file in input_files]
 
-        return input_files, None
+#         return input_files, None
 
 
 class MoltDetectionBuildingBlock(BuildingBlock):
@@ -529,7 +589,7 @@ class FluorescenceQuantificationBuildingBlock(BuildingBlock):
         ]
 
         input_files, _ = get_input_and_output_files_parallel(
-            experiment_filemap, columns, subdir, rerun=True
+            experiment_filemap, columns, subdir
         )
 
         if len(input_files) != 0:
@@ -678,8 +738,12 @@ def create_building_blocks(blocks_config):
             or block_config["name"] == "volume_computation"
         ):  # volume_computation is there for backward compatibility
             building_block = MorphologyComputationBuildingBlock(block_config)
+        elif block_config["name"] == "quality_control":
+            building_block = QualityControlBuildingBlock(block_config)
         elif block_config["name"] == "classification":
-            building_block = ClassificationBuildingBlock(block_config)
+            raise ValueError(
+                "'classification' building block was replaced by 'quality_control'. Please check the wiki and update your config file."
+            )
         elif block_config["name"] == "molt_detection":
             building_block = MoltDetectionBuildingBlock(block_config)
         elif block_config["name"] == "fluorescence_quantification":

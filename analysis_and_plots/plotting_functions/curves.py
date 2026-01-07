@@ -39,9 +39,7 @@ def plot_aggregated_series(
                     "larval_stage_durations_time_step"
                 ]
             # TEMPORARY, ONLY WORKS WITH SINGLE CLASSIFICATION, FIND A WAY TO GENERALIZE
-            worm_type_key = [
-                key for key in condition_dict.keys() if "worm_type" in key
-            ][0]
+            worm_type_key = [key for key in condition_dict.keys() if "qc" in key][0]
             rescaled_time, aggregated_series, _, ste_series = rescale_and_aggregate(
                 condition_dict[column],
                 time,
@@ -102,11 +100,11 @@ def plot_growth_curves_individuals(
     for i, condition_id in enumerate(conditions_to_plot):
         condition_dict = conditions_struct[condition_id]
         # TEMPORARY, ONLY WORKS WITH SINGLE CLASSIFICATION, FIND A WAY TO GENERALIZE
-        worm_type_key = [key for key in condition_dict.keys() if "worm_type" in key][0]
+        worm_type_key = [key for key in condition_dict.keys() if "qc" in key][0]
         for j in range(len(condition_dict[column])):
             time = condition_dict["experiment_time"][j] / 3600
             data = condition_dict[column][j]
-            worm_type = condition_dict[worm_type_key][j]
+            qc = condition_dict[worm_type_key][j]
             hatch = condition_dict["ecdysis_time_step"][j][0]
             hatch_experiment_time = (
                 condition_dict["ecdysis_experiment_time"][j][0] / 3600
@@ -118,16 +116,16 @@ def plot_growth_curves_individuals(
                     if len(indexes_to_cut) > 0:
                         data = data[: indexes_to_cut[0] + 1]
                         time = time[: indexes_to_cut[0] + 1]
-                        worm_type = worm_type[: indexes_to_cut[0] + 1]
+                        qc = qc[: indexes_to_cut[0] + 1]
 
                 time = time[hatch:]
                 time = time - hatch_experiment_time
                 data = data[hatch:]
-                worm_type = worm_type[hatch:]
+                qc = qc[hatch:]
                 filtered_data = smooth_series_classified(
                     data,
                     time,
-                    worm_type,
+                    qc,
                 )
                 label = build_legend(condition_dict, legend)
                 try:

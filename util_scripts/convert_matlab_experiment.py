@@ -15,7 +15,7 @@ from pipeline_scripts.utils import (  # noqa: E402
 KEY_CONVERSION_MAP = {
     "vol": "volume",
     "len": "length",
-    "strClass": "worm_type",
+    "strClass": "qc",
     "ecdys": "ecdysis",
 }
 
@@ -47,24 +47,24 @@ def convert_matlab_experiment(
                 print(f"Error converting key {key}: {e}")
                 continue
 
-        # convert worm_type from [' ', 'w', 'o', 'e'] to ['worm', 'egg', 'error']
-        new_matlab_report["worm_type"] = np.where(
-            new_matlab_report["worm_type"] == "w",
+        # convert qc from [' ', 'w', 'o', 'e'] to ['worm', 'egg', 'error']
+        new_matlab_report["qc"] = np.where(
+            new_matlab_report["qc"] == "w",
             "worm",
-            new_matlab_report["worm_type"],
+            new_matlab_report["qc"],
         )
-        new_matlab_report["worm_type"] = np.where(
-            new_matlab_report["worm_type"] == "e", "egg", new_matlab_report["worm_type"]
+        new_matlab_report["qc"] = np.where(
+            new_matlab_report["qc"] == "e", "egg", new_matlab_report["qc"]
         )
-        new_matlab_report["worm_type"] = np.where(
-            new_matlab_report["worm_type"] == "o",
+        new_matlab_report["qc"] = np.where(
+            new_matlab_report["qc"] == "o",
             "error",
-            new_matlab_report["worm_type"],
+            new_matlab_report["qc"],
         )
-        new_matlab_report["worm_type"] = np.where(
-            new_matlab_report["worm_type"] == " ",
+        new_matlab_report["qc"] = np.where(
+            new_matlab_report["qc"] == " ",
             "error",
-            new_matlab_report["worm_type"],
+            new_matlab_report["qc"],
         )
 
         point = np.arange(0, new_matlab_report["volume"].shape[0])
@@ -82,7 +82,7 @@ def convert_matlab_experiment(
             "Time": time,
             f"{column_name}_volume": new_matlab_report["volume"].flatten(),
             f"{column_name}_length": new_matlab_report["length"].flatten(),
-            f"{column_name}_worm_type": new_matlab_report["worm_type"].flatten(),
+            f"{column_name}_worm_type": new_matlab_report["qc"].flatten(),
         }
 
         df = pd.DataFrame(data)

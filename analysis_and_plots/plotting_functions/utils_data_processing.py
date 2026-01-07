@@ -55,8 +55,8 @@ def compute_growth_rate(
     for condition in conditions_struct:
         series_values = condition[series_name]
         # TEMPORARY, ONLY WORKS WITH SINGLE CLASSIFICATION, FIND A WAY TO GENERALIZE
-        worm_type_key = [key for key in condition.keys() if "worm_type" in key][0]
-        worm_type = condition[worm_type_key]
+        worm_type_key = [key for key in condition.keys() if "qc" in key][0]
+        qc = condition[worm_type_key]
 
         if experiment_time:
             time = condition["experiment_time_hours"]
@@ -68,7 +68,7 @@ def compute_growth_rate(
             gr = compute_instantaneous_growth_rate_classified(
                 series_values[i],
                 time[i],
-                worm_type[i],
+                qc[i],
                 lmbda=lmbda,
                 order=order,
                 medfilt_window=medfilt_window,
@@ -92,8 +92,8 @@ def rescale(
     for condition in conditions_struct:
         series_values = condition[series_name]
         # TEMPORARY, ONLY WORKS WITH SINGLE CLASSIFICATION, FIND A WAY TO GENERALIZE
-        worm_type_key = [key for key in condition.keys() if "worm_type" in key][0]
-        worm_type = condition[worm_type_key]
+        worm_type_key = [key for key in condition.keys() if "qc" in key][0]
+        qc = condition[worm_type_key]
         ecdysis = condition["ecdysis_index"]
 
         if experiment_time:
@@ -102,7 +102,7 @@ def rescale(
             time = condition["time"]
 
         _, rescaled_series = rescale_series(
-            series_values, time, ecdysis, worm_type, n_points=n_points
+            series_values, time, ecdysis, qc, n_points=n_points
         )  # shape (n_worms, 4, n_points)
 
         # reshape into (n_worms, 4*n_points)
@@ -124,8 +124,8 @@ def rescale_without_flattening(
     for condition in conditions_struct:
         series_values = condition[series_name]
         # TEMPORARY, ONLY WORKS WITH SINGLE CLASSIFICATION, FIND A WAY TO GENERALIZE
-        worm_type_key = [key for key in condition.keys() if "worm_type" in key][0]
-        worm_type = condition[worm_type_key]
+        worm_type_key = [key for key in condition.keys() if "qc" in key][0]
+        qc = condition[worm_type_key]
         ecdysis = condition["ecdysis_index"]
 
         if experiment_time:
@@ -134,7 +134,7 @@ def rescale_without_flattening(
             time = condition["time"]
 
         _, rescaled_series = rescale_series(
-            series_values, time, ecdysis, worm_type, n_points=n_points
+            series_values, time, ecdysis, qc, n_points=n_points
         )  # shape (n_worms, 4, n_points)
 
         condition[rescaled_series_name] = rescaled_series
@@ -174,8 +174,8 @@ def smooth_series(
     for condition in conditions_struct:
         series_values = condition[series_name]
         # TEMPORARY, ONLY WORKS WITH SINGLE CLASSIFICATION, FIND A WAY TO GENERALIZE
-        worm_type_key = [key for key in condition.keys() if "worm_type" in key][0]
-        worm_type = condition[worm_type_key]
+        worm_type_key = [key for key in condition.keys() if "qc" in key][0]
+        qc = condition[worm_type_key]
         if experiment_time:
             time = condition["experiment_time_hours"]
         else:
@@ -187,7 +187,7 @@ def smooth_series(
             smoothed = smooth_series_classified(
                 values,
                 time[i],
-                worm_type[i],
+                qc[i],
                 lmbda=lmbda,
                 order=order,
                 medfilt_window=medfilt_window,
@@ -224,8 +224,8 @@ def smooth_and_rescale_series(
     for condition in conditions_struct:
         series_values = condition[series_name]
         # TEMPORARY, ONLY WORKS WITH SINGLE CLASSIFICATION, FIND A WAY TO GENERALIZE
-        worm_type_key = [key for key in condition.keys() if "worm_type" in key][0]
-        worm_type = condition[worm_type_key]
+        worm_type_key = [key for key in condition.keys() if "qc" in key][0]
+        qc = condition[worm_type_key]
         ecdysis = condition["ecdysis_index"]
         if experiment_time:
             time = condition["experiment_time_hours"]
@@ -238,7 +238,7 @@ def smooth_and_rescale_series(
             smoothed = smooth_series_classified(
                 values,
                 time[i],
-                worm_type[i],
+                qc[i],
                 lmbda=lmbda,
                 order=order,
                 medfilt_window=medfilt_window,
@@ -258,11 +258,11 @@ def smooth_and_rescale_series(
         smoothed_series = np.array(smoothed_series)
 
         # we don't need the classification anymore
-        worm_type = np.full_like(smoothed_series, "worm", dtype=object)
+        qc = np.full_like(smoothed_series, "worm", dtype=object)
 
         # rescale the smoothed series
         _, rescaled_series = rescale_series(
-            smoothed_series, time, ecdysis, worm_type, n_points=n_points
+            smoothed_series, time, ecdysis, qc, n_points=n_points
         )  # shape (n_worms, 4, n_points)
 
         # reshape into (n_worms, 4*n_points)

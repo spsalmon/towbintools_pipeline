@@ -115,9 +115,7 @@ def populate_column_choices(filemap):
         "Dead",
     ]
 
-    usual_columns.extend(
-        [column for column in filemap.columns if "worm_type" in column]
-    )
+    usual_columns.extend([column for column in filemap.columns if "qc" in column])
 
     for feature in FEATURES_TO_COMPUTE_AT_MOLT:
         usual_columns.extend(
@@ -144,13 +142,11 @@ def populate_column_choices(filemap):
     custom_columns_choices = ["None"] + custom_columns
 
     try:
-        worm_type_column = [
-            column for column in filemap.columns if "worm_type" in column
-        ][0]
+        qc_column = [column for column in filemap.columns if "qc" in column][0]
     except IndexError:
-        print("No worm_type column found in the filemap, creating a placeholder.")
-        worm_type_column = "placeholder_worm_type"
-        filemap = filemap.with_columns(pl.lit("worm").alias(worm_type_column))
+        print("No qc column found in the filemap, creating a placeholder.")
+        qc_column = "placeholder_qc"
+        filemap = filemap.with_columns(pl.lit("worm").alias(qc_column))
 
     try:
         default_plotted_column = [
@@ -181,7 +177,7 @@ def populate_column_choices(filemap):
         filemap,
         feature_columns,
         custom_columns_choices,
-        worm_type_column,
+        qc_column,
         default_plotted_column,
         overlay_segmentation_choices,
     )
@@ -289,7 +285,7 @@ def build_single_values_df(filemap):
 
 
 def process_feature_at_molt_columns(
-    filemap, feature_columns, worm_type_column, recompute_features_at_molt=False
+    filemap, feature_columns, qc_column, recompute_features_at_molt=False
 ):
     columns = filemap.columns
 
@@ -303,7 +299,7 @@ def process_feature_at_molt_columns(
         ecdysis_index,
     ) = get_time_and_ecdysis(filemap)
 
-    worm_types = separate_column_by_point(filemap, worm_type_column)
+    qcs = separate_column_by_point(filemap, qc_column)
 
     unique_points = (
         filemap.select(pl.col("Point")).unique(maintain_order=True).to_numpy().squeeze()
@@ -328,7 +324,7 @@ def process_feature_at_molt_columns(
         new_series_at_ecdysis = _compute_series_at_molt(
             series,
             series_at_ecdysis,
-            worm_types,
+            qcs,
             ecdysis_index,
             experiment_time,
             time,
@@ -389,16 +385,14 @@ def update_molt_and_ecdysis_columns(
     ecdys_event,
     new_time,
     new_time_index,
-    worm_type_column,
+    qc_column,
     experiment_time=True,
 ):
     single_values_df = single_values_df.with_columns(
         pl.lit(new_time).alias(ecdys_event)
     )
 
-    worm_type_values = (
-        point_filemap.select(pl.col(worm_type_column)).to_numpy().squeeze()
-    )
+    qc_values = point_filemap.select(pl.col(qc_column)).to_numpy().squeeze()
     if experiment_time:
         time = (
             point_filemap.select(pl.col("ExperimentTime")).to_numpy().squeeze() / 3600
@@ -427,7 +421,7 @@ def update_molt_and_ecdysis_columns(
                 series,
                 time[int(new_time_index)],
                 time,
-                worm_type_values,
+                qc_values,
             )
 
         print(
@@ -473,7 +467,7 @@ def correct_ecdysis_columns(point_filemap, single_values_df, ecdys_event, time_i
 def _compute_series_at_molt(
     series,
     series_at_ecdysis,
-    worm_types,
+    qcs,
     ecdysis_index,
     experiment_time,
     time,
@@ -515,7 +509,7 @@ def _compute_series_at_molt(
             series[i],
             time[i][ecdys],
             time[i],
-            worm_types[i],
+            qcs[i],
         )
 
         print(new_series_at_ecdysis[i])
@@ -527,7 +521,7 @@ def _compute_series_at_molt(
 def set_marker_shape(
     times_of_point,
     selected_time_index,
-    worm_types,
+    qcs,
     hatch_time,
     m1,
     m2,
@@ -536,12 +530,12 @@ def set_marker_shape(
     custom_annotations: list = [],
 ):
     symbols = []
-    for worm_type in worm_types:
-        if worm_type == "egg":
+    for qc in qcs:
+        if qc == "egg":
             symbol = "square-open"
-        elif worm_type == "worm":
+        elif qc == "worm":
             symbol = "circle-open"
-        elif worm_type != "":
+        elif qc != "":
             symbol = "triangle-up-open"
         else:
             symbol = ""

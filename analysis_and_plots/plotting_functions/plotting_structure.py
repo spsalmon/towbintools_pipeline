@@ -146,9 +146,7 @@ def _get_custom_columns(filemap):
         "Dead",
     ]
 
-    usual_columns.extend(
-        [column for column in filemap.columns if "worm_type" in column]
-    )
+    usual_columns.extend([column for column in filemap.columns if "qc" in column])
 
     for feature in FEATURES_TO_COMPUTE_AT_MOLT:
         usual_columns.extend(
@@ -206,7 +204,7 @@ def _process_condition_id_plotting_structure(
     n_points = condition_df.select(pl.col("Point")).n_unique()
 
     # TEMPORARY, ONLY WORKS WITH SINGLE CLASSIFICATION, FIND A WAY TO GENERALIZE
-    worm_type_column = [col for col in condition_df.columns if "worm_type" in col][0]
+    worm_type_column = [col for col in condition_df.columns if "qc" in col][0]
     worm_types = separate_column_by_point(condition_df, worm_type_column)
 
     condition_dict.update(
@@ -228,7 +226,7 @@ def _process_condition_id_plotting_structure(
             "time": time,
             "experiment_time": experiment_time,
             "experiment_time_hours": experiment_time / 3600,
-            "worm_type": worm_types,
+            "qc": worm_types,
             "death": death,
             "arrest": arrest,
         }
@@ -265,7 +263,7 @@ def _process_condition_id_plotting_structure(
                 condition_df, organ_feature_column, ecdysis_time_step
             )
 
-            if "worm_type" not in organ_feature_column:
+            if "qc" not in organ_feature_column:
                 condition_dict = _compute_values_at_molt(
                     condition_dict,
                     renamed_feature_organ_column,
