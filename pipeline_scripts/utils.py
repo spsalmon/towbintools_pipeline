@@ -192,6 +192,11 @@ def get_output_name(
     report_subdir = config["report_subdir"]
     raw_dir_name = config.get("raw_dir_name", "raw")
 
+    split = input_name.split("/")
+    if len(split) > 1 and "analysis" in split[0]:
+        input_name = split[1:]
+        input_name = os.path.join(*input_name)
+
     output_name = ""
     if channels is not None:
         if isinstance(channels, list):

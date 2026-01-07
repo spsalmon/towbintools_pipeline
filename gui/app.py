@@ -18,7 +18,7 @@ print("Creating the app ...")
     custom_columns_choices,
     points,
     times,
-    worm_type_column,
+    qc_column,
     default_plotted_column,
 ) = initialize_ui(filemap, recompute_features_at_molt=recompute_features_at_molt)
 
@@ -34,7 +34,7 @@ def s(input, output, session):
         custom_columns_choices=custom_columns_choices,
         points=points,
         times=times,
-        worm_type_column=worm_type_column,
+        qc_column=qc_column,
         default_plotted_column=default_plotted_column,
     )
 

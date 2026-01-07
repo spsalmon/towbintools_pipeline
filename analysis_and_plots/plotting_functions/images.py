@@ -29,8 +29,8 @@ from towbintools.foundation.image_handling import read_tiff_file
 #     for condition_id in conditions_to_plot:
 #         condition = conditions_struct[condition_id]
 #         # TEMPORARY, ONLY WORKS WITH SINGLE CLASSIFICATION, FIND A WAY TO GENERALIZE
-#         worm_type_key = [key for key in condition.keys() if "worm_type" in key][0]
-#         series, point, experiment, ecdysis, worm_type = (
+#         worm_type_key = [key for key in condition.keys() if "qc" in key][0]
+#         series, point, experiment, ecdysis, qc = (
 #             condition[key]
 #             for key in [
 #                 column,
@@ -45,7 +45,7 @@ from towbintools.foundation.image_handling import read_tiff_file
 #         series, ecdysis = process_series_at_ecdysis(
 #             series, ecdysis, remove_hatch, exclude_arrests
 #         )
-#         series = filter_non_worm_data(series, worm_type, ecdysis)
+#         series = filter_non_worm_data(series, qc, ecdysis)
 #         size_mean = np.nanmean(series, axis=0)
 #         image_paths = []
 #         for i in range(size_mean.shape[0]):
@@ -99,13 +99,13 @@ def get_condition_filemaps_images(
 
 def filter_non_worm_data(
     data: np.ndarray,
-    worm_type: np.ndarray,
+    qc: np.ndarray,
 ) -> np.ndarray:
     """
-    Set data points to np.nan where worm_type is not 'worm'.
-    Assumes data and worm_type have the same shape.
+    Set data points to np.nan where qc is not 'worm'.
+    Assumes data and qc have the same shape.
     """
-    mask = (worm_type != "worm") & ~np.isnan(data)
+    mask = (qc != "worm") & ~np.isnan(data)
     filtered_data = data.copy()
     filtered_data[mask] = np.nan
     return filtered_data
@@ -300,8 +300,8 @@ def get_images_ecdysis(
 #         condition_filemaps = get_condition_filemaps_images(condition)
 
 #         # TEMPORARY, ONLY WORKS WITH SINGLE CLASSIFICATION, FIND A WAY TO GENERALIZE
-#         worm_type_key = [key for key in condition.keys() if "worm_type" in key][0]
-#         series, rescaled_series, point, time, filemap_path, ecdysis, worm_type = (
+#         worm_type_key = [key for key in condition.keys() if "qc" in key][0]
+#         series, rescaled_series, point, time, filemap_path, ecdysis, qc = (
 #             condition[key]
 #             for key in [
 #                 column,

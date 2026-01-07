@@ -473,7 +473,7 @@ def plot_correlation(
         condition_dict = conditions_struct[condition_id]
 
         # TEMPORARY, ONLY WORKS WITH SINGLE CLASSIFICATION, FIND A WAY TO GENERALIZE
-        worm_type_key = [key for key in condition_dict.keys() if "worm_type" in key][0]
+        worm_type_key = [key for key in condition_dict.keys() if "qc" in key][0]
         _, aggregated_series_one, _, _ = rescale_and_aggregate(
             condition_dict[column_one],
             condition_dict["time"],

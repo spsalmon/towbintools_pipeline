@@ -264,7 +264,7 @@
 # #         )[:, np.newaxis]
 # #         condition_dict["point"] = np.unique(condition_df["Point"].values)[:, np.newaxis]
 # #         # TEMPORARY, ONLY WORKS WITH SINGLE CLASSIFICATION, FIND A WAY TO GENERALIZE
-# #         worm_type_column = [col for col in condition_df.columns if "worm_type" in col][
+# #         worm_type_column = [col for col in condition_df.columns if "qc" in col][
 # #             0
 # #         ]
 # #         worm_types = separate_column_by_point(condition_df, worm_type_column)
@@ -297,9 +297,9 @@
 # #                 condition_dict[renamed_organ_column] = separate_column_by_point(
 # #                     condition_df, organ_column
 # #                 )
-# #             # remove any column with worm_type in it
+# #             # remove any column with qc in it
 # #             renamed_organ_feature_columns = [
-# #                 col for col in renamed_organ_feature_columns if "worm_type" not in col
+# #                 col for col in renamed_organ_feature_columns if "qc" not in col
 # #             ]
 # #             # compute the features of the organ at each molt
 # #             for column in renamed_organ_feature_columns:
@@ -503,7 +503,7 @@
 #                 ]
 #             # TEMPORARY, ONLY WORKS WITH SINGLE CLASSIFICATION, FIND A WAY TO GENERALIZE
 #             worm_type_key = [
-#                 key for key in condition_dict.keys() if "worm_type" in key
+#                 key for key in condition_dict.keys() if "qc" in key
 #             ][0]
 #             rescaled_time, aggregated_series, _, ste_series = rescale_and_aggregate(
 #                 condition_dict[column],
@@ -562,7 +562,7 @@
 #     for i, condition_id in enumerate(conditions_to_plot):
 #         condition_dict = conditions_struct[condition_id]
 #         # TEMPORARY, ONLY WORKS WITH SINGLE CLASSIFICATION, FIND A WAY TO GENERALIZE
-#         worm_type_key = [key for key in condition_dict.keys() if "worm_type" in key][0]
+#         worm_type_key = [key for key in condition_dict.keys() if "qc" in key][0]
 #         _, aggregated_series_one, _, _ = rescale_and_aggregate(
 #             condition_dict[column_one],
 #             condition_dict["time"],
@@ -1160,11 +1160,11 @@
 #     for i, condition_id in enumerate(conditions_to_plot):
 #         condition_dict = conditions_struct[condition_id]
 #         # TEMPORARY, ONLY WORKS WITH SINGLE CLASSIFICATION, FIND A WAY TO GENERALIZE
-#         worm_type_key = [key for key in condition_dict.keys() if "worm_type" in key][0]
+#         worm_type_key = [key for key in condition_dict.keys() if "qc" in key][0]
 #         for j in range(len(condition_dict[column])):
 #             time = condition_dict["experiment_time"][j] / 3600
 #             data = condition_dict[column][j]
-#             worm_type = condition_dict[worm_type_key][j]
+#             qc = condition_dict[worm_type_key][j]
 #             hatch = condition_dict["ecdysis_time_step"][j][0]
 #             hatch_experiment_time = (
 #                 condition_dict["ecdysis_experiment_time"][j][0] / 3600
@@ -1174,8 +1174,8 @@
 #                 time = time[hatch:]
 #                 time = time - hatch_experiment_time
 #                 data = data[hatch:]
-#                 worm_type = worm_type[hatch:]
-#                 filtered_data = correct_series_with_classification(data, worm_type)
+#                 qc = qc[hatch:]
+#                 filtered_data = correct_series_with_classification(data, qc)
 #                 # smooth the data
 #                 filtered_data = medfilt(filtered_data, smoothing_window)
 #                 label = build_legend(condition_dict, legend)
@@ -1591,7 +1591,7 @@
 #         series[:, i][nan_mask] = np.nan
 #     return series, ecdysis
 # def filter_non_worm_data(
-#     data: np.ndarray, worm_type: np.ndarray, ecdysis: np.ndarray
+#     data: np.ndarray, qc: np.ndarray, ecdysis: np.ndarray
 # ) -> np.ndarray:
 #     """
 #     Filter out non-worm data points.
@@ -1602,7 +1602,7 @@
 #             try:
 #                 if (
 #                     ~(np.isnan(data[i][j]))
-#                     and worm_type[i][int(ecdysis[i][j])] != "worm"
+#                     and qc[i][int(ecdysis[i][j])] != "worm"
 #                 ):
 #                     filtered_data[i][j] = np.nan
 #             except ValueError:
@@ -1690,8 +1690,8 @@
 #     for condition_id in conditions_to_plot:
 #         condition = conditions_struct[condition_id]
 #         # TEMPORARY, ONLY WORKS WITH SINGLE CLASSIFICATION, FIND A WAY TO GENERALIZE
-#         worm_type_key = [key for key in condition.keys() if "worm_type" in key][0]
-#         series_one, series_two, point, experiment, ecdysis, worm_type = (
+#         worm_type_key = [key for key in condition.keys() if "qc" in key][0]
+#         series_one, series_two, point, experiment, ecdysis, qc = (
 #             condition[key]
 #             for key in [
 #                 column_one,
@@ -1710,8 +1710,8 @@
 #         series_two, _ = process_series_at_ecdysis(
 #             series_two, ecdysis, remove_hatch, exclude_arrests
 #         )
-#         series_one = filter_non_worm_data(series_one, worm_type, ecdysis)
-#         series_two = filter_non_worm_data(series_two, worm_type, ecdysis)
+#         series_one = filter_non_worm_data(series_one, qc, ecdysis)
+#         series_two = filter_non_worm_data(series_two, qc, ecdysis)
 #         ratio = series_one / series_two
 #         ratio_mean = np.nanmean(ratio, axis=0)
 #         image_paths = []
@@ -1772,8 +1772,8 @@
 # #     for condition_id in conditions_to_plot:
 # #         condition = conditions_struct[condition_id]
 # #         # TEMPORARY, ONLY WORKS WITH SINGLE CLASSIFICATION, FIND A WAY TO GENERALIZE
-# #         worm_type_key = [key for key in condition.keys() if "worm_type" in key][0]
-# #         series_one, series_two, point, experiment, ecdysis, worm_type = [
+# #         worm_type_key = [key for key in condition.keys() if "qc" in key][0]
+# #         series_one, series_two, point, experiment, ecdysis, qc = [
 # #             condition[key] for key in [column_one, column_two, 'point', 'experiment', 'ecdysis_time_step', worm_type_key]
 # #         ]
 # #         filemaps = setup_image_filemaps(experiment, img_dir_list)
@@ -1783,7 +1783,7 @@
 # #         # Calculate expected values and deviations
 # #         expected_series_two = np.exp(control_model(np.log(series_one)))
 # #         percentage_deviation = ((series_two - expected_series_two) / expected_series_two * 100)
-# #         percentage_deviation = filter_non_worm_data(percentage_deviation, worm_type, ecdysis)
+# #         percentage_deviation = filter_non_worm_data(percentage_deviation, qc, ecdysis)
 # #         y = np.nanmean(percentage_deviation, axis=0)
 # #         for i in range(percentage_deviation.shape[1]):
 # #             deviation_molt = percentage_deviation[:, i]
@@ -1814,8 +1814,8 @@
 #     for condition_id in conditions_to_plot:
 #         condition = conditions_struct[condition_id]
 #         # TEMPORARY, ONLY WORKS WITH SINGLE CLASSIFICATION, FIND A WAY TO GENERALIZE
-#         worm_type_key = [key for key in condition.keys() if "worm_type" in key][0]
-#         series, point, experiment, ecdysis, worm_type = (
+#         worm_type_key = [key for key in condition.keys() if "qc" in key][0]
+#         series, point, experiment, ecdysis, qc = (
 #             condition[key]
 #             for key in [
 #                 column,
@@ -1830,7 +1830,7 @@
 #         series, ecdysis = process_series_at_ecdysis(
 #             series, ecdysis, remove_hatch, exclude_arrests
 #         )
-#         series = filter_non_worm_data(series, worm_type, ecdysis)
+#         series = filter_non_worm_data(series, qc, ecdysis)
 #         size_mean = np.nanmean(series, axis=0)
 #         image_paths = []
 #         for i in range(size_mean.shape[0]):
@@ -2043,19 +2043,19 @@
 # #     for condition in conditions_struct:
 # #         series_values = condition[series_name]
 # #         # TEMPORARY, ONLY WORKS WITH SINGLE CLASSIFICATION, FIND A WAY TO GENERALIZE
-# #         worm_type_key = [key for key in condition.keys() if "worm_type" in key][0]
-# #         worm_type = condition[worm_type_key]
+# #         worm_type_key = [key for key in condition.keys() if "qc" in key][0]
+# #         qc = condition[worm_type_key]
 # #         if experiment_time:
 # #             time = condition["experiment_time"]
 # #         else:
 # #             time = condition["time"]
 # #         growth_rate = []
 # #         for i in range(series_values.shape[0]):
-# #             # gr = compute_instantaneous_growth_rate_classified(series_values[i], time[i], worm_type[i], smoothing_method = 'savgol', savgol_filter_window = 7)
+# #             # gr = compute_instantaneous_growth_rate_classified(series_values[i], time[i], qc[i], smoothing_method = 'savgol', savgol_filter_window = 7)
 # #             gr = compute_instantaneous_growth_rate_classified(
 # #                 series_values[i],
 # #                 time[i],
-# #                 worm_type[i],
+# #                 qc[i],
 # #                 smoothing_method="savgol",
 # #                 savgol_filter_window=5,
 # #             )
@@ -2073,15 +2073,15 @@
 # #     for condition in conditions_struct:
 # #         series_values = condition[series_name]
 # #         # TEMPORARY, ONLY WORKS WITH SINGLE CLASSIFICATION, FIND A WAY TO GENERALIZE
-# #         worm_type_key = [key for key in condition.keys() if "worm_type" in key][0]
-# #         worm_type = condition[worm_type_key]
+# #         worm_type_key = [key for key in condition.keys() if "qc" in key][0]
+# #         qc = condition[worm_type_key]
 # #         ecdysis = condition["ecdysis_index"]
 # #         if experiment_time:
 # #             time = condition["experiment_time"]
 # #         else:
 # #             time = condition["time"]
 # #         _, rescaled_series = rescale_series(
-# #             series_values, time, ecdysis, worm_type, n_points=n_points
+# #             series_values, time, ecdysis, qc, n_points=n_points
 # #         )  # shape (n_worms, 4, n_points)
 # #         # reshape into (n_worms, 4*n_points)
 # #         rescaled_series = rescaled_series.reshape(rescaled_series.shape[0], -1)
@@ -2097,15 +2097,15 @@
 # #     for condition in conditions_struct:
 # #         series_values = condition[series_name]
 # #         # TEMPORARY, ONLY WORKS WITH SINGLE CLASSIFICATION, FIND A WAY TO GENERALIZE
-# #         worm_type_key = [key for key in condition.keys() if "worm_type" in key][0]
-# #         worm_type = condition[worm_type_key]
+# #         worm_type_key = [key for key in condition.keys() if "qc" in key][0]
+# #         qc = condition[worm_type_key]
 # #         ecdysis = condition["ecdysis_index"]
 # #         if experiment_time:
 # #             time = condition["experiment_time"]
 # #         else:
 # #             time = condition["time"]
 # #         _, rescaled_series = rescale_series(
-# #             series_values, time, ecdysis, worm_type, n_points=n_points
+# #             series_values, time, ecdysis, qc, n_points=n_points
 # #         )  # shape (n_worms, 4, n_points)
 # #         condition[rescaled_series_name] = rescaled_series
 # #     return conditions_struct
