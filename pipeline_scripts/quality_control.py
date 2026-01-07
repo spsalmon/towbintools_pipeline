@@ -34,12 +34,6 @@ def main(input_pickle, output_file, config, n_jobs):
     input_images = [f["image_path"] for f in input_files]
     input_masks = [f["mask_path"] for f in input_files]
 
-    print(input_images)
-    print(type(input_images[0]))
-
-    print(input_masks)
-    print(type(input_masks[0]))
-
     # mask_only = input_images[0] is None or input_images[0][0] is None
 
     classifier_path = config["qc_model_path"]
