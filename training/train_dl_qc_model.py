@@ -34,8 +34,10 @@ torch.cuda.manual_seed_all(seed)  # For multi-GPU
 # PyTorch Lightning
 pl.seed_everything(seed, workers=True)
 
-dataset_path = "/mnt/towbin.data/shared/spsalmon/towbinlab_classification_database/datasets/10x_body_qc/body"
-model_save_dir = "/mnt/towbin.data/shared/spsalmon/towbinlab_classification_database/models/10x_body_qc"
+image_only = True
+
+dataset_path = "/mnt/towbin.data/shared/spsalmon/towbinlab_classification_database/datasets/10x_pharynx_qc/pharynx"
+model_save_dir = "/mnt/towbin.data/shared/spsalmon/towbinlab_classification_database/models/10x_pharynx_qc"
 project_yaml = os.path.join(dataset_path, "project.yaml")
 with open(project_yaml) as f:
     project_config = yaml.safe_load(f)
@@ -45,15 +47,19 @@ mask_dir = os.path.join(dataset_path, "masks")
 annotation_csv_path = os.path.join(dataset_path, "annotations", "annotations.csv")
 annotations_df = pd.read_csv(annotation_csv_path)
 
-database_csv_path = "/mnt/towbin.data/shared/spsalmon/towbinlab_classification_database/datasets/10x_body_qc/body/body_classification_filemap.csv"
+database_csv_path = "/mnt/towbin.data/shared/spsalmon/towbinlab_classification_database/datasets/10x_pharynx_qc/pharynx/pharynx_classification_filemap.csv"
 database_df = pd.read_csv(database_csv_path)
+labels = annotations_df["Class"].values
+classes = np.unique(labels).tolist()
 
 train_val_split_ratio = 0.2
-test_val_split_ratio = 0.1
-classes = ["egg", "good", "bad", "unusable"]
+test_val_split_ratio = 0.05
+annotations_df["Class"] = annotations_df["Class"].replace(
+    {"good": "worm", "bad": "error", "unusable": "error"}
+)
 channels_to_keep = [0]
-batch_size = 8
-architecture = "efficientnet_b0"
+batch_size = 24
+architecture = "efficientnet_b5"
 
 full_normalization_parameters = {
     "type": "percentile",
@@ -114,7 +120,7 @@ val_df, test_df = train_test_split(
 
 train_dataset = QualityControlDataset(
     image_paths=train_df["ImagePath"].tolist(),
-    mask_paths=train_df["MaskPath"].tolist(),
+    mask_paths=train_df["MaskPath"].tolist() if not image_only else [],
     labels=train_df["Class"].tolist(),
     channels=channels_to_keep,
     classes=classes,
@@ -126,7 +132,7 @@ train_dataset = QualityControlDataset(
 
 val_dataset = QualityControlDataset(
     image_paths=val_df["ImagePath"].tolist(),
-    mask_paths=val_df["MaskPath"].tolist(),
+    mask_paths=val_df["MaskPath"].tolist() if not image_only else [],
     labels=val_df["Class"].tolist(),
     channels=channels_to_keep,
     classes=classes,
@@ -156,7 +162,7 @@ val_loader = DataLoader(
 
 model = PretrainedClassificationModel(
     architecture,
-    len(channels_to_keep) + 1,  # add one for the mask channel
+    len(channels_to_keep) + 1 if not image_only else len(channels_to_keep),
     classes,
     1e-4,
     full_normalization_parameters,

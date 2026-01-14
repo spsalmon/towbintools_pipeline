@@ -53,6 +53,9 @@ def predict_batch(model, images, image_shapes, device, n_classes):
         predictions = predictions > 0.5
     predictions = predictions.astype(np.uint8)
 
+    if predictions.ndim == 2:
+        predictions = np.expand_dims(predictions, axis=0)
+
     predictions = reshape_images_to_original_shape(
         predictions, image_shapes, padded_or_cropped="pad"
     )
