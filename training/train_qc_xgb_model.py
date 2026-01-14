@@ -110,8 +110,8 @@ def train_xgb_model(
     return model
 
 
-dataset_path = "/mnt/towbin.data/shared/spsalmon/towbinlab_classification_database/datasets/10x_body_qc/body"
-output_path = "/mnt/towbin.data/shared/spsalmon/towbinlab_classification_database/models/10x_body_qc"
+dataset_path = "/mnt/towbin.data/shared/spsalmon/towbinlab_classification_database/datasets/10x_pharynx_qc/pharynx"
+output_path = "/mnt/towbin.data/shared/spsalmon/towbinlab_classification_database/models/10x_pharynx_qc"
 os.makedirs(output_path, exist_ok=True)
 model_name = "qc_xgb_model.pkl"
 egg_classifier_name = "egg_xgb_model.json"
@@ -119,6 +119,7 @@ qc_classifier_name = "qc_xgb_model.json"
 project_yaml = os.path.join(dataset_path, "project.yaml")
 optimize_hyperparameters = True
 mask_only = False
+train_egg_detector = False
 with open(project_yaml) as f:
     project_config = yaml.safe_load(f)
 
@@ -138,6 +139,7 @@ annotations_df["MaskPath"] = annotations_df["ImagePath"].apply(
     lambda x: os.path.join(mask_dir, os.path.basename(x))
 )
 
+print(annotations_df.head())
 # check that image and mask paths exist
 for idx, row in annotations_df.iterrows():
     assert os.path.exists(
@@ -175,77 +177,115 @@ else:
 
 print(f"features df shape: {features_df.shape}")
 
-eggs_annotations_df = annotations_df.copy()
-eggs_annotations_df.loc[eggs_annotations_df["Class"] != "egg", "Class"] = "non_egg"
+if train_egg_detector:
+    eggs_annotations_df = annotations_df.copy()
+    eggs_annotations_df.loc[eggs_annotations_df["Class"] != "egg", "Class"] = "non_egg"
 
-qc_annotations_df = annotations_df.copy()
-qc_annotations_df["Class"] = qc_annotations_df["Class"].replace(
-    {"good": "worm", "bad": "worm", "unusable": "error"}
-)
-egg_indices = eggs_annotations_df[eggs_annotations_df["Class"] == "egg"].index
-qc_annotations_df = qc_annotations_df.drop(index=egg_indices).reset_index(drop=True)
-qc_features_df = features_df.drop(index=egg_indices).reset_index(drop=True)
+    qc_annotations_df = annotations_df.copy()
+    qc_annotations_df["Class"] = qc_annotations_df["Class"].replace(
+        {"good": "worm", "bad": "worm", "unusable": "error"}
+    )
+    egg_indices = eggs_annotations_df[eggs_annotations_df["Class"] == "egg"].index
+    qc_annotations_df = qc_annotations_df.drop(index=egg_indices).reset_index(drop=True)
+    qc_features_df = features_df.drop(index=egg_indices).reset_index(drop=True)
 
-print(f"Feature df shape: {features_df.shape}")
+    print(f"Feature df shape: {features_df.shape}")
 
-# first, train the egg vs non-egg model
-labels = eggs_annotations_df["Class"].values
-egg_classes = np.unique(labels).tolist()
-print(f"Classes for egg model: {classes}")
-# convert classes to integers
-class_to_int = {cls: i for i, cls in enumerate(egg_classes)}
-labels = np.array([class_to_int[cls] for cls in labels])
-train_X, test_X, train_y, test_y = train_test_split(
-    features_df, labels, test_size=0.2, random_state=42, stratify=labels
-)
-print(f"TrainX shape: {train_X.shape}, TestX shape: {test_X.shape}")
-print(f"train y shape: {train_y.shape}, test y shape: {test_y.shape}")
+    # first, train the egg vs non-egg model
+    labels = eggs_annotations_df["Class"].values
+    egg_classes = np.unique(labels).tolist()
+    print(f"Classes for egg model: {classes}")
+    # convert classes to integers
+    class_to_int = {cls: i for i, cls in enumerate(egg_classes)}
+    labels = np.array([class_to_int[cls] for cls in labels])
+    train_X, test_X, train_y, test_y = train_test_split(
+        features_df, labels, test_size=0.2, random_state=42, stratify=labels
+    )
+    print(f"TrainX shape: {train_X.shape}, TestX shape: {test_X.shape}")
+    print(f"train y shape: {train_y.shape}, test y shape: {test_y.shape}")
 
-egg_model = train_xgb_model(
-    train_X,
-    train_y,
-    test_X,
-    test_y,
-    egg_classes,
-    optimize_hyperparameters,
-    n_points=10,
-    n_iter=30,
-)
+    egg_model = train_xgb_model(
+        train_X,
+        train_y,
+        test_X,
+        test_y,
+        egg_classes,
+        optimize_hyperparameters,
+        n_points=10,
+        n_iter=30,
+    )
 
-# now, train the qc model
-labels = qc_annotations_df["Class"].values
-qc_classes = np.unique(labels).tolist()
-print(f"QC classes: {classes}")
-# convert classes to integers
-class_to_int = {cls: i for i, cls in enumerate(qc_classes)}
-labels = np.array([class_to_int[cls] for cls in labels])
-train_X, test_X, train_y, test_y = train_test_split(
-    qc_features_df, labels, test_size=0.2, random_state=42, stratify=labels
-)
-qc_model = train_xgb_model(
-    train_X,
-    train_y,
-    test_X,
-    test_y,
-    qc_classes,
-    optimize_hyperparameters,
-    n_points=10,
-    n_iter=50,
-)
+    # now, train the qc model
+    labels = qc_annotations_df["Class"].values
+    qc_classes = np.unique(labels).tolist()
+    print(f"QC classes: {classes}")
+    # convert classes to integers
+    class_to_int = {cls: i for i, cls in enumerate(qc_classes)}
+    labels = np.array([class_to_int[cls] for cls in labels])
+    train_X, test_X, train_y, test_y = train_test_split(
+        qc_features_df, labels, test_size=0.2, random_state=42, stratify=labels
+    )
+    qc_model = train_xgb_model(
+        train_X,
+        train_y,
+        test_X,
+        test_y,
+        qc_classes,
+        optimize_hyperparameters,
+        n_points=10,
+        n_iter=50,
+    )
 
-# save the egg model
-egg_model_path = os.path.join(output_path, egg_classifier_name)
-egg_model.save_model(egg_model_path)
-# save the qc model
-qc_model_path = os.path.join(output_path, qc_classifier_name)
-qc_model.save_model(qc_model_path)
+    # save the egg model
+    egg_model_path = os.path.join(output_path, egg_classifier_name)
+    egg_model.save_model(egg_model_path)
+    # save the qc model
+    qc_model_path = os.path.join(output_path, qc_classifier_name)
+    qc_model.save_model(qc_model_path)
 
-# save the model
-to_save = {
-    "egg_model_path": egg_model_path,
-    "qc_model_path": qc_model_path,
-    "egg_classes": egg_classes,
-    "qc_classes": qc_classes,
-}
+    # save the model
+    to_save = {
+        "egg_model_path": egg_model_path,
+        "qc_model_path": qc_model_path,
+        "egg_classes": egg_classes,
+        "qc_classes": qc_classes,
+    }
 
-dump(to_save, os.path.join(output_path, model_name))
+    dump(to_save, os.path.join(output_path, model_name))
+else:
+    annotations_df["Class"] = annotations_df["Class"].replace(
+        {"good": "worm", "bad": "worm", "unusable": "error"}
+    )
+
+    # now, train the qc model
+    labels = annotations_df["Class"].values
+    classes = np.unique(labels).tolist()
+    print(f"QC classes: {classes}")
+    # convert classes to integers
+    class_to_int = {cls: i for i, cls in enumerate(classes)}
+    labels = np.array([class_to_int[cls] for cls in labels])
+    train_X, test_X, train_y, test_y = train_test_split(
+        features_df, labels, test_size=0.2, random_state=42, stratify=labels
+    )
+    qc_model = train_xgb_model(
+        train_X,
+        train_y,
+        test_X,
+        test_y,
+        classes,
+        optimize_hyperparameters,
+        n_points=10,
+        n_iter=50,
+    )
+
+    # save the qc model
+    qc_model_path = os.path.join(output_path, qc_classifier_name)
+    qc_model.save_model(qc_model_path)
+
+    # save the model
+    to_save = {
+        "qc_model_path": qc_model_path,
+        "qc_classes": classes,
+    }
+
+    dump(to_save, os.path.join(output_path, model_name))

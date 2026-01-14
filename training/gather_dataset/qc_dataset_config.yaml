@@ -1,19 +1,20 @@
 storage_path: "/mnt/towbin.data/shared"
 valid_subdirectories: ["plenart", "kstojanovski"]
 
-database_path: "/mnt/towbin.data/shared/spsalmon/towbinlab_classification_database/datasets/10x_body_qc"
+database_path: "/mnt/towbin.data/shared/spsalmon/towbinlab_classification_database/datasets/10x_pharynx_qc"
 
 database_configs: {
-  'body': {
+  'pharynx': {
       'size': 2000,
       # 'stage_proportions': {'L1': 0.25, 'L2': 0.25, 'L3': 0.25, 'L4': 0.25,},
       'scope_proportions': {'ti2': 0.5, 'squid': 0.5},
-      'channel': [1],
+      'channel': [0],
       'strains': ["186", "160", "125", "318", "446"],
       'magnification': "10x",
   },
 }
 
+class_proportions: {"error": 0.0, "potential_error": 0.45, "good": 0.45, "egg": 0.1}
 # smoother configuration
 lambda: 0.0075
 # threshold quantile
@@ -34,7 +35,7 @@ scopes_alt_names: {
 keywords_to_exclude: ["exclude", "fail", "failure", "crash"]
 keywords_to_include: []
 
-experiments_to_consider: []
+experiments_to_consider: ["/mnt/towbin.data/shared/plenart/20232707_Ti2_wbt125_measuring_measurement_error_for_organ_size_paper"]
 
 experient_to_always_include: []
 experiments_to_exclude: [
