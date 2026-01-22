@@ -48,7 +48,9 @@ qc_images: [['analysis/ch2_raw_str', null]]
 qc_model_path: ["/mnt/towbin.data/shared/spsalmon/towbinlab_classification_database/models/10x_body_qc/qc_xgb_model.pkl"]
 
 # molt detection parameters
-molt_detection_volume: ['ch2_seg_str_volume']
+molt_detection_method: ["deep_learning"]
+molt_detection_model_path: ['./models/molt_detection_model.ckpt']
+molt_detection_columns: [['ch2_seg_str_volume']]
 molt_detection_worm_type: ['ch2_seg_str_qc']
 
 # fluo quantification parameters

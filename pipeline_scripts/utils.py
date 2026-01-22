@@ -5,11 +5,11 @@ import shutil
 import subprocess
 
 import numpy as np
-import pandas as pd
+import polars as pl
 from joblib import delayed
 from joblib import Parallel
 from joblib import parallel_config
-from towbintools.foundation import file_handling as file_handling
+from towbintools.foundation.file_handling import write_filemap
 from towbintools.foundation.image_handling import get_acquisition_date
 
 # ----BOILERPLATE CODE FOR FILE HANDLING----
@@ -93,31 +93,7 @@ def get_experiment_subdirs(config):
     return sorted(subdirs)
 
 
-def get_and_create_folders_subdir(config, subdir):
-    (
-        experiment_dir,
-        raw_subdir,
-        analysis_subdir,
-        report_subdir,
-        pipeline_backup_dir,
-    ) = get_and_create_folders(config)
-
-    raw_subdir = os.path.join(raw_subdir, subdir)
-    report_subdir = os.path.join(report_subdir, subdir)
-    os.makedirs(report_subdir, exist_ok=True)
-    pipeline_backup_dir = os.path.join(pipeline_backup_dir, subdir)
-    os.makedirs(pipeline_backup_dir, exist_ok=True)
-
-    return (
-        experiment_dir,
-        raw_subdir,
-        analysis_subdir,
-        report_subdir,
-        pipeline_backup_dir,
-    )
-
-
-def get_and_create_folders(config):
+def get_and_create_folders(config, subdir=None):
     experiment_dir = config["experiment_dir"]
     analysis_dir_name = config.get("analysis_dir_name", "analysis")
     raw_dir_name = config.get("raw_dir_name", "raw")
@@ -129,6 +105,13 @@ def get_and_create_folders(config):
     os.makedirs(report_subdir, exist_ok=True)
     pipeline_backup_dir = os.path.join(report_subdir, "pipeline_backup")
     os.makedirs(pipeline_backup_dir, exist_ok=True)
+
+    if subdir is not None:
+        raw_subdir = os.path.join(raw_subdir, subdir)
+        report_subdir = os.path.join(report_subdir, subdir)
+        os.makedirs(report_subdir, exist_ok=True)
+        pipeline_backup_dir = os.path.join(pipeline_backup_dir, subdir)
+        os.makedirs(pipeline_backup_dir, exist_ok=True)
 
     return (
         experiment_dir,
@@ -229,142 +212,112 @@ def create_temp_folders(temp_dir):
     os.makedirs(os.path.join(temp_dir, "sbatch_output"), exist_ok=True)
 
 
-def process_row_input_output_files(row, columns, output_dir, rerun):
-    input_file = [row[column] for column in columns]
-
-    if np.any(pd.isnull(input_file)):
+def process_input_output_files(input_files, output_dir, rerun):
+    if np.any(input_files is None) or np.any(input_files == ""):
         return None, None
-
     try:
-        output_file = os.path.join(output_dir, os.path.basename(row[columns[0]]))
+        output_file = os.path.join(output_dir, os.path.basename(input_files[0]))
     except Exception as e:
-        print(f"Raised exception {e} for row {row}")
+        print(f"Raised exception {e} for files {input_files}")
         return None, None
 
-    if (rerun or not os.path.exists(output_file)) and all(
-        [(inp is not None) and (inp != "") for inp in input_file]
-    ):
-        return input_file, output_file
+    if rerun or not os.path.exists(output_file):
+        return input_files, output_file
     else:
         return None, None
 
 
-def get_input_and_output_files_parallel(
-    experiment_filemap, columns: list, output_dir: str, rerun=True, n_jobs=-1
-):
-    with parallel_config(backend="loky", n_jobs=n_jobs):
+def get_input_and_output_files(experiment_filemap, columns, output_dir, rerun=True):
+    all_input_files = [
+        experiment_filemap.select(pl.col(column)).to_series().to_list()
+        for column in columns
+    ]
+    all_input_files = np.array(all_input_files).T.tolist()
+    with parallel_config(backend="loky", n_jobs=-1):
         results = Parallel()(
-            delayed(process_row_input_output_files)(row, columns, output_dir, rerun)
-            for _, row in experiment_filemap.iterrows()
+            delayed(process_input_output_files)(input_files, output_dir, rerun)
+            for input_files in all_input_files
         )
 
-    # Filter out None results
     results = [result for result in results if result[0] is not None]
+    input_files, output_files = zip(*results)
 
-    # Separate input and output files
-    input_files, output_files = zip(*results) if results else ([], [])
+    input_files = list(input_files)
+    output_files = list(output_files)
 
     return input_files, output_files
-
-
-def get_input_and_output_files(experiment_filemap, columns, output_dir, rerun=True):
-    input_files = []
-    output_files = []
-
-    for _, row in experiment_filemap.iterrows():
-        input_file = [row[column] for column in columns]
-        output_file = os.path.join(output_dir, os.path.basename(row[columns[0]]))
-        if (rerun or not os.path.exists(output_file)) and all(
-            [((inp is not None) & (inp != "")) for inp in input_file]
-        ):
-            input_files.append(input_file)
-            output_files.append(output_file)
-    return input_files, output_files
-
-
-def add_dir_to_experiment_filemap(experiment_filemap, dir_path, subdir_name):
-    subdir_filemap = file_handling.get_dir_filemap(dir_path)
-    subdir_filemap.rename(columns={"ImagePath": subdir_name}, inplace=True)
-    # check if column already exists
-    if subdir_name in experiment_filemap.columns:
-        experiment_filemap.drop(columns=[subdir_name], inplace=True)
-    experiment_filemap = experiment_filemap.merge(
-        subdir_filemap, on=["Time", "Point"], how="left"
-    )
-    experiment_filemap = experiment_filemap.replace(np.nan, "", regex=True)
-    return experiment_filemap
 
 
 def get_experiment_time_from_filemap(experiment_filemap, config):
-    experiment_filemap = experiment_filemap.copy()
+    experiment_filemap = experiment_filemap.clone()
     raw_dir_name = config.get("raw_dir_name", "raw")
+    raw_files = experiment_filemap.select(pl.col(raw_dir_name)).to_series().to_list()
 
     with parallel_config(backend="multiprocessing", n_jobs=-1):
         date_result = Parallel()(
-            delayed(get_acquisition_date)(raw)
-            for raw in experiment_filemap[raw_dir_name]
+            delayed(get_acquisition_date)(raw) for raw in raw_files
         )
-    experiment_filemap["date"] = pd.Series(date_result, index=experiment_filemap.index)
 
-    experiment_filemap["date"] = pd.to_datetime(experiment_filemap["date"], utc=True)
+    experiment_filemap = experiment_filemap.with_columns(pl.Series("date", date_result))
 
-    # ensure no timezone info is present
+    # Cast to datetime only if it's not already a datetime type
+    if experiment_filemap.select(pl.col("date")).to_series().dtype != pl.Datetime:
+        experiment_filemap = experiment_filemap.with_columns(
+            pl.col("date").str.to_datetime(time_zone="UTC")
+        )
+    elif experiment_filemap.select(pl.col("date")).to_series().dtype.time_zone is None:
+        experiment_filemap = experiment_filemap.with_columns(
+            pl.col("date").dt.replace_time_zone("UTC")
+        )
+
+    # remove all timezone information, to prevent issues with some scopes
     if (
-        hasattr(experiment_filemap["date"].dtype, "tz")
-        and experiment_filemap["date"].dt.tz is not None
+        experiment_filemap.select(pl.col("date")).to_series().dtype.time_zone
+        is not None
     ):
-        experiment_filemap["date"] = experiment_filemap["date"].dt.tz_localize(None)
+        experiment_filemap = experiment_filemap.with_columns(
+            pl.col("date").dt.replace_time_zone(None)
+        )
 
-    if experiment_filemap["date"].isnull().all():
-        return pd.Series([np.nan] * len(experiment_filemap))
+    if experiment_filemap.select(pl.col("date")).to_series().null_count() == len(
+        experiment_filemap
+    ):
+        return pl.Series("ExperimentTime", [None] * len(experiment_filemap))
 
+    min_time = experiment_filemap.select(pl.col("Time")).to_series().min()
     try:
         first_time = (
-            experiment_filemap[experiment_filemap["Time"] == 0]
-            .groupby("Point")["date"]
-            .first()
+            experiment_filemap.filter(pl.col("Time") == min_time)
+            .group_by("Point", maintain_order=True)
+            .agg(pl.col("date").first())
         )
-    except KeyError:
+    except Exception:
         print(
             "### Error: Time 0 not found for all points, experiment time will be computed from lowest Time value for each point.###"
         )
-        first_time = experiment_filemap.loc[
-            experiment_filemap.groupby("Point")["Time"].idxmin()
-        ].set_index("Point")["date"]
-
-    if hasattr(first_time.dtype, "tz") and first_time.dt.tz is not None:
-        first_time = first_time.dt.tz_localize(None)
-
-    with parallel_config(backend="loky", n_jobs=-1):
-        experiment_time = Parallel()(
-            delayed(calculate_experiment_time)(point, experiment_filemap, first_time)
-            for point in experiment_filemap["Point"].unique()
+        first_time = (
+            experiment_filemap.group_by("Point", maintain_order=True)
+            .agg(pl.col("Time").arg_min().alias("min_idx"))
+            .join(experiment_filemap, on="Point")
+            .group_by("Point", maintain_order=True)
+            .agg(pl.col("date").first())
         )
 
-    experiment_time = pd.concat(experiment_time)
-    experiment_filemap["ExperimentTime"] = experiment_time
+    # remove timezone from first_time if present
+    if first_time.select(pl.col("date")).to_series().dtype.time_zone is not None:
+        first_time = first_time.with_columns(pl.col("date").dt.replace_time_zone(None))
 
-    return experiment_filemap["ExperimentTime"]
+    first_time = first_time.rename({"date": "first_date"})
 
+    experiment_filemap = experiment_filemap.join(first_time, on="Point", how="left")
 
-def calculate_experiment_time(point, experiment_filemap, first_time):
-    point_indices = experiment_filemap["Point"] == point
-    point_data = experiment_filemap.loc[point_indices]
-    try:
-        dates = pd.to_datetime(
-            pd.Series(point_data["date"].values, index=point_data.index)
+    experiment_filemap = experiment_filemap.with_columns(
+        ((pl.col("date") - pl.col("first_date")).dt.total_seconds().round(0)).alias(
+            "ExperimentTime"
         )
-        first_time_point = pd.to_datetime(first_time[point])
-        return round((dates - first_time_point).dt.total_seconds())
-    except KeyError:
-        print(f"### Error calculating experiment time for point {point} ###")
-        return pd.Series([np.nan] * len(point_data))
-    except Exception as e:
-        print(
-            f"### Unexpected error calculating experiment time for point {point}: {e} ###"
-        )
-        print(f"dates: {dates}, first_time: {first_time[point]}")
-        return pd.Series([np.nan] * len(point_data))
+    )
+
+    return experiment_filemap.select(pl.col("ExperimentTime")).to_series()
 
 
 # ----BOILERPLATE CODE FOR PICKLING----
@@ -523,6 +476,9 @@ def basic_get_args() -> argparse.Namespace:
     parser.add_argument(
         "-j", "--n_jobs", type=int, help="Number of jobs for parallel execution."
     )
+    parser.add_argument(
+        "-f", "--filemap", help="Pickled experiment filemap (if needed).", default=None
+    )
 
     return parser.parse_args()
 
@@ -530,35 +486,47 @@ def basic_get_args() -> argparse.Namespace:
 # ----BOILERPLATE CODE FOR SAVING ----
 
 
-def rename_merge_and_save_csv(
+def rename_merge_and_save_records(
     experiment_filemap,
     filemap_path,
-    csv_file,
+    records_file,
     column_name_old,
     column_name_new,
     merge_cols=["Time", "Point"],
 ):
-    dataframe = pd.read_csv(csv_file)
-    dataframe.rename(columns={column_name_old: column_name_new}, inplace=True)
+    if records_file.endswith(".parquet"):
+        dataframe = pl.read_parquet(records_file)
+    else:
+        dataframe = pl.read_csv(records_file)
+
+    dataframe = dataframe.rename({column_name_old: column_name_new})
+
     if column_name_new in experiment_filemap.columns:
-        experiment_filemap.drop(columns=[column_name_new], inplace=True)
-    experiment_filemap = experiment_filemap.merge(dataframe, on=merge_cols, how="left")
-    experiment_filemap.to_csv(filemap_path, index=False)
+        experiment_filemap = experiment_filemap.drop(column_name_new)
+
+    experiment_filemap = experiment_filemap.join(dataframe, on=merge_cols, how="left")
+
+    write_filemap(experiment_filemap, filemap_path)
+
     return experiment_filemap
 
 
-def merge_and_save_csv(
-    experiment_filemap, filemap_path, csv_file, merge_cols=["Time", "Point"]
+def merge_and_save_records(
+    experiment_filemap, filemap_path, records_file, merge_cols=["Time", "Point"]
 ):
-    dataframe = pd.read_csv(csv_file)
-    new_columns = [
-        column
-        for column in dataframe.columns
-        if (column != "Time" and column != "Point")
-    ]
-    for column in new_columns:
-        if column in experiment_filemap.columns:
-            experiment_filemap.drop(columns=[column], inplace=True)
-    experiment_filemap = experiment_filemap.merge(dataframe, on=merge_cols, how="left")
-    experiment_filemap.to_csv(filemap_path, index=False)
+    if records_file.endswith(".parquet"):
+        dataframe = pl.read_parquet(records_file)
+    else:
+        dataframe = pl.read_csv(records_file)
+
+    new_columns = [column for column in dataframe.columns if column not in merge_cols]
+
+    # Drop any overlapping columns from experiment_filemap
+    columns_to_drop = [col for col in new_columns if col in experiment_filemap.columns]
+    if columns_to_drop:
+        experiment_filemap = experiment_filemap.drop(columns_to_drop)
+
+    experiment_filemap = experiment_filemap.join(dataframe, on=merge_cols, how="left")
+    write_filemap(experiment_filemap, filemap_path)
+
     return experiment_filemap

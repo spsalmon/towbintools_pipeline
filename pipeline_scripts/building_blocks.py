@@ -3,11 +3,11 @@ from abc import ABC
 from abc import abstractmethod
 
 import numpy as np
+from towbintools.foundation.file_handling import add_dir_to_experiment_filemap
 
-from pipeline_scripts.utils import add_dir_to_experiment_filemap
 from pipeline_scripts.utils import create_linker_command
 from pipeline_scripts.utils import filter_files_of_group
-from pipeline_scripts.utils import get_input_and_output_files_parallel
+from pipeline_scripts.utils import get_input_and_output_files
 from pipeline_scripts.utils import get_output_name
 from pipeline_scripts.utils import pickle_objects
 from pipeline_scripts.utils import run_command
@@ -41,17 +41,12 @@ OPTIONS_MAP = {
         "pixelsize",
         "morphological_features",
     ],
-    # "classification": [
-    #     "rerun_classification",
-    #     "classification_source",
-    #     "classifier",
-    #     "pixelsize",
-    # ],
     "quality_control": [
         "rerun_quality_control",
         "qc_images",
         "qc_masks",
         "qc_model_path",
+        "qc_import_eggs_from",
     ],
     "molt_detection": [
         "rerun_molt_detection",
@@ -103,6 +98,7 @@ DEFAULT_OPTIONS = {
     },
     "quality_control": {
         "rerun_quality_control": [False],
+        "qc_import_eggs_from": [None],
     },
     # "classification": {
     #     "rerun_classification": [False],
@@ -129,7 +125,14 @@ DEFAULT_OPTIONS = {
 
 class BuildingBlock(ABC):
     def __init__(
-        self, name, options, block_config, return_type, script_path, requires_gpu=False
+        self,
+        name,
+        options,
+        block_config,
+        return_type,
+        script_path,
+        requires_gpu=False,
+        requires_filemap=False,
     ):
         self.name = name
         self.options = options
@@ -137,6 +140,7 @@ class BuildingBlock(ABC):
         self.return_type = return_type
         self.script_path = script_path
         self.requires_gpu = requires_gpu
+        self.requires_filemap = requires_filemap
 
     def __str__(self):
         return f"{self.name}: {self.block_config}"
@@ -156,6 +160,7 @@ class BuildingBlock(ABC):
         output_pickle_path,
         pickled_block_config,
         config,
+        pickled_filemap_path=None,
     ):
         script_path = self.script_path
 
@@ -167,12 +172,23 @@ class BuildingBlock(ABC):
             raise ValueError(
                 f"Script type of {script_path} is not supported. The pipeline only supports bash or python scripts."
             )
+
+        if pickled_filemap_path is not None:
+            command += f" -f {pickled_filemap_path}"
         return command
 
     def run(self, experiment_filemap, config, subdir=None):
         block_config = self.block_config
         micromamba_path = config.get("micromamba_path", "~/.local/bin/micromamba")
         temp_dir = config["temp_dir"]
+
+        if self.requires_filemap:
+            pickled_filemap_path = pickle_objects(
+                temp_dir,
+                {"path": "experiment_filemap", "obj": experiment_filemap},
+            )[0]
+        else:
+            pickled_filemap_path = None
 
         if self.return_type == "subdir":
             subdir = self.get_output_name(config, subdir)
@@ -198,6 +214,7 @@ class BuildingBlock(ABC):
                     output_pickle_path,
                     pickled_block_config,
                     config,
+                    pickled_filemap_path=pickled_filemap_path,
                 )
 
                 linker_command = create_linker_command(
@@ -251,6 +268,7 @@ class BuildingBlock(ABC):
                     output_file,
                     pickled_block_config,
                     config,
+                    pickled_filemap_path=pickled_filemap_path,
                 )
 
                 linker_command = create_linker_command(
@@ -320,7 +338,7 @@ class SegmentationBuildingBlock(BuildingBlock):
         )
 
     def get_input_and_output_files(self, config, experiment_filemap, subdir):
-        input_files, output_files = get_input_and_output_files_parallel(
+        input_files, output_files = get_input_and_output_files(
             experiment_filemap,
             [self.block_config["segmentation_column"]],
             subdir,
@@ -373,7 +391,10 @@ class StraighteningBuildingBlock(BuildingBlock):
                     experiment_filemap = add_dir_to_experiment_filemap(
                         experiment_filemap, column_subdir, column
                     )
-                    experiment_filemap.to_csv(config["filemap_path"], index=False)
+                    if config["filemap_path"].endswith(".parquet"):
+                        experiment_filemap.write_parquet(config["filemap_path"])
+                    else:
+                        experiment_filemap.write_csv(config["filemap_path"])
                 except Exception as e:
                     print(e)
                     print(
@@ -381,7 +402,7 @@ class StraighteningBuildingBlock(BuildingBlock):
                     )
                     return subdir
 
-        input_files, straightening_output_files = get_input_and_output_files_parallel(
+        input_files, straightening_output_files = get_input_and_output_files(
             experiment_filemap,
             columns,
             subdir,
@@ -406,6 +427,7 @@ class QualityControlBuildingBlock(BuildingBlock):
             block_config,
             "csv",
             script_path,
+            requires_filemap=True,
         )
         self.mask_only = (
             block_config["qc_images"] is None or block_config["qc_images"][0] is None
@@ -428,7 +450,7 @@ class QualityControlBuildingBlock(BuildingBlock):
         else:
             columns = [block_config["qc_images"][0], block_config["qc_masks"]]
 
-        input_files, _ = get_input_and_output_files_parallel(
+        input_files, _ = get_input_and_output_files(
             experiment_filemap,
             columns,
             subdir,
@@ -475,7 +497,7 @@ class MorphologyComputationBuildingBlock(BuildingBlock):
         ]
         analysis_subdir = config["analysis_subdir"]
 
-        input_files, _ = get_input_and_output_files_parallel(
+        input_files, _ = get_input_and_output_files(
             experiment_filemap,
             morphology_computation_masks,
             analysis_subdir,
@@ -484,41 +506,6 @@ class MorphologyComputationBuildingBlock(BuildingBlock):
         input_files = [input_file[0] for input_file in input_files]
 
         return input_files, None
-
-
-# class ClassificationBuildingBlock(BuildingBlock):
-#     def __init__(self, block_config):
-#         script_path = "./pipeline_scripts/classify.py"
-#         super().__init__(
-#             "classification",
-#             OPTIONS_MAP["classification"],
-#             block_config,
-#             "csv",
-#             script_path,
-#         )
-
-#     def get_output_name(self, config, subdir):
-#         model_name = os.path.basename(os.path.normpath(self.block_config["classifier"]))
-#         model_name = model_name.split("_classifier")[0]
-#         return get_output_name(
-#             config,
-#             self.block_config["classification_source"],
-#             model_name,
-#             subdir=subdir,
-#             return_subdir=False,
-#         )
-
-#     def get_input_and_output_files(self, config, experiment_filemap, subdir):
-#         classification_source = [self.block_config["classification_source"]]
-#         analysis_subdir = config["analysis_subdir"]
-
-#         input_files, _ = get_input_and_output_files_parallel(
-#             experiment_filemap, classification_source, analysis_subdir
-#         )
-
-#         input_files = [input_file[0] for input_file in input_files]
-
-#         return input_files, None
 
 
 class MoltDetectionBuildingBlock(BuildingBlock):
@@ -588,9 +575,7 @@ class FluorescenceQuantificationBuildingBlock(BuildingBlock):
             self.block_config["fluorescence_quantification_masks"],
         ]
 
-        input_files, _ = get_input_and_output_files_parallel(
-            experiment_filemap, columns, subdir
-        )
+        input_files, _ = get_input_and_output_files(experiment_filemap, columns, subdir)
 
         if len(input_files) != 0:
             input_files = [

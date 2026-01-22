@@ -2,14 +2,15 @@ import argparse
 import os
 
 import numpy as np
-import pandas as pd
+import polars as pl
 import yaml
-from towbintools.foundation import file_handling as file_handling
+from towbintools.foundation.file_handling import get_dir_filemap
+from towbintools.foundation.file_handling import read_filemap
+from towbintools.foundation.file_handling import write_filemap
 
 from pipeline_scripts.building_blocks import parse_and_create_building_blocks
 from pipeline_scripts.utils import create_temp_folders
 from pipeline_scripts.utils import get_and_create_folders
-from pipeline_scripts.utils import get_and_create_folders_subdir
 from pipeline_scripts.utils import get_experiment_subdirs
 from pipeline_scripts.utils import get_experiment_time_from_filemap
 from pipeline_scripts.utils import pickle_objects
@@ -50,23 +51,13 @@ create_temp_folders(temp_dir)
 def main(global_config, temp_dir_basename, temp_dir, subdir=None):
     print(f"### Initializing the pipeline for subdir {subdir} ###")
 
-    if subdir is None:
-        (
-            experiment_dir,
-            raw_subdir,
-            analysis_subdir,
-            report_subdir,
-            pipeline_backup_dir,
-        ) = get_and_create_folders(global_config)
-
-    else:
-        (
-            experiment_dir,
-            raw_subdir,
-            analysis_subdir,
-            report_subdir,
-            pipeline_backup_dir,
-        ) = get_and_create_folders_subdir(global_config, subdir)
+    (
+        experiment_dir,
+        raw_subdir,
+        analysis_subdir,
+        report_subdir,
+        pipeline_backup_dir,
+    ) = get_and_create_folders(global_config, subdir)
 
     pipeline_backup_dir = os.path.join(pipeline_backup_dir, temp_dir_basename)
     os.makedirs(pipeline_backup_dir, exist_ok=True)
@@ -74,47 +65,61 @@ def main(global_config, temp_dir_basename, temp_dir, subdir=None):
     config = global_config.copy()
 
     config["raw_subdir"] = raw_subdir
-    raw_dir_name = os.path.basename(os.path.normpath(raw_subdir))
+    if subdir is None:
+        raw_dir_name = os.path.basename(os.path.normpath(raw_subdir))
+    else:
+        # instead, get the name from the parent directory
+        raw_dir_name = os.path.basename(os.path.normpath(os.path.dirname(raw_subdir)))
+
     config["raw_dir_name"] = raw_dir_name
     config["analysis_subdir"] = analysis_subdir
     config["report_subdir"] = report_subdir
     config["pipeline_backup_dir"] = pipeline_backup_dir
     config["temp_dir"] = temp_dir
 
+    report_format = config.get("report_format", "csv")
+
     sync_backup_folder(temp_dir, pipeline_backup_dir)
 
     extract_experiment_time = config.get("get_experiment_time", True)
     overwrite_annotated = config.get("overwrite_annotated_filemap", False)
 
-    if not os.path.exists(os.path.join(report_subdir, "analysis_filemap.csv")):
-        experiment_filemap = file_handling.get_dir_filemap(raw_subdir)
+    if not os.path.exists(
+        os.path.join(report_subdir, f"analysis_filemap.{report_format}")
+    ):
+        experiment_filemap = get_dir_filemap(raw_subdir)
 
         # if the filemap is empty, it's probably because they do not follow the Time, Point structure
-        if experiment_filemap.empty:
-            experiment_filemap = pd.DataFrame()
-            experiment_filemap["ImagePath"] = sorted(
-                [os.path.join(raw_subdir, f) for f in os.listdir(raw_subdir)]
+        if experiment_filemap.is_empty():
+            experiment_filemap = pl.DataFrame()
+            experiment_filemap = experiment_filemap.with_columns(
+                pl.lit(
+                    sorted(
+                        [os.path.join(raw_subdir, f) for f in os.listdir(raw_subdir)]
+                    )
+                ).alias("ImagePath")
             )
             config["no_timepoints"] = True
 
-        experiment_filemap.rename(columns={"ImagePath": raw_dir_name}, inplace=True)
-        filemap_path = os.path.join(report_subdir, "analysis_filemap.csv")
-        experiment_filemap = experiment_filemap.replace(np.nan, "", regex=True)
-        experiment_filemap.to_csv(filemap_path, index=False)
+        experiment_filemap = experiment_filemap.rename({"ImagePath": raw_dir_name})
+        filemap_path = os.path.join(report_subdir, f"analysis_filemap.{report_format}")
+        experiment_filemap = experiment_filemap.fill_nan("").fill_null("")
+        write_filemap(experiment_filemap, filemap_path)
 
     else:
         if overwrite_annotated and os.path.exists(
-            os.path.join(report_subdir, "analysis_filemap_annotated.csv")
+            os.path.join(report_subdir, f"analysis_filemap_annotated.{report_format}")
         ):
-            filemap_path = os.path.join(report_subdir, "analysis_filemap_annotated.csv")
+            filemap_path = os.path.join(
+                report_subdir, f"analysis_filemap_annotated.{report_format}"
+            )
         else:
-            filemap_path = os.path.join(report_subdir, "analysis_filemap.csv")
+            filemap_path = os.path.join(
+                report_subdir, f"analysis_filemap.{report_format}"
+            )
 
-        experiment_filemap = pd.read_csv(
-            filemap_path,
-            low_memory=False,
-        )
-        experiment_filemap = experiment_filemap.replace(np.nan, "", regex=True)
+        experiment_filemap = read_filemap(filemap_path)
+        experiment_filemap = experiment_filemap.fill_nan("").fill_null("")
 
     config["filemap_path"] = filemap_path
 
@@ -122,13 +127,17 @@ def main(global_config, temp_dir_basename, temp_dir, subdir=None):
     if "ExperimentTime" not in experiment_filemap.columns:
         if extract_experiment_time:
             print("### Calculating ExperimentTime ###")
-            experiment_filemap["ExperimentTime"] = get_experiment_time_from_filemap(
-                experiment_filemap, config
+            experiment_filemap = experiment_filemap.with_columns(
+                pl.lit(
+                    get_experiment_time_from_filemap(experiment_filemap, config)
+                ).alias("ExperimentTime")
             )
-            experiment_filemap.to_csv(config["filemap_path"], index=False)
+            write_filemap(experiment_filemap, filemap_path)
         else:
-            experiment_filemap["ExperimentTime"] = np.nan
-            experiment_filemap.to_csv(config["filemap_path"], index=False)
+            experiment_filemap = experiment_filemap.with_columns(
+                pl.lit(np.nan).alias("ExperimentTime")
+            )
+            write_filemap(experiment_filemap, filemap_path)
 
     print("Building the config of the building blocks ...")
 
@@ -166,8 +175,5 @@ current_building_block, current_subdir, current_config = (
     current["config"],
 )
 
-experiment_filemap = pd.read_csv(
-    current_config["filemap_path"],
-    low_memory=False,
-)
+experiment_filemap = read_filemap(current_config["filemap_path"])
 current_building_block.run(experiment_filemap, current_config, subdir=current_subdir)

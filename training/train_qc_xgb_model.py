@@ -138,6 +138,10 @@ annotations_df["ImagePath"] = annotations_df["ImagePath"].str.replace("\\", "/")
 annotations_df["MaskPath"] = annotations_df["ImagePath"].apply(
     lambda x: os.path.join(mask_dir, os.path.basename(x))
 )
+# remove rows with no class label or classes not in the project config
+annotations_df = annotations_df[annotations_df["Class"].isin(classes)].reset_index(
+    drop=True
+)
 
 print(annotations_df.head())
 # check that image and mask paths exist

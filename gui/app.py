@@ -4,10 +4,13 @@ from app_components.ui import main_server
 from shiny import App
 
 recompute_features_at_molt = False
+lazy_loading = True
 
-filemap_path = "/mnt/towbin.data/shared/plenart/20232707_Ti2_wbt125_measuring_measurement_error_for_organ_size_paper/analysis_towbintools_paper/report/analysis_filemap.csv"
+filemap_path = "/mnt/towbin.data/shared/fdell/Starvation_survival_wild_strains/20251210_SQUID1_wBT499to506_N2_stravation_survival/analysis/report/analysis_filemap.csv"
 
-filemap, filemap_save_path = open_filemap(filemap_path, open_annotated=True)
+filemap, filemap_save_path = open_filemap(
+    filemap_path, open_annotated=True, lazy_loading=lazy_loading
+)
 
 print("Creating the app ...")
 (

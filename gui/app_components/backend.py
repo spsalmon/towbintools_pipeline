@@ -29,7 +29,7 @@ def get_backup_path(filemap_folder, filemap_name):
     return filemap_save_path
 
 
-def open_filemap(filemap_path, open_annotated=True):
+def open_filemap(filemap_path, open_annotated=True, lazy_loading=False):
     filemap_folder = os.path.dirname(filemap_path)
     filemap_name = os.path.basename(filemap_path).split(".")[0]
 
@@ -52,12 +52,18 @@ def open_filemap(filemap_path, open_annotated=True):
     elif "annotated" in filemap_name:
         filemap_save_path = filemap_path
 
-    # Read the filemap (either original or annotated)
-    filemap = pl.read_csv(
-        filemap_path,
-        infer_schema_length=10000,
-        null_values=["np.nan", "[nan]", "", "NaN", "nan", "NA", "N/A"],
-    )
+    if lazy_loading:
+        filemap = pl.scan_csv(
+            filemap_path,
+            infer_schema_length=10000,
+            null_values=["np.nan", "[nan]", "", "NaN", "nan", "NA", "N/A"],
+        )
+    else:
+        filemap = pl.read_csv(
+            filemap_path,
+            infer_schema_length=10000,
+            null_values=["np.nan", "[nan]", "", "NaN", "nan", "NA", "N/A"],
+        )
 
     # Backup the filemap
     backup_path = get_backup_path(filemap_folder, filemap_name)

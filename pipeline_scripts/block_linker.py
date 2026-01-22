@@ -1,12 +1,14 @@
 import argparse
 import os
 
-import pandas as pd
+import polars as pl
+from towbintools.foundation.file_handling import add_dir_to_experiment_filemap
+from towbintools.foundation.file_handling import read_filemap
+from towbintools.foundation.file_handling import write_filemap
 
-from pipeline_scripts.utils import add_dir_to_experiment_filemap
 from pipeline_scripts.utils import cleanup_files
 from pipeline_scripts.utils import load_pickles
-from pipeline_scripts.utils import merge_and_save_csv
+from pipeline_scripts.utils import merge_and_save_records
 from pipeline_scripts.utils import pickle_objects
 from pipeline_scripts.utils import sync_backup_folder
 
@@ -40,31 +42,39 @@ def cleanup_temp_pickles(pickle_dir, keep_paths):
 
 
 def update_experiment_filemap(
-    experiment_filemap, config, result, previous_block, previous_subdir, report_subdir
+    experiment_filemap: pl.DataFrame,
+    config,
+    result,
+    previous_block,
+    previous_subdir,
+    report_subdir,
 ):
     """Update experiment_filemap based on previous block's return type."""
+    filemap_path = config["filemap_path"]
     if previous_block.return_type == "subdir":
         # The column name is always the same regardless of previous_subdir
         column_name = f'{config["analysis_dir_name"]}/{os.path.basename(os.path.normpath(result))}'
         no_timepoint = config.get("no_timepoint", False)
         print(config)
         if no_timepoint or ("Time" not in experiment_filemap.columns):
-            experiment_filemap[column_name] = sorted(
-                [os.path.join(result, f) for f in os.listdir(result)]
+            experiment_filemap = experiment_filemap.with_columns(
+                pl.lit(
+                    sorted([os.path.join(result, f) for f in os.listdir(result)])
+                ).alias(column_name)
             )
         else:
             experiment_filemap = add_dir_to_experiment_filemap(
                 experiment_filemap, result, column_name
             )
-        experiment_filemap.to_csv(config["filemap_path"], index=False)
+        write_filemap(experiment_filemap, filemap_path)
     elif previous_block.return_type == "csv":
         if previous_block.name == "molt_detection":
-            experiment_filemap = merge_and_save_csv(
-                experiment_filemap, config["filemap_path"], result, merge_cols=["Point"]
+            experiment_filemap = merge_and_save_records(
+                experiment_filemap, filemap_path, result, merge_cols=["Point"]
             )
         else:
-            experiment_filemap = merge_and_save_csv(
-                experiment_filemap, config["filemap_path"], result
+            experiment_filemap = merge_and_save_records(
+                experiment_filemap, filemap_path, result
             )
     return experiment_filemap
 
@@ -108,9 +118,7 @@ def main():
         sync_backup_folder(previous_config["temp_dir"], pipeline_backup_dir)
 
         # Load experiment filemap
-        experiment_filemap = pd.read_csv(
-            previous_config["filemap_path"], low_memory=False
-        )
+        experiment_filemap = read_filemap(previous_config["filemap_path"])
 
         experiment_filemap = update_experiment_filemap(
             experiment_filemap,
@@ -129,10 +137,7 @@ def main():
             current["subdir"],
             current["config"],
         )
-        experiment_filemap = pd.read_csv(
-            current_config["filemap_path"],
-            low_memory=False,
-        )
+        experiment_filemap = read_filemap(current_config["filemap_path"])
         print(f"Running {current_building_block} ...")
         result = current_building_block.run(
             experiment_filemap, current_config, subdir=current_subdir
