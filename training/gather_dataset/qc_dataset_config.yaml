@@ -14,7 +14,7 @@ database_configs: {
   },
 }
 
-class_proportions: {"error": 0.0, "potential_error": 0.45, "good": 0.45, "egg": 0.1}
+class_proportions: {"error": 0.0, "potential_error": 0.5, "good": 0.5, "egg": 0.0}
 # smoother configuration
 lambda: 0.0075
 # threshold quantile
