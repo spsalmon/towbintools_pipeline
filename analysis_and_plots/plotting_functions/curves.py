@@ -4,6 +4,7 @@ from towbintools.data_analysis import rescale_and_aggregate
 from towbintools.data_analysis.time_series import (
     smooth_series_classified,
 )
+from towbintools.foundation.utils import find_best_string_match
 
 from .utils_plotting import build_legend
 from .utils_plotting import get_colors
@@ -38,14 +39,19 @@ def plot_aggregated_series(
                 larval_stage_durations = condition_dict[
                     "larval_stage_durations_time_step"
                 ]
-            # TEMPORARY, ONLY WORKS WITH SINGLE CLASSIFICATION, FIND A WAY TO GENERALIZE
-            worm_type_key = [key for key in condition_dict.keys() if "qc" in key][0]
+
+            qc_keys = [key for key in condition_dict.keys() if "qc" in key]
+            if len(qc_keys) == 1:
+                qc_key = qc_keys[0]
+            else:
+                qc_key = find_best_string_match(column, qc_keys)
+
             rescaled_time, aggregated_series, _, ste_series = rescale_and_aggregate(
                 condition_dict[column],
                 time,
                 condition_dict["ecdysis_index"],
                 larval_stage_durations,
-                condition_dict[worm_type_key],
+                condition_dict[qc_key],
                 aggregation=aggregation,
                 n_points=n_points,
             )
@@ -99,12 +105,17 @@ def plot_growth_curves_individuals(
     )
     for i, condition_id in enumerate(conditions_to_plot):
         condition_dict = conditions_struct[condition_id]
-        # TEMPORARY, ONLY WORKS WITH SINGLE CLASSIFICATION, FIND A WAY TO GENERALIZE
-        worm_type_key = [key for key in condition_dict.keys() if "qc" in key][0]
+
+        qc_keys = [key for key in condition_dict.keys() if "qc" in key]
+        if len(qc_keys) == 1:
+            qc_key = qc_keys[0]
+        else:
+            qc_key = find_best_string_match(column, qc_keys)
+
         for j in range(len(condition_dict[column])):
             time = condition_dict["experiment_time"][j] / 3600
             data = condition_dict[column][j]
-            qc = condition_dict[worm_type_key][j]
+            qc = condition_dict[qc_key][j]
             hatch = condition_dict["ecdysis_time_step"][j][0]
             hatch_experiment_time = (
                 condition_dict["ecdysis_experiment_time"][j][0] / 3600

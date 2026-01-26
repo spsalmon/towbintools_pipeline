@@ -2,13 +2,14 @@ import logging
 import os
 import re
 
-import pandas as pd
+import polars as pl
 import utils
 from joblib import delayed
 from joblib import Parallel
 from joblib import parallel_config
 from towbintools.foundation import image_handling
 from towbintools.foundation import worm_features
+from towbintools.foundation.file_handling import write_filemap
 
 
 def compute_morphological_features_from_file_path(
@@ -51,19 +52,17 @@ def main(input_pickle, output_file, config, n_jobs):
             )
             for input_file in input_files
         )
-    morphological_features_dataframe = pd.DataFrame(morphological_features)
+    morphological_features_dataframe = pl.DataFrame(morphological_features)
 
     # rename columns to match the rest of the pipeline
-    output_file_basename = os.path.basename(output_file).split("_morphology.csv")[0]
+    output_file_basename = os.path.basename(output_file).split("_morphology")[0]
     for feature in config["morphological_features"]:
-        morphological_features_dataframe.rename(
-            columns={
+        morphological_features_dataframe = morphological_features_dataframe.rename(
+            {
                 feature: f"{output_file_basename}_{feature}",
             },
-            inplace=True,
         )
-
-    morphological_features_dataframe.to_csv(output_file, index=False)
+    write_filemap(morphological_features_dataframe, output_file)
 
 
 if __name__ == "__main__":

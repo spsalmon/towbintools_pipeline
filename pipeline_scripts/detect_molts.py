@@ -18,7 +18,10 @@ from towbintools.deep_learning.deep_learning_tools import (
 from towbintools.deep_learning.utils.dataset import KeypointDetection1DPredictionDataset
 from towbintools.foundation import detect_molts
 from towbintools.foundation.detect_molts import find_hatch_time
+from towbintools.foundation.file_handling import read_filemap
+from towbintools.foundation.file_handling import write_filemap
 from towbintools.foundation.keypoint_detection import heatmap_to_keypoints_1D
+from towbintools.foundation.utils import find_best_string_match
 from towbintools.foundation.worm_features import get_features_to_compute_at_molt
 from tqdm import tqdm
 
@@ -55,18 +58,26 @@ def separate_column_by_point(filemap, column):
 def run_detect_molts(
     analysis_filemap,
     volume_column,
-    worm_type_column,
     point,
     molt_size_range=[6.6e4, 15e4, 36e4, 102e4],
     search_width=20,
     fit_width=5,
 ):
-    data_of_point = analysis_filemap[analysis_filemap["Point"] == point]
-    volumes = data_of_point[volume_column]
-    # replace '' with np.nan
+    data_of_point = analysis_filemap.filter(pl.col("Point") == point)
+    volumes = data_of_point.select(pl.col(volume_column))
+
     volumes = volumes.replace("", np.nan)
-    volumes = volumes.values.astype(float)
-    worm_types = data_of_point[worm_type_column].values
+    volumes = volumes.to_numpy().squeeze().astype(float)
+
+    # find the qc column with the best match to the volume column
+    qc_columns = [col for col in analysis_filemap.columns if "qc" in col]
+
+    if len(qc_columns) == 1:
+        worm_type_column = qc_columns[0]
+    else:
+        worm_type_column = find_best_string_match(volume_column, qc_columns)
+
+    worm_types = data_of_point.select(pl.col(worm_type_column)).to_numpy().squeeze()
     try:
         # Detect molts
         ecdysis = detect_molts.find_molts(
@@ -98,11 +109,16 @@ def run_detect_molts(
 def run_detect_molts_deep_learning(
     analysis_filemap,
     molt_detection_columns,
-    worm_type_column,
     model_path,
     batch_size=1,
 ):
-    analysis_filemap = pl.from_pandas(analysis_filemap)
+    # find the qc column with the best match to the volume column
+    qc_columns = [col for col in analysis_filemap.columns if "qc" in col]
+
+    if len(qc_columns) == 1:
+        worm_type_column = qc_columns[0]
+    else:
+        worm_type_column = find_best_string_match(molt_detection_columns[0], qc_columns)
 
     worm_type_data = separate_column_by_point(analysis_filemap, worm_type_column)
 
@@ -120,6 +136,8 @@ def run_detect_molts_deep_learning(
             raise ValueError(f"Column {column} not found in analysis filemap.")
         column_data = separate_column_by_point(analysis_filemap, column)
 
+        print(f"Column data shape for {column}: {column_data.shape}")
+
         corrected_column_data = []
         for i, series_i in enumerate(column_data):
             worm_type_i = worm_type_data[i]
@@ -134,6 +152,10 @@ def run_detect_molts_deep_learning(
         molt_detection_data.append(np.array(corrected_column_data))
 
     molt_detection_data = np.array(molt_detection_data).squeeze()
+    if molt_detection_data.ndim == 1:
+        molt_detection_data = molt_detection_data[np.newaxis, ...]
+
+    print(f"Molt detection data shape: {molt_detection_data.shape}")
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -207,15 +229,14 @@ def run_detect_molts_deep_learning(
     }
     for i, column in enumerate(molt_columns):
         molt_data[column] = molt_times[:, i]
-    molts_dataframe = pd.DataFrame(molt_data)
+    molts_dataframe = pl.DataFrame(molt_data)
     return molts_dataframe
 
 
-def compute_features_at_molt(analysis_filemap, molt_dataframe, worm_type_column, point):
-    data_of_point = analysis_filemap[analysis_filemap["Point"] == point]
-    molt_data_of_point = molt_dataframe[molt_dataframe["Point"] == point]
-    data_of_point = data_of_point.sort_values(by=["Time"])
-    worm_types = data_of_point[worm_type_column].values
+def compute_features_at_molt(analysis_filemap, molt_dataframe, point):
+    data_of_point = analysis_filemap.filter(pl.col("Point") == point)
+    molt_data_of_point = molt_dataframe.filter(pl.col("Point") == point)
+    data_of_point = data_of_point.sort(by="Time")
 
     columns_to_compute = []
     for feature in FEATURES_TO_COMPUTE_AT_MOLT:
@@ -227,16 +248,31 @@ def compute_features_at_molt(analysis_filemap, molt_dataframe, worm_type_column,
             ]
         )
 
+    molt_values = (
+        molt_data_of_point.select(pl.col(["HatchTime", "M1", "M2", "M3", "M4"]))
+        .to_numpy()
+        .squeeze()
+    )
+    time_values = data_of_point.select(pl.col("Time")).to_numpy().squeeze()
     # compute the features at each molt
     features_at_molt = {"Point": point}
+    qc_columns = [col for col in analysis_filemap.columns if "qc" in col]
 
     for column in columns_to_compute:
-        column_data = data_of_point[column]
-        column_data = column_data.replace("", np.nan)
-        column_data = column_data.values.astype(float)
+        # find the qc column with the best match to the volume column
+        if len(qc_columns) == 1:
+            worm_type_column = qc_columns[0]
+        else:
+            worm_type_column = find_best_string_match(column, qc_columns)
 
-        for molt in ["HatchTime", "M1", "M2", "M3", "M4"]:
-            molt_time = float(molt_data_of_point[molt].values[0])
+        print(f"Using worm type column {worm_type_column} for feature column {column}")
+
+        worm_types = data_of_point.select(pl.col(worm_type_column)).to_numpy().squeeze()
+        column_data = data_of_point.select(pl.col(column))
+        column_data = column_data.to_numpy().squeeze().astype(float)
+
+        for i, molt in enumerate(["HatchTime", "M1", "M2", "M3", "M4"]):
+            molt_time = float(molt_values[i])
             try:
                 if not np.isnan(molt_time):
                     features_at_molt[
@@ -244,9 +280,9 @@ def compute_features_at_molt(analysis_filemap, molt_dataframe, worm_type_column,
                     ] = compute_series_at_time_classified(
                         column_data,
                         molt_time,
-                        data_of_point["Time"].values,
+                        time_values,
                         worm_types,
-                    )
+                    ).item()
                 else:
                     features_at_molt[f"{column}_at_{molt}"] = np.nan
             except Exception as e:
@@ -262,8 +298,6 @@ def main(input_dataframe_path, output_file, config, n_jobs):
     config = utils.load_pickles(config)[0]
 
     method = config.get("molt_detection_method", "legacy")
-
-    print(f"Running molt detection with method: {method}")
 
     if method == "deep_learning":
         model_path = config.get("molt_detection_model_path", None)
@@ -284,7 +318,8 @@ def main(input_dataframe_path, output_file, config, n_jobs):
     else:
         molt_detection_columns = config["molt_detection_columns"]
 
-    analysis_filemap = pd.read_pickle(input_dataframe_path)
+    analysis_filemap = utils.load_pickles(input_dataframe_path)[0]
+    analysis_filemap = read_filemap(analysis_filemap)
 
     os.makedirs(os.path.dirname(output_file), exist_ok=True)
 
@@ -294,17 +329,15 @@ def main(input_dataframe_path, output_file, config, n_jobs):
                 delayed(run_detect_molts)(
                     analysis_filemap,
                     molt_detection_columns[0],
-                    config["molt_detection_worm_type"],
                     point,
                 )
-                for point in analysis_filemap["Point"].unique()
+                for point in analysis_filemap["Point"].unique(maintain_order=True)
             )
             molts_dataframe = pd.DataFrame(molts)
     elif method == "deep_learning":
         molts_dataframe = run_detect_molts_deep_learning(
             analysis_filemap,
             molt_detection_columns,
-            config["molt_detection_worm_type"],
             model_path,
             batch_size=config.get("molt_detection_batch_size", 1),
         )
@@ -315,18 +348,19 @@ def main(input_dataframe_path, output_file, config, n_jobs):
             delayed(compute_features_at_molt)(
                 analysis_filemap,
                 molts_dataframe,
-                config["molt_detection_worm_type"],
                 point,
             )
-            for point in analysis_filemap["Point"].unique()
+            for point in analysis_filemap["Point"].unique(maintain_order=True)
         )
 
-    other_features_at_molt_dataframe = pd.DataFrame(other_features_at_molt)
-    molts_dataframe = molts_dataframe.merge(
-        other_features_at_molt_dataframe, on="Point"
+    other_features_at_molt_dataframe = pl.DataFrame(other_features_at_molt)
+    molts_dataframe = molts_dataframe.join(
+        other_features_at_molt_dataframe,
+        on="Point",
+        how="left",
     )
 
-    molts_dataframe.to_csv(output_file, index=False)
+    write_filemap(molts_dataframe, output_file)
 
 
 if __name__ == "__main__":

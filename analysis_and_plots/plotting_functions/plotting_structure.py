@@ -5,6 +5,7 @@ import numpy as np
 import polars as pl
 import yaml
 from towbintools.data_analysis import compute_series_at_time_classified
+from towbintools.foundation.utils import find_best_string_match
 from towbintools.foundation.worm_features import get_features_to_compute_at_molt
 
 FEATURES_TO_COMPUTE_AT_MOLT = get_features_to_compute_at_molt()
@@ -203,10 +204,6 @@ def _process_condition_id_plotting_structure(
 
     n_points = condition_df.select(pl.col("Point")).n_unique()
 
-    # TEMPORARY, ONLY WORKS WITH SINGLE CLASSIFICATION, FIND A WAY TO GENERALIZE
-    worm_type_column = [col for col in condition_df.columns if "qc" in col][0]
-    worm_types = separate_column_by_point(condition_df, worm_type_column)
-
     condition_dict.update(
         {
             "condition_id": int(condition_dict["condition_id"]),
@@ -226,11 +223,14 @@ def _process_condition_id_plotting_structure(
             "time": time,
             "experiment_time": experiment_time,
             "experiment_time_hours": experiment_time / 3600,
-            "qc": worm_types,
             "death": death,
             "arrest": arrest,
         }
     )
+
+    qc_columns = [
+        col for col in condition_df.columns if "qc" in col or "worm_type" in col
+    ]
 
     for organ in organ_channels.keys():
         organ_channel = organ_channels[organ]
@@ -240,6 +240,25 @@ def _process_condition_id_plotting_structure(
 
         # remove any column with _at_ in it
         organ_columns = [col for col in organ_columns if "_at_" not in col]
+
+        organ_qc_columns = [
+            col for col in organ_columns if "qc" in col or "worm_type" in col
+        ]
+        if len(organ_qc_columns) == 0:
+            organ_qc_columns.append(qc_columns[0])
+
+        renamed_organ_qc_columns = [
+            col.replace(organ_channel, organ) for col in organ_qc_columns
+        ]
+        renamed_organ_qc_columns = [
+            col.replace("worm_type", "qc") for col in renamed_organ_qc_columns
+        ]
+
+        for column, renamed_column in zip(organ_qc_columns, renamed_organ_qc_columns):
+            qc_values = separate_column_by_point(condition_df, column)
+            condition_dict[renamed_column] = qc_values
+            if column in organ_columns:
+                organ_columns.remove(column)
 
         # get the columns that contain the interesting features
         organ_feature_columns = []
@@ -254,6 +273,11 @@ def _process_condition_id_plotting_structure(
                 organ_channel, organ
             )
 
+            qc_key = find_best_string_match(
+                renamed_feature_organ_column, renamed_organ_qc_columns
+            )
+            qc = condition_dict[qc_key]
+
             condition_dict[renamed_feature_organ_column] = separate_column_by_point(
                 condition_df, organ_feature_column
             )
@@ -263,13 +287,12 @@ def _process_condition_id_plotting_structure(
                 condition_df, organ_feature_column, ecdysis_time_step
             )
 
-            if "qc" not in organ_feature_column:
-                condition_dict = _compute_values_at_molt(
-                    condition_dict,
-                    renamed_feature_organ_column,
-                    worm_types,
-                    recompute_values_at_molt=recompute_values_at_molt,
-                )
+            condition_dict = _compute_values_at_molt(
+                condition_dict,
+                renamed_feature_organ_column,
+                qc,
+                recompute_values_at_molt=recompute_values_at_molt,
+            )
 
     # Add custom columns if they exist
     if custom_columns is not None:
