@@ -8,6 +8,7 @@ from sklearn.linear_model import LinearRegression
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import PolynomialFeatures
 from towbintools.data_analysis import rescale_and_aggregate
+from towbintools.foundation.utils import find_best_string_match
 
 from .utils_plotting import build_legend
 from .utils_plotting import get_colors
@@ -472,14 +473,20 @@ def plot_correlation(
     for i, condition_id in enumerate(conditions_to_plot):
         condition_dict = conditions_struct[condition_id]
 
-        # TEMPORARY, ONLY WORKS WITH SINGLE CLASSIFICATION, FIND A WAY TO GENERALIZE
-        worm_type_key = [key for key in condition_dict.keys() if "qc" in key][0]
+        qc_keys = [key for key in condition_dict.keys() if "qc" in key]
+        if len(qc_keys) == 1:
+            column_one_qc_key = qc_keys[0]
+            column_two_qc_key = qc_keys[0]
+        else:
+            column_one_qc_key = find_best_string_match(column_one, qc_keys)
+            column_two_qc_key = find_best_string_match(column_two, qc_keys)
+
         _, aggregated_series_one, _, _ = rescale_and_aggregate(
             condition_dict[column_one],
             condition_dict["time"],
             condition_dict["ecdysis_index"],
             condition_dict["larval_stage_durations_time_step"],
-            condition_dict[worm_type_key],
+            condition_dict[column_one_qc_key],
             aggregation="mean",
         )
 
@@ -488,7 +495,7 @@ def plot_correlation(
             condition_dict["time"],
             condition_dict["ecdysis_index"],
             condition_dict["larval_stage_durations_time_step"],
-            condition_dict[worm_type_key],
+            condition_dict[column_two_qc_key],
             aggregation="mean",
         )
 

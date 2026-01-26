@@ -257,6 +257,16 @@ swa_callback = callbacks.StochasticWeightAveraging(swa_lrs=1e-5)
 # configure logger
 logger = pl_loggers.TensorBoardLogger(model_save_dir)
 
+# try to load a couple of batches to make sure everything is working
+i = 0
+for batch in train_loader:
+    images, masks = batch
+    print(f"Image batch shape: {images.shape}")
+    print(f"Mask batch shape: {masks.shape}")
+    i += 1
+    if i >= 2:
+        break
+
 trainer = pl.Trainer(
     max_epochs=max_epochs,
     accelerator="gpu",

@@ -4,12 +4,12 @@ from app_components.ui import main_server
 from shiny import App
 
 recompute_features_at_molt = False
-lazy_loading = True
+# lazy_loading = False
 
-filemap_path = "/mnt/towbin.data/shared/fdell/Starvation_survival_wild_strains/20251210_SQUID1_wBT499to506_N2_stravation_survival/analysis/report/analysis_filemap.csv"
+filemap_path = "/mnt/towbin.data/shared/spsalmon/pipeline_test_folder/analysis/report/analysis_filemap.parquet"
 
 filemap, filemap_save_path = open_filemap(
-    filemap_path, open_annotated=True, lazy_loading=lazy_loading
+    filemap_path, open_annotated=True, lazy_loading=False
 )
 
 print("Creating the app ...")
@@ -20,7 +20,6 @@ print("Creating the app ...")
     custom_columns_choices,
     points,
     times,
-    qc_column,
     default_plotted_column,
 ) = initialize_ui(filemap, recompute_features_at_molt=recompute_features_at_molt)
 
@@ -36,7 +35,6 @@ def s(input, output, session):
         custom_columns_choices=custom_columns_choices,
         points=points,
         times=times,
-        qc_column=qc_column,
         default_plotted_column=default_plotted_column,
     )
 

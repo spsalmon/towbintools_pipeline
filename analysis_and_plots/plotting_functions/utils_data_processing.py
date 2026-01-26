@@ -7,6 +7,7 @@ from towbintools.data_analysis.growth_rate import (
 from towbintools.data_analysis.time_series import (
     smooth_series_classified,
 )
+from towbintools.foundation.utils import find_best_string_match
 
 
 def combine_series(
@@ -54,9 +55,12 @@ def compute_growth_rate(
 ):
     for condition in conditions_struct:
         series_values = condition[series_name]
-        # TEMPORARY, ONLY WORKS WITH SINGLE CLASSIFICATION, FIND A WAY TO GENERALIZE
-        worm_type_key = [key for key in condition.keys() if "qc" in key][0]
-        qc = condition[worm_type_key]
+        qc_keys = [key for key in condition.keys() if "qc" in key]
+        if len(qc_keys) == 1:
+            qc_key = qc_keys[0]
+        else:
+            qc_key = find_best_string_match(series_name, qc_keys)
+        qc = condition[qc_key]
 
         if experiment_time:
             time = condition["experiment_time_hours"]
@@ -91,9 +95,12 @@ def rescale(
 ):
     for condition in conditions_struct:
         series_values = condition[series_name]
-        # TEMPORARY, ONLY WORKS WITH SINGLE CLASSIFICATION, FIND A WAY TO GENERALIZE
-        worm_type_key = [key for key in condition.keys() if "qc" in key][0]
-        qc = condition[worm_type_key]
+        qc_keys = [key for key in condition.keys() if "qc" in key]
+        if len(qc_keys) == 1:
+            qc_key = qc_keys[0]
+        else:
+            qc_key = find_best_string_match(series_name, qc_keys)
+        qc = condition[qc_key]
         ecdysis = condition["ecdysis_index"]
 
         if experiment_time:
@@ -123,9 +130,12 @@ def rescale_without_flattening(
 ):
     for condition in conditions_struct:
         series_values = condition[series_name]
-        # TEMPORARY, ONLY WORKS WITH SINGLE CLASSIFICATION, FIND A WAY TO GENERALIZE
-        worm_type_key = [key for key in condition.keys() if "qc" in key][0]
-        qc = condition[worm_type_key]
+        qc_keys = [key for key in condition.keys() if "qc" in key]
+        if len(qc_keys) == 1:
+            qc_key = qc_keys[0]
+        else:
+            qc_key = find_best_string_match(series_name, qc_keys)
+        qc = condition[qc_key]
         ecdysis = condition["ecdysis_index"]
 
         if experiment_time:
@@ -173,9 +183,12 @@ def smooth_series(
 ):
     for condition in conditions_struct:
         series_values = condition[series_name]
-        # TEMPORARY, ONLY WORKS WITH SINGLE CLASSIFICATION, FIND A WAY TO GENERALIZE
-        worm_type_key = [key for key in condition.keys() if "qc" in key][0]
-        qc = condition[worm_type_key]
+        qc_keys = [key for key in condition.keys() if "qc" in key]
+        if len(qc_keys) == 1:
+            qc_key = qc_keys[0]
+        else:
+            qc_key = find_best_string_match(series_name, qc_keys)
+        qc = condition[qc_key]
         if experiment_time:
             time = condition["experiment_time_hours"]
         else:
@@ -223,9 +236,12 @@ def smooth_and_rescale_series(
 ):
     for condition in conditions_struct:
         series_values = condition[series_name]
-        # TEMPORARY, ONLY WORKS WITH SINGLE CLASSIFICATION, FIND A WAY TO GENERALIZE
-        worm_type_key = [key for key in condition.keys() if "qc" in key][0]
-        qc = condition[worm_type_key]
+        qc_keys = [key for key in condition.keys() if "qc" in key]
+        if len(qc_keys) == 1:
+            qc_key = qc_keys[0]
+        else:
+            qc_key = find_best_string_match(series_name, qc_keys)
+        qc = condition[qc_key]
         ecdysis = condition["ecdysis_index"]
         if experiment_time:
             time = condition["experiment_time_hours"]

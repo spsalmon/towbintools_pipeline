@@ -66,6 +66,7 @@ def update_experiment_filemap(
             experiment_filemap = add_dir_to_experiment_filemap(
                 experiment_filemap, result, column_name
             )
+        print(f"Writing updated filemap to {filemap_path} ...")
         write_filemap(experiment_filemap, filemap_path)
     elif previous_block.return_type == "csv":
         if previous_block.name == "molt_detection":

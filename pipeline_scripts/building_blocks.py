@@ -6,7 +6,6 @@ import numpy as np
 from towbintools.foundation.file_handling import add_dir_to_experiment_filemap
 
 from pipeline_scripts.utils import create_linker_command
-from pipeline_scripts.utils import filter_files_of_group
 from pipeline_scripts.utils import get_input_and_output_files
 from pipeline_scripts.utils import get_output_name
 from pipeline_scripts.utils import pickle_objects
@@ -27,7 +26,6 @@ OPTIONS_MAP = {
         "enforce_n_channels",
         "activation_layer",
         "batch_size",
-        "run_segmentation_on",
     ],
     "straightening": [
         "rerun_straightening",
@@ -54,7 +52,6 @@ OPTIONS_MAP = {
         "molt_detection_columns",
         "molt_detection_model_path",
         "molt_detection_volume",  # deprecated, use "molt_detection_columns" instead
-        "molt_detection_worm_type",
         "molt_detection_batch_size",
     ],
     "fluorescence_quantification": [
@@ -345,13 +342,6 @@ class SegmentationBuildingBlock(BuildingBlock):
             rerun=self.block_config["rerun_segmentation"],
         )
 
-        input_files = filter_files_of_group(
-            input_files, config, self.block_config["run_segmentation_on"]
-        )
-        output_files = filter_files_of_group(
-            output_files, config, self.block_config["run_segmentation_on"]
-        )
-
         return input_files, output_files
 
 
@@ -520,10 +510,12 @@ class MoltDetectionBuildingBlock(BuildingBlock):
         )
 
     def get_output_name(self, config, subdir):
-        return os.path.join(config["report_subdir"], "ecdysis.csv")
+        return os.path.join(
+            config["report_subdir"], f"ecdysis.{config['report_format']}"
+        )
 
     def get_input_and_output_files(self, config, experiment_filemap, subdir):
-        return experiment_filemap, None
+        return config["filemap_path"], None
 
 
 class FluorescenceQuantificationBuildingBlock(BuildingBlock):
@@ -610,11 +602,13 @@ class CustomBuildingBlock(BuildingBlock):
         elif self.return_type == "csv":
             if subdir is not None:
                 output = os.path.join(
-                    report_subdir, f"{subdir}_{custom_script_name}.csv"
+                    report_subdir,
+                    f"{subdir}_{custom_script_name}.{config['report_format']}",
                 )
             else:
                 output = os.path.join(
-                    report_subdir, f"{subdir}_{custom_script_name}.csv"
+                    report_subdir,
+                    f"{subdir}_{custom_script_name}.{config['report_format']}",
                 )
 
         return output

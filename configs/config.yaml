@@ -23,7 +23,6 @@ segmentation_column: ['raw']
 segmentation_name_suffix: [null]
 segmentation_method: ["deep_learning"]
 segmentation_channels: [[1]]
-run_segmentation_on: [null]
 
 # edge-based segmentation parameters
 pixelsize: [0.65]

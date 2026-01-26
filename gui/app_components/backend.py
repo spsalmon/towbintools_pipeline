@@ -5,6 +5,9 @@ import numpy as np
 import polars as pl
 from towbintools.data_analysis import compute_series_at_time_classified
 from towbintools.foundation import image_handling
+from towbintools.foundation.file_handling import read_filemap
+from towbintools.foundation.file_handling import write_filemap
+from towbintools.foundation.utils import find_best_string_match
 from towbintools.foundation.worm_features import get_features_to_compute_at_molt
 
 FEATURES_TO_COMPUTE_AT_MOLT = get_features_to_compute_at_molt()
@@ -12,7 +15,7 @@ FEATURES_TO_COMPUTE_AT_MOLT = get_features_to_compute_at_molt()
 ECDYSIS_COLUMNS = ["HatchTime", "M1", "M2", "M3", "M4"]
 
 
-def get_backup_path(filemap_folder, filemap_name):
+def get_backup_path(filemap_folder, filemap_name, filemap_extension):
     # check if the filemap is already annotated
     match = re.search(r"annotated_v(/d+)", filemap_name)
     if not match:
@@ -20,10 +23,10 @@ def get_backup_path(filemap_folder, filemap_name):
     else:
         iteration = int(match.group(1))
 
-    filemap_save_path = f"{filemap_name}_v{iteration}.csv"
+    filemap_save_path = f"{filemap_name}_v{iteration}.{filemap_extension}"
     while os.path.exists(os.path.join(filemap_folder, filemap_save_path)):
         iteration += 1
-        filemap_save_path = f"{filemap_name}_v{iteration}.csv"
+        filemap_save_path = f"{filemap_name}_v{iteration}.{filemap_extension}"
 
     filemap_save_path = os.path.join(filemap_folder, filemap_save_path)
     return filemap_save_path
@@ -31,9 +34,8 @@ def get_backup_path(filemap_folder, filemap_name):
 
 def open_filemap(filemap_path, open_annotated=True, lazy_loading=False):
     filemap_folder = os.path.dirname(filemap_path)
-    filemap_name = os.path.basename(filemap_path).split(".")[0]
-
-    annotated_name = f"{filemap_name}_annotated.csv"
+    filemap_name, filemap_extension = os.path.splitext(os.path.basename(filemap_path))
+    annotated_name = f"{filemap_name}_annotated{filemap_extension}"
     annotated_path = os.path.join(filemap_folder, annotated_name)
 
     # If we want to open the annotated version and it's not already annotated
@@ -52,22 +54,14 @@ def open_filemap(filemap_path, open_annotated=True, lazy_loading=False):
     elif "annotated" in filemap_name:
         filemap_save_path = filemap_path
 
-    if lazy_loading:
-        filemap = pl.scan_csv(
-            filemap_path,
-            infer_schema_length=10000,
-            null_values=["np.nan", "[nan]", "", "NaN", "nan", "NA", "N/A"],
-        )
-    else:
-        filemap = pl.read_csv(
-            filemap_path,
-            infer_schema_length=10000,
-            null_values=["np.nan", "[nan]", "", "NaN", "nan", "NA", "N/A"],
-        )
-
+    filemap = read_filemap(filemap_path, lazy_loading=lazy_loading)
+    # replace worm_type columns with qc columns
+    for col in filemap.columns:
+        if "worm_type" in col:
+            filemap = filemap.rename({col: col.replace("worm_type", "qc")})
     # Backup the filemap
-    backup_path = get_backup_path(filemap_folder, filemap_name)
-    filemap.write_csv(backup_path)
+    backup_path = get_backup_path(filemap_folder, filemap_name, filemap_extension)
+    write_filemap(filemap, backup_path)
 
     return filemap, filemap_save_path
 
@@ -147,9 +141,8 @@ def populate_column_choices(filemap):
     # add None to the list of custom columns
     custom_columns_choices = ["None"] + custom_columns
 
-    try:
-        qc_column = [column for column in filemap.columns if "qc" in column][0]
-    except IndexError:
+    qc_columns = [column for column in filemap.columns if "qc" in column]
+    if len(qc_columns) == 0:
         print("No qc column found in the filemap, creating a placeholder.")
         qc_column = "placeholder_qc"
         filemap = filemap.with_columns(pl.lit("worm").alias(qc_column))
@@ -183,7 +176,6 @@ def populate_column_choices(filemap):
         filemap,
         feature_columns,
         custom_columns_choices,
-        qc_column,
         default_plotted_column,
         overlay_segmentation_choices,
     )
@@ -291,7 +283,7 @@ def build_single_values_df(filemap):
 
 
 def process_feature_at_molt_columns(
-    filemap, feature_columns, qc_column, recompute_features_at_molt=False
+    filemap, feature_columns, recompute_features_at_molt=False
 ):
     columns = filemap.columns
 
@@ -305,8 +297,6 @@ def process_feature_at_molt_columns(
         ecdysis_index,
     ) = get_time_and_ecdysis(filemap)
 
-    qcs = separate_column_by_point(filemap, qc_column)
-
     unique_points = (
         filemap.select(pl.col("Point")).unique(maintain_order=True).to_numpy().squeeze()
     )
@@ -314,9 +304,17 @@ def process_feature_at_molt_columns(
     if unique_points.ndim == 0:
         unique_points = np.array([unique_points])
 
+    qc_columns = [column for column in filemap.columns if "qc" in column]
+
     for feature_column in feature_columns:
         # convert the feature column to float
         filemap = filemap.with_columns(pl.col(feature_column).cast(pl.Float64))
+        if len(qc_columns) == 1:
+            qcs = separate_column_by_point(filemap, qc_columns[0])
+        else:
+            qc_column = find_best_string_match(feature_column, qc_columns)
+            qcs = separate_column_by_point(filemap, qc_column)
+
         series = separate_column_by_point(filemap, feature_column)
         feature_at_ecdysis_columns = [
             f"{feature_column}_at_{ecdys}" for ecdys in ECDYSIS_COLUMNS
@@ -391,14 +389,12 @@ def update_molt_and_ecdysis_columns(
     ecdys_event,
     new_time,
     new_time_index,
-    qc_column,
     experiment_time=True,
 ):
     single_values_df = single_values_df.with_columns(
         pl.lit(new_time).alias(ecdys_event)
     )
 
-    qc_values = point_filemap.select(pl.col(qc_column)).to_numpy().squeeze()
     if experiment_time:
         time = (
             point_filemap.select(pl.col("ExperimentTime")).to_numpy().squeeze() / 3600
@@ -414,9 +410,16 @@ def update_molt_and_ecdysis_columns(
         re.sub(r"_at_.*$", "", column) for column in value_at_ecdys_columns
     ]
 
+    qc_columns = [col for col in point_filemap.columns if "qc" in col]
+
     for value_column, value_at_ecdys_column in zip(
         value_columns, value_at_ecdys_columns
     ):
+        if len(qc_columns) == 1:
+            qc_values = point_filemap.select(pl.col(qc_columns[0])).to_numpy().squeeze()
+        else:
+            qc_column = find_best_string_match(value_column, qc_columns)
+            qc_values = point_filemap.select(pl.col(qc_column)).to_numpy().squeeze()
         if np.isnan(new_time_index):
             new_value_at_ecdys = np.nan
         else:

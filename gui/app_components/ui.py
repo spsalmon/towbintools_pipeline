@@ -22,6 +22,9 @@ from shiny import ui
 from shinywidgets import output_widget
 from shinywidgets import render_widget
 from towbintools.foundation import image_handling
+from towbintools.foundation.file_handling import read_filemap
+from towbintools.foundation.file_handling import write_filemap
+from towbintools.foundation.utils import find_best_string_match
 from towbintools.foundation.worm_features import get_features_to_compute_at_molt
 
 FEATURES_TO_COMPUTE_AT_MOLT = get_features_to_compute_at_molt()
@@ -60,7 +63,6 @@ def molt_annotation_buttons_server(
     molt_time,
     value_at_molt,
     molt_name,
-    qc_column,
     use_experiment_time=False,
 ):
     @output
@@ -81,7 +83,6 @@ def molt_annotation_buttons_server(
                 molt_name,
                 new_molt,
                 new_molt_index,
-                qc_column,
                 experiment_time=use_experiment_time,
             )
         )
@@ -106,7 +107,6 @@ def molt_annotation_buttons_server(
                 molt_name,
                 new_molt,
                 new_molt_index,
-                qc_column,
                 experiment_time=use_experiment_time,
             )
         )
@@ -187,7 +187,7 @@ def create_molt_annotator(ecdysis_list_id, custom_columns_choices):
                 ui.input_file(
                     "import_file",
                     "Import Annotations",
-                    accept=[".csv", ".mat"],
+                    accept=[".csv", ".mat", ".parquet"],
                     multiple=False,
                 ),
             ),
@@ -348,7 +348,6 @@ def initialize_ui(filemap, recompute_features_at_molt=False):
         filemap,
         feature_columns,
         custom_columns_choices,
-        qc_column,
         default_plotted_column,
         overlay_segmentation_choices,
     ) = populate_column_choices(filemap)
@@ -356,7 +355,6 @@ def initialize_ui(filemap, recompute_features_at_molt=False):
     filemap = process_feature_at_molt_columns(
         filemap,
         feature_columns,
-        qc_column,
         recompute_features_at_molt=recompute_features_at_molt,
     )
 
@@ -378,7 +376,6 @@ def initialize_ui(filemap, recompute_features_at_molt=False):
         custom_columns_choices,
         points,
         times,
-        qc_column,
         default_plotted_column,
     )
 
@@ -393,7 +390,6 @@ def main_server(
     times=None,
     feature_columns=None,
     custom_columns_choices=None,
-    qc_column=None,
     default_plotted_column=None,
 ):
     use_experiment_time = check_use_experiment_time(filemap)
@@ -475,7 +471,6 @@ def main_server(
             molt_time,
             value_at_molt,
             molt_name=molt_name,
-            qc_column=qc_column,
             use_experiment_time=use_experiment_time,
         )
         for molt_name, molt_time, value_at_molt in zip(
@@ -519,19 +514,14 @@ def main_server(
             _,
             _,
             custom_columns_choices,
-            qc_column,
             _,
             _,
         ) = populate_column_choices(filemap)
 
         datapath = file[0]["datapath"]
-        if datapath.endswith(".csv"):
+        if datapath.endswith(".csv") or datapath.endswith(".parquet"):
             print(f"Importing molts from {datapath} ...")
-            imported_df = pl.read_csv(
-                datapath,
-                infer_schema_length=10000,
-                null_values=["np.nan", "NaN", "[nan]", ""],
-            )
+            imported_df = read_filemap(datapath)
 
             work_df_columns = [
                 "Death",
@@ -573,7 +563,6 @@ def main_server(
             imported_df = process_feature_at_molt_columns(
                 imported_df,
                 feature_columns,
-                qc_column,
                 recompute_features_at_molt=False,
             )
 
@@ -621,7 +610,6 @@ def main_server(
             imported_df = process_feature_at_molt_columns(
                 updated_filemap,
                 feature_columns,
-                qc_column,
                 recompute_features_at_molt=True,
             )
 
@@ -703,7 +691,7 @@ def main_server(
             work_df, on=["Point", "Time"], how="left"
         )
 
-        filemap_to_save.write_csv(filemap_save_path, null_value="")
+        write_filemap(filemap_to_save, filemap_save_path)
         print("Filemap saved!")
 
     @reactive.Effect
@@ -1114,7 +1102,6 @@ def main_server(
                 [
                     "Time",
                     input.column_to_plot(),
-                    qc_column,
                     "HatchTime",
                     "M1",
                     "M2",
@@ -1204,6 +1191,12 @@ def main_server(
     @reactive.calc
     def get_markers():
         print("get_markers")
+        qc_columns = [col for col in current_point_filemap().columns if "qc" in col]
+        if len(qc_columns) == 0:
+            qc_column = qc_columns[0]
+        else:
+            qc_column = find_best_string_match(input.column_to_plot(), qc_columns)
+
         data_of_point = current_point_filemap().select(
             pl.col(
                 [

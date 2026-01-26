@@ -2,12 +2,13 @@ import os
 import re
 
 import numpy as np
-import pandas as pd
+import polars as pl
 import utils
 from joblib import delayed
 from joblib import Parallel
 from joblib import parallel_config
 from towbintools.foundation import image_handling
+from towbintools.foundation.file_handling import write_filemap
 from towbintools.quantification import compute_fluorescence_in_mask
 
 
@@ -84,21 +85,20 @@ def main(input_pickle, output_file, config, n_jobs):
             )
             for source_file, mask_file in zip(source_files, mask_files)
         )
-    fluo_dataframe = pd.DataFrame(fluo)
+    fluo_dataframe = pl.DataFrame(fluo)
 
     # rename columns to match the rest of the pipeline
-    output_file_basename = os.path.basename(output_file).split(".csv")[0]
+    output_file_basename = os.path.basename(output_file).split(".")[0]
     fluo_source = output_file_basename.split("_")[0]
     mask_column = output_file_basename.split("_on_")[-1]
-    fluo_dataframe.rename(
-        columns={
+    fluo_dataframe = fluo_dataframe.rename(
+        {
             "FluoAggregation": f"{fluo_source}_fluo_{aggregation}_on_{mask_column}",
             "FluoStd": f"{fluo_source}_fluo_std_on_{mask_column}",
         },
-        inplace=True,
     )
 
-    fluo_dataframe.to_csv(output_file, index=False)
+    write_filemap(fluo_dataframe, output_file)
 
 
 if __name__ == "__main__":

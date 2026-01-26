@@ -78,6 +78,7 @@ def main(global_config, temp_dir_basename, temp_dir, subdir=None):
     config["temp_dir"] = temp_dir
 
     report_format = config.get("report_format", "csv")
+    config["report_format"] = report_format
 
     sync_backup_folder(temp_dir, pipeline_backup_dir)
 

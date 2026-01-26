@@ -3,12 +3,14 @@ import re
 
 import numpy as np
 import pandas as pd
+import polars as pl
 import utils
 import xgboost as xgb
 from joblib import delayed
 from joblib import load
 from joblib import Parallel
 from towbintools.classification.qc_tools import compute_qc_features
+from towbintools.foundation.file_handling import write_filemap
 
 
 def extract_time_point_and_worm_type(path):
@@ -71,7 +73,7 @@ def main(input_pickle, output_file, config, filemap, n_jobs=-1):
 
         # if for some reason scikit-image decided to add features that we didn't include, we need to remove them
         egg_feature_names = egg_classifier.get_booster().feature_names
-        extracted_feature_names = features_df.columns.tolist()
+        extracted_feature_names = features_df.columns.to_list()
         extra_features = [
             fname for fname in extracted_feature_names if fname not in egg_feature_names
         ]
@@ -82,7 +84,7 @@ def main(input_pickle, output_file, config, filemap, n_jobs=-1):
         egg_predictions = [egg_classes[pred] for pred in egg_predictions]
 
     elif import_eggs_from is not None:
-        egg_predictions = filemap[import_eggs_from].tolist()
+        egg_predictions = filemap[import_eggs_from].to_list()
         egg_predictions = [egg_predictions[i] for i in valid_indices]
 
     else:
@@ -95,7 +97,7 @@ def main(input_pickle, output_file, config, filemap, n_jobs=-1):
     # now, predict qc classes for non-egg samples
     # if for some reason scikit-image decided to add features that we didn't include, we need to remove them
     qc_feature_names = qc_classifier.get_booster().feature_names
-    extracted_feature_names = qc_features_df.columns.tolist()
+    extracted_feature_names = qc_features_df.columns.to_list()
     extra_features = [
         fname for fname in extracted_feature_names if fname not in qc_feature_names
     ]
@@ -121,16 +123,12 @@ def main(input_pickle, output_file, config, filemap, n_jobs=-1):
     time_points = Parallel(n_jobs=-1)(
         delayed(extract_time_point_and_worm_type)(path) for path in input_masks
     )
-    time_points_df = pd.DataFrame(time_points)
-    worm_types_dataframe = pd.DataFrame(
-        {
-            "Time": time_points_df["Time"],
-            "Point": time_points_df["Point"],
-            f"{os.path.splitext(os.path.basename(output_file))[0]}": full_predictions,
-        }
+    time_points_df = pl.DataFrame(time_points)
+    col_name = os.path.splitext(os.path.basename(output_file))[0]
+    worm_types_dataframe = time_points_df.select(["Time", "Point"]).with_columns(
+        pl.Series(col_name, full_predictions)
     )
-
-    worm_types_dataframe.to_csv(output_file, index=False)
+    write_filemap(worm_types_dataframe, output_file)
 
 
 if __name__ == "__main__":

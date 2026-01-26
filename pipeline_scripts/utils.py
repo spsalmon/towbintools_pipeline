@@ -9,6 +9,7 @@ import polars as pl
 from joblib import delayed
 from joblib import Parallel
 from joblib import parallel_config
+from towbintools.foundation.file_handling import read_filemap
 from towbintools.foundation.file_handling import write_filemap
 from towbintools.foundation.image_handling import get_acquisition_date
 
@@ -201,7 +202,9 @@ def get_output_name(
             output_name = os.path.join(output_name, subdir)
         os.makedirs(output_name, exist_ok=True)
     else:
-        output_name = os.path.join(report_subdir, f"{output_name}.csv")
+        output_name = os.path.join(
+            report_subdir, f"{output_name}.{config['report_format']}"
+        )
     return output_name
 
 
@@ -240,7 +243,7 @@ def get_input_and_output_files(experiment_filemap, columns, output_dir, rerun=Tr
         )
 
     results = [result for result in results if result[0] is not None]
-    input_files, output_files = zip(*results)
+    input_files, output_files = zip(*results) if results else ([], [])
 
     input_files = list(input_files)
     output_files = list(output_files)
@@ -494,10 +497,7 @@ def rename_merge_and_save_records(
     column_name_new,
     merge_cols=["Time", "Point"],
 ):
-    if records_file.endswith(".parquet"):
-        dataframe = pl.read_parquet(records_file)
-    else:
-        dataframe = pl.read_csv(records_file)
+    dataframe = read_filemap(records_file)
 
     dataframe = dataframe.rename({column_name_old: column_name_new})
 
@@ -514,10 +514,7 @@ def rename_merge_and_save_records(
 def merge_and_save_records(
     experiment_filemap, filemap_path, records_file, merge_cols=["Time", "Point"]
 ):
-    if records_file.endswith(".parquet"):
-        dataframe = pl.read_parquet(records_file)
-    else:
-        dataframe = pl.read_csv(records_file)
+    dataframe = read_filemap(records_file)
 
     new_columns = [column for column in dataframe.columns if column not in merge_cols]
 
