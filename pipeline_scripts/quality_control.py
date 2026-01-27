@@ -77,10 +77,19 @@ def main(input_pickle, output_file, config, filemap, n_jobs=-1):
         extra_features = [
             fname for fname in extracted_feature_names if fname not in egg_feature_names
         ]
+
         if len(extra_features) > 0:
             egg_features_df = features_df.drop(columns=extra_features)
 
-        egg_predictions = egg_classifier.predict(egg_features_df)
+        egg_features_dm = xgb.DMatrix(
+            egg_features_df, feature_names=egg_features_df.columns.to_list()
+        )
+        egg_predictions = egg_classifier.get_booster().predict(egg_features_dm)
+        # map numeric predictions back to class labels
+        if len(egg_predictions.shape) > 1:
+            egg_predictions = np.argmax(egg_predictions, axis=1)
+        else:
+            egg_predictions = (egg_predictions > 0.5).astype(int)
         egg_predictions = [egg_classes[pred] for pred in egg_predictions]
 
     elif import_eggs_from is not None:
@@ -104,7 +113,15 @@ def main(input_pickle, output_file, config, filemap, n_jobs=-1):
     if len(extra_features) > 0:
         qc_features_df = qc_features_df.drop(columns=extra_features)
 
-    qc_predictions = qc_classifier.predict(qc_features_df)
+    qc_features_dm = xgb.DMatrix(
+        qc_features_df, feature_names=qc_features_df.columns.to_list()
+    )
+    qc_predictions = qc_classifier.get_booster().predict(qc_features_dm)
+    # map numeric predictions back to class labels
+    if len(qc_predictions.shape) > 1:
+        qc_predictions = np.argmax(qc_predictions, axis=1)
+    else:
+        qc_predictions = (qc_predictions > 0.5).astype(int)
     qc_predictions = [qc_classes[pred] for pred in qc_predictions]
 
     # combine predictions - start with egg predictions
