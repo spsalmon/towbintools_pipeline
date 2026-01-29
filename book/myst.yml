@@ -1,0 +1,16 @@
+version: 1
+project:
+  title: towbintools_pipeline
+  authors:
+    - name: Sacha Psalmon
+    - name: Towbin Lab
+  toc:
+    - file: Landing.md
+    - title: Getting started
+      children:
+        - file: Installation.md
+site:
+  options:
+    logo: images/logo_light.png
+    folders: True
+  template: book-theme
