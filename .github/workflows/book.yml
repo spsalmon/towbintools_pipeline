@@ -44,7 +44,8 @@ jobs:
           ls -la book/Installation* || echo "No Installation file found"
       - name: Build the book
         run: |
-          jupyter-book build book
+          cd book
+          jupyter-book build . --builder html
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
