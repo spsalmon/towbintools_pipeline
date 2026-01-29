@@ -9,10 +9,11 @@ project:
     - title: Getting started
       children:
         - file: Installation.md
+        - file: RunningFirstPipeline.md
 site:
   options:
     logo: images/logo_dark.png
     logo_dark: images/logo_light.png
-    favicon: images/logo_dark.png
+    favicon: images/favicon.ico
     folders: True
   template: book-theme
