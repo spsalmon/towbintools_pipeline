@@ -22,4 +22,4 @@ cd ~/towbintools_pipeline
 bash install_pipeline.sh
 ```
 
-This will create a micromamba environment called towbintools, containing all required packages. Now you're all set, click here to learn how to [run your first pipeline](link).
+This will create a micromamba environment called towbintools, containing all required packages. Now you're all set, click here to learn how to [run your first pipeline](https://spsalmon.github.io/towbintools_pipeline/runningfirstpipeline/).
