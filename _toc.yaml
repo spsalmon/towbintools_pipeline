@@ -1,0 +1,7 @@
+format: jb-book
+root: book/Landing
+
+parts:
+  - caption: Getting started
+    chapters:
+    - file: book/Installation
