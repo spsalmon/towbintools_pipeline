@@ -88,18 +88,18 @@ def main(global_config, temp_dir_basename, temp_dir, subdir=None):
     if not os.path.exists(
         os.path.join(report_subdir, f"analysis_filemap.{report_format}")
     ):
-        experiment_filemap = get_dir_filemap(raw_subdir)
+        try:
+            experiment_filemap = get_dir_filemap(raw_subdir)
+        except Exception as e:
+            print(f"Error generating filemap from directory: {e}")
+            experiment_filemap = pl.DataFrame()
 
         # if the filemap is empty, it's probably because they do not follow the Time, Point structure
         if experiment_filemap.is_empty():
-            experiment_filemap = pl.DataFrame()
-            experiment_filemap = experiment_filemap.with_columns(
-                pl.lit(
-                    sorted(
-                        [os.path.join(raw_subdir, f) for f in os.listdir(raw_subdir)]
-                    )
-                ).alias("ImagePath")
+            image_paths = sorted(
+                [os.path.join(raw_subdir, f) for f in os.listdir(raw_subdir)]
             )
+            experiment_filemap = pl.DataFrame({"ImagePath": image_paths})
             config["no_timepoints"] = True
 
         experiment_filemap = experiment_filemap.rename({"ImagePath": raw_dir_name})
