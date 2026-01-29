@@ -10,6 +10,15 @@ project:
       children:
         - file: Installation.md
         - file: RunningFirstPipeline.md
+    - title: Building Blocks
+      children:
+        - file: BuildingBlock.md
+        # - file: Segmentation.md
+        # - file: Straightening.md
+        # - file: MorphologyComputation.md
+        # - file: FluorescenceQuantification.md
+        # - file: QualityControl.md
+        # - file: MoltDetection.md
 site:
   options:
     logo: images/logo_dark.png

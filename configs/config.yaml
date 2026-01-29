@@ -9,7 +9,19 @@ report_format: "parquet"
 
 get_experiment_time: True
 
-building_blocks: [ "segmentation", "segmentation", "straightening", "straightening", "straightening", "straightening", "morphology_computation", "morphology_computation", "fluorescence_quantification", "quality_control", "quality_control", "molt_detection" ]
+building_blocks:
+  - "segmentation"
+  - "segmentation"
+  - "straightening"
+  - "straightening"
+  - "straightening"
+  - "straightening"
+  - "morphology_computation"
+  - "morphology_computation"
+  - "fluorescence_quantification"
+  - "quality_control"
+  - "quality_control"
+  - "molt_detection"
 
 rerun_segmentation: [ False ]
 rerun_straightening: [ False ]
