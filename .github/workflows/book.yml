@@ -5,7 +5,7 @@ on:
   push:
     branches:
     - main
-    
+
 # Sets permissions of the GITHUB_TOKEN to allow deployment to Pages
 permissions:
   contents: read
@@ -20,7 +20,7 @@ jobs:
       url: ${{ steps.deployment.outputs.page_url}}
     runs-on: ubuntu-latest
     steps:
-      
+
       - name: Checkout repo
         uses: actions/checkout@v4
 
@@ -41,7 +41,7 @@ jobs:
         uses: actions/upload-pages-artifact@v3
         with:
           path: '_build/html'
-      
+
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4
