@@ -11,6 +11,8 @@ project:
         - file: Installation.md
 site:
   options:
-    logo: images/logo_light.png
+    logo: images/logo_dark.png
+    logo_dark: images/logo_light.png
+    favicon: images/logo_dark.png
     folders: True
   template: book-theme
