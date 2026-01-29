@@ -231,6 +231,7 @@ def process_input_output_files(input_files, output_dir, rerun):
 
 
 def get_input_and_output_files(experiment_filemap, columns, output_dir, rerun=True):
+    print(experiment_filemap)
     all_input_files = [
         experiment_filemap.select(pl.col(column)).to_series().to_list()
         for column in columns
