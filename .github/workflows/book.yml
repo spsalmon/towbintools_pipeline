@@ -26,6 +26,22 @@ jobs:
       - name: Install dependencies
         run: |
           pip install "jupyter-book"
+      - name: Debug - List book contents
+        run: |
+          echo "=== Contents of book directory ==="
+          ls -la book/
+          echo ""
+          echo "=== Contents of _toc.yml ==="
+          cat book/_toc.yml
+          echo ""
+          echo "=== Contents of _config.yml ==="
+          cat book/_config.yml
+          echo ""
+          echo "=== Check if Landing file exists ==="
+          ls -la book/Landing* || echo "No Landing file found"
+          echo ""
+          echo "=== Check if Installation file exists ==="
+          ls -la book/Installation* || echo "No Installation file found"
       - name: Build the book
         run: |
           jupyter-book build book
