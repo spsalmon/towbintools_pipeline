@@ -57,11 +57,8 @@ def update_experiment_filemap(
         no_timepoint = config.get("no_timepoint", False)
         print(config)
         if no_timepoint or ("Time" not in experiment_filemap.columns):
-            experiment_filemap = experiment_filemap.with_columns(
-                pl.lit(
-                    sorted([os.path.join(result, f) for f in os.listdir(result)])
-                ).alias(column_name)
-            )
+            image_paths = sorted([os.path.join(result, f) for f in os.listdir(result)])
+            experiment_filemap = pl.DataFrame({column_name: image_paths})
         else:
             experiment_filemap = add_dir_to_experiment_filemap(
                 experiment_filemap, result, column_name
