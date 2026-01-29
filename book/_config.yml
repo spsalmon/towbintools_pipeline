@@ -3,6 +3,3 @@ author: Sacha Psalmon, Towbin Lab
 logo: images/logo_dark.png
 execute:
   execute_notebooks: 'off'
-sphinx:
-  config:
-    html_static_path: ['images']  # Remove 'books/images' and just use 'images'
