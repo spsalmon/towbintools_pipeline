@@ -81,7 +81,6 @@ DEFAULT_OPTIONS = {
         "tiler_config": [None],
         "enforce_n_channels": [None],
         "activation_layer": [None],
-        "run_segmentation_on": [None],
         "model_path": [None],
         "batch_size": [1],
     },
@@ -300,7 +299,7 @@ class BuildingBlock(ABC):
 class SegmentationBuildingBlock(BuildingBlock):
     def __init__(self, block_config):
         NON_LEARNING_METHODS = ["double_threshold", "edge_based", "threshold"]
-        LEARNING_BASED_METHODS = ["deep_learning", "ilastik"]
+        LEARNING_BASED_METHODS = ["deep_learning", "conv_paint"]
 
         if block_config["segmentation_method"] in NON_LEARNING_METHODS:
             requires_gpu = False

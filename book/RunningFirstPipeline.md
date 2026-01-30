@@ -13,12 +13,14 @@ experiment_dir: "/mnt/towbin.data/shared/spsalmon/pipeline_test_folder/"
 analysis_dir_name: "analysis"
 raw_dir_name: "raw"
 report_format: "parquet"
+pixelsize: [ 0.65 ]
 ```
 
 - **experiment_dir** : the root of your experiment
 - **analysis_dir_name** : the name of the directory where all the analysis files (segmentation masks, quantifications, etc.) will be saved. You can change it to run multiple different analysis of the same experiment
 - **raw_dir_name** : directory where all your raw images are saved
-- **report_format**: either "csv" or "parquet". Parquet files will be much smaller than CSVs (usefull for big experiments), but are less convenient to edit
+- **report_format** : either "csv" or "parquet". Parquet files will be much smaller than CSVs (usefull for big experiments), but are less convenient to edit
+- **pixelsize** : physical size in µm of a pixel (depends on your microscope, camera and objective)
 
 ```yaml
 get_experiment_time: True
