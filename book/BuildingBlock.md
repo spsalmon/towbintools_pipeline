@@ -3,7 +3,7 @@
 A building block represents a single atomic task, such as : segment the first channel of those images, straighten the second channel of those images using this set of masks, etc.
 To be efficiently implemented, all workflows need to be divided into single building blocks.
 
-- **segmentation** : "segmentation" building block
+- [segmentation](https://spsalmon.github.io/towbintools_pipeline/segmentation/) : "segmentation" building block
 - **straightening** : "straightening" building block
 - **morphology computation** : "morphology_computation" building block
 - **quality_control** : "classification" building block

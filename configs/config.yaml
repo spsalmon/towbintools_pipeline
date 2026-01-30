@@ -2,6 +2,7 @@ experiment_dir: "/mnt/towbin.data/shared/spsalmon/pipeline_test_folder/"
 analysis_dir_name: "analysis"
 raw_dir_name: "raw"
 report_format: "parquet"
+pixelsize: [ 0.65 ]
 
 #########################################################################################################
 ################################# IMAGE ANALYSIS PIPELINE CONFIGURATION #################################
@@ -34,10 +35,7 @@ segmentation_column: [ 'raw' ]
 segmentation_name_suffix: [ null ]
 segmentation_method: [ "deep_learning", "deep_learning" ]
 segmentation_channels: [ [ 1 ], [ 0 ] ]
-run_segmentation_on: [ null ]
 
-# edge-based segmentation parameters
-pixelsize: [ 0.65 ]
 
 # deep learning segmentation parameters
 model_path: [ "/mnt/towbin.data/shared/spsalmon/towbinlab_segmentation_database/models/paper/body/towbintools_medium/best_light.ckpt", "/mnt/towbin.data/shared/spsalmon/towbinlab_segmentation_database/models/paper/pharynx/towbintools_medium/best_light.ckpt" ]

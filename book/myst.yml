@@ -13,7 +13,7 @@ project:
     - title: Building Blocks
       children:
         - file: BuildingBlock.md
-        # - file: Segmentation.md
+        - file: Segmentation.ipynb
         # - file: Straightening.md
         # - file: MorphologyComputation.md
         # - file: FluorescenceQuantification.md
