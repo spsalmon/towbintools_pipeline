@@ -4,7 +4,7 @@ A building block represents a single atomic task, such as : segment the first ch
 To be efficiently implemented, all workflows need to be divided into single building blocks.
 
 - [segmentation](https://spsalmon.github.io/towbintools_pipeline/segmentation/) : "segmentation" building block
-- **straightening** : "straightening" building block
+- [straightening](https://spsalmon.github.io/towbintools_pipeline/straightening/) : "straightening" building block
 - **morphology computation** : "morphology_computation" building block
 - **quality_control** : "classification" building block
 - **molt detection** : "molt_detection" building block
