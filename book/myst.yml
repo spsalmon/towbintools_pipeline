@@ -14,8 +14,8 @@ project:
       children:
         - file: BuildingBlock.md
         - file: Segmentation.ipynb
-        # - file: Straightening.md
-        # - file: MorphologyComputation.md
+        - file: Straightening.ipynb
+        - file: MorphologyComputation.ipynb
         # - file: FluorescenceQuantification.md
         # - file: QualityControl.md
         # - file: MoltDetection.md

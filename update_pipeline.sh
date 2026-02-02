@@ -19,7 +19,7 @@ if [[ "$PIPELINE_ONLY" == false ]]; then
     ~/.local/bin/micromamba self-update
 
     # Recreate the environment using the lock file
-    ~/.local/bin/micromamba create -n towbintools -f ./requirements/conda-lock.yaml -y
+    ~/.local/bin/micromamba run -n towbintools conda-lock install --name towbintools ./requirements/conda-lock.yml
 
     # Add the environment to the jupyter notebook kernel
     ~/.local/bin/micromamba run -n towbintools python -m ipykernel install --user --name=towbintools
