@@ -9,6 +9,7 @@ project:
     - title: Getting started
       children:
         - file: Installation.md
+        - file: Update.md
         - file: RunningFirstPipeline.md
     - title: Building Blocks
       children:
