@@ -9,6 +9,7 @@ fi
 
 # Update the pipeline
 git fetch origin
+git checkout main
 git reset --hard origin/main
 
 # Skip environment updates if pipeline-only mode is enabled
