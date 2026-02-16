@@ -55,15 +55,20 @@ def update_experiment_filemap(
         # The column name is always the same regardless of previous_subdir
         column_name = f'{config["analysis_dir_name"]}/{os.path.basename(os.path.normpath(result))}'
         no_timepoint = config.get("no_timepoint", False)
-        print(config)
+        print(
+            f"Updating experiment filemap with new column '{column_name}' from subdir result ..."
+        )
         if no_timepoint or ("Time" not in experiment_filemap.columns):
             image_paths = sorted([os.path.join(result, f) for f in os.listdir(result)])
-            experiment_filemap = pl.DataFrame({column_name: image_paths})
+            experiment_filemap = experiment_filemap.with_columns(
+                pl.Series(name=column_name, values=image_paths)
+            )
         else:
             experiment_filemap = add_dir_to_experiment_filemap(
                 experiment_filemap, result, column_name
             )
         print(f"Writing updated filemap to {filemap_path} ...")
+        print(f"Filemap columns: {experiment_filemap.columns}")
         write_filemap(experiment_filemap, filemap_path)
     elif previous_block.return_type == "csv":
         if previous_block.name == "molt_detection":
