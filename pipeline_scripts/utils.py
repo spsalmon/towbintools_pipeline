@@ -261,7 +261,9 @@ def get_experiment_time_from_filemap(experiment_filemap, config):
             delayed(get_acquisition_date)(raw) for raw in raw_files
         )
 
-    experiment_filemap = experiment_filemap.with_columns(pl.Series("date", date_result))
+    experiment_filemap = experiment_filemap.with_columns(
+        pl.Series("date", date_result, dtype=pl.Datetime)
+    )
 
     # Cast to datetime only if it's not already a datetime type
     if experiment_filemap.select(pl.col("date")).to_series().dtype != pl.Datetime:
@@ -433,7 +435,13 @@ def create_sbatch_file(
 #SBATCH -c {cores}
 #SBATCH -t {time_limit}
 #SBATCH --mem={memory}
+
+## this is a test for removing issues with lock files
+# export TMPDIR={os.path.join(temp_dir, 'tmp', "$SLURM_JOB_ID")}
+# mkdir -p $TMPDIR
+# export XDG_CACHE_HOME={os.path.join(temp_dir, 'cache')}
 """
+
     if gpus is not None:
         content += f"#SBATCH --gres=gpu:{gpus}\n"
 

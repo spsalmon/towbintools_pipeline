@@ -6,11 +6,11 @@ from joblib import delayed
 from joblib import Parallel
 from tqdm import tqdm
 
-experiment_dir = "/mnt/towbin.data/shared/spsalmon/20251031_164520_274_ZIVA_60x_397_405_yap_dynamics/"
+experiment_dir = "/mnt/towbin.data/shared/spsalmon/20260206_LIPSI_10x_125_615_pumping/"
 image_dir = os.path.join(experiment_dir, "raw")
 channels_to_output = {
-    "DIA,DIA,GFP,mCherry": "raw",
-    "GFP,mCherry": "raw_zstack",
+    "GFP,WF mCherry,WF Brightfield": "raw",
+    "WF GFP": "raw_movies",
 }
 
 for subdir in channels_to_output.values():
@@ -18,7 +18,7 @@ for subdir in channels_to_output.values():
 
 
 def move_image(filename, experiment_dir):
-    match = re.search(r"Channel([A-Za-z0-9_,]+)_Seq", filename)
+    match = re.search(r"Channel\s*([A-Za-z0-9_,\s]+?)\s*_Seq", filename)
 
     if not match:
         print(f"Filename {filename} does not match expected pattern, skipping.")
