@@ -51,6 +51,11 @@ mkdir -p "$TEMP_DIR"
 # Copy the configuration file to the temporary directory
 cp "$CONFIG_FILE" "$TEMP_DIR"
 
+# Move logs to temp dir and update SLURM to write there going forward
+mv "./sbatch_output/pipeline-${SLURM_JOB_ID}.out" "$TEMP_DIR/"
+mv "./sbatch_output/pipeline-${SLURM_JOB_ID}.err" "$TEMP_DIR/"
+scontrol update JobId=$SLURM_JOB_ID StdOut="$TEMP_DIR/pipeline-${SLURM_JOB_ID}.out" StdErr="$TEMP_DIR/pipeline-${SLURM_JOB_ID}.err"
+
 config_file_name=$(basename "$CONFIG_FILE")
 CONFIG_FILE="$TEMP_DIR/$config_file_name"
 # Run the Python script with the specified or default configuration file

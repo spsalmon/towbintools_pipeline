@@ -17,8 +17,8 @@ project:
         - file: Segmentation.ipynb
         - file: Straightening.ipynb
         - file: MorphologyComputation.ipynb
+        - file: QualityControl.ipynb
         # - file: FluorescenceQuantification.md
-        # - file: QualityControl.md
         # - file: MoltDetection.md
 site:
   options:

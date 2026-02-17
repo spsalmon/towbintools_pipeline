@@ -1,3 +1,4 @@
+import argparse
 import os
 import re
 from collections import defaultdict
@@ -12,6 +13,39 @@ from joblib import parallel_config
 from ome_types.model import Channel
 from ome_types.model import Image
 from ome_types.model import Pixels
+
+
+def get_args() -> argparse.Namespace:
+    """
+    Parses the command-line arguments and returns them as a namespace object.
+
+    Returns:
+        argparse.Namespace: The namespace object containing the parsed arguments.
+    """
+    # Create a parser and set the formatter class to ArgumentDefaultsHelpFormatter
+    parser = argparse.ArgumentParser(
+        description="Convert ND2 files to OME-TIFF format while retaining metadata.",
+        formatter_class=argparse.ArgumentDefaultsHelpFormatter,
+    )
+
+    # Add the arguments to the parser
+    parser.add_argument(
+        "--input-dir",
+        dest="input_dir",
+        type=str,
+        required=True,
+        help="Path to the input directory",
+    )
+    parser.add_argument(
+        "--output-dir",
+        dest="output_dir",
+        type=str,
+        required=True,
+        help="Path to the output directory",
+    )
+
+    # Parse the arguments and return the resulting namespace object
+    return parser.parse_args()
 
 
 def group_files_by_point(dir_path):
@@ -166,12 +200,10 @@ def merge_and_rename_images(source_dir, output_dir, overwrite=False):
 
 
 if __name__ == "__main__":
-    experiment_dir = (
-        "/mnt/towbin.data/shared/spsalmon/20250918_SQUID_10x_yapAID_F79G_527_557"
-    )
-    source_dir = os.path.join(experiment_dir, "squid_raw")
-    output_dir = os.path.join(experiment_dir, "raw")
+    args = get_args()
+    input_dir = args.input_dir
+    output_dir = args.output_dir
 
     overwrite = True
 
-    merge_and_rename_images(source_dir, output_dir, overwrite)
+    merge_and_rename_images(input_dir, output_dir, overwrite)

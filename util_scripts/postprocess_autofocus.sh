@@ -1,6 +1,7 @@
 #!/bin/bash
-#SBATCH -J best_plane
-#SBATCH -o best_plane.out
+#SBATCH -J postprocess_autofocus
+#SBATCH -o ../sbatch_output/postprocess_autofocus.out
+#SBATCH -e ../sbatch_output/postprocess_autofocus.err
 #SBATCH -c 64
 #SBATCH -t 12:00:00
 #SBATCH --mem=64G

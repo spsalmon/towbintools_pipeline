@@ -24,8 +24,6 @@ logging.basicConfig(level=logging.INFO)
 
 def reshape_images_to_original_shape(images, original_shapes, padded_or_cropped="pad"):
     reshaped_images = []
-    print(f"Image shapes before reshaping: {[image.shape for image in images]}")
-    print(f"Target shapes: {original_shapes}")
     for image, original_shape in zip(images, original_shapes):
         if padded_or_cropped == "pad":
             reshaped_image = image_handling.crop_to_dim_equally(
@@ -44,13 +42,18 @@ def predict_batch(model, images, image_shapes, device, n_classes):
         images = torch.from_numpy(images)
     images = images.to(device)
 
+    print(f"Predicting batch of {images.shape[0]} images on device {device} ...")
+    print(f"Input image shape: {images.shape}")
+
     with torch.no_grad():
         predictions = model(images)
 
     predictions = predictions.cpu().numpy()
     predictions = np.squeeze(predictions)
 
-    if predictions.ndim == 3:
+    print(f"Raw prediction shape: {predictions.shape}")
+
+    if predictions.ndim < 3:
         predictions = np.expand_dims(predictions, axis=0)
 
     if n_classes > 1:
@@ -62,9 +65,13 @@ def predict_batch(model, images, image_shapes, device, n_classes):
     if predictions.ndim == 2:
         predictions = np.expand_dims(predictions, axis=0)
 
+    print(f"Prediction shape before reshaping: {predictions.shape}")
+
     predictions = reshape_images_to_original_shape(
         predictions, image_shapes, padded_or_cropped="pad"
     )
+    print(f"Final prediction shape after reshaping: {predictions[0].shape}")
+    print(f"Length of predictions list: {len(predictions)}")
     return predictions
 
 
