@@ -385,11 +385,9 @@ class StraighteningBuildingBlock(BuildingBlock):
                     else:
                         experiment_filemap.write_csv(config["filemap_path"])
                 except Exception as e:
-                    print(e)
-                    print(
-                        f"Could not find {column} in the experiment_filemap and could not infer the files that it would contain."
+                    raise ValueError(
+                        f"Column {column} not found in experiment filemap and could not be added. Error: {e}"
                     )
-                    return subdir
 
         input_files, straightening_output_files = get_input_and_output_files(
             experiment_filemap,

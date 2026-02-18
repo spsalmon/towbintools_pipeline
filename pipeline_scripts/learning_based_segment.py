@@ -42,9 +42,6 @@ def predict_batch(model, images, image_shapes, device, n_classes):
         images = torch.from_numpy(images)
     images = images.to(device)
 
-    print(f"Predicting batch of {images.shape[0]} images on device {device} ...")
-    print(f"Input image shape: {images.shape}")
-
     with torch.no_grad():
         predictions = model(images)
 
@@ -65,13 +62,9 @@ def predict_batch(model, images, image_shapes, device, n_classes):
     if predictions.ndim == 2:
         predictions = np.expand_dims(predictions, axis=0)
 
-    print(f"Prediction shape before reshaping: {predictions.shape}")
-
     predictions = reshape_images_to_original_shape(
         predictions, image_shapes, padded_or_cropped="pad"
     )
-    print(f"Final prediction shape after reshaping: {predictions[0].shape}")
-    print(f"Length of predictions list: {len(predictions)}")
     return predictions
 
 
