@@ -47,7 +47,7 @@ straightening_masks: [ 'analysis/ch2_seg', 'analysis/ch1_seg', "analysis/ch2_seg
 
 # morphology computation parameters
 morphology_computation_masks: [ 'analysis/ch2_seg_str', 'analysis/ch1_seg_str' ]
-morphological_features: [ [ 'length', 'area', 'volume', 'width_mean' ], [ 'length', 'area', 'volume', 'width_mean' ] ]
+morphological_features: [ [ 'length', 'area', 'volume', 'width_mean' ] ]
 
 # quality control parameters
 qc_masks: [ 'analysis/ch2_seg_str', 'analysis/ch1_seg_str' ]

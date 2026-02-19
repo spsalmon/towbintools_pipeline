@@ -5,6 +5,7 @@ import numpy as np
 import polars as pl
 import yaml
 from towbintools.data_analysis import compute_series_at_time_classified
+from towbintools.foundation.file_handling import read_filemap
 from towbintools.foundation.utils import find_best_string_match
 from towbintools.foundation.worm_features import get_features_to_compute_at_molt
 
@@ -313,11 +314,7 @@ def build_plotting_struct(
     recompute_values_at_molt=False,
     rescale_n_points=100,
 ):
-    experiment_filemap = pl.read_csv(
-        filemap_path,
-        infer_schema_length=10000,
-        null_values=["np.nan", "[nan]", ""],
-    )
+    experiment_filemap = read_filemap(filemap_path)
 
     custom_columns = _get_custom_columns(experiment_filemap)
     if not custom_columns:

@@ -59,5 +59,4 @@ scontrol update JobId=$SLURM_JOB_ID StdOut="$TEMP_DIR/pipeline-${SLURM_JOB_ID}.o
 config_file_name=$(basename "$CONFIG_FILE")
 CONFIG_FILE="$TEMP_DIR/$config_file_name"
 # Run the Python script with the specified or default configuration file
-# ~/.local/bin/micromamba run -n towbintools python3 -m pipeline_scripts.pimp_your_pipeline.py -c "$CONFIG_FILE" --temp_dir "$TEMP_DIR"
 ~/.local/bin/micromamba run -n towbintools python3 -m pipeline_scripts.init_pipeline -c "$CONFIG_FILE" --temp_dir "$TEMP_DIR"

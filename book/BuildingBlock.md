@@ -5,8 +5,8 @@ To be efficiently implemented, all workflows need to be divided into single buil
 
 - [segmentation](https://spsalmon.github.io/towbintools_pipeline/segmentation/) : "segmentation" building block
 - [straightening](https://spsalmon.github.io/towbintools_pipeline/straightening/) : "straightening" building block
-- **morphology computation** : "morphology_computation" building block
-- **quality_control** : "classification" building block
+- [morphology computation](https://spsalmon.github.io/towbintools_pipeline/morphologycomputation/) : "morphology_computation" building block
+- [quality_control](https://spsalmon.github.io/towbintools_pipeline/qualitycontrol/) : "classification" building block
 - **molt detection** : "molt_detection" building block
 - **fluorescence quantification** : "fluorescence_quantification" building block
 - **custom script** : "custom" building block (allowing you to run a foreign script as part of a pipeline)
@@ -48,5 +48,4 @@ If you ever want to leave an option empty, use the keyword **null**.
 
 ## Output
 
-Some blocks (i.e. segmentation and straightening) will output individual images, while some others (i.e. morphology computation) will output a report file (either CSV or Parquet). The naming of those output
-is always predicatable, allowing you to reliably feed the output of one block into the next one. For example, if you segment the first channel of the raw images, the corresponding output directory would be : analysis/ch1_seg. More explanation will be given in each invididual block's page.
+Some blocks (i.e. segmentation and straightening) will output individual images, while some others (i.e. morphology computation) will output a report file (either CSV or Parquet). The naming of those output is always predictable, allowing you to reliably feed the output of one block into the next one. For example, if you segment the first channel of the raw images, the corresponding output directory would be : analysis/ch1_seg. More explanation will be given in each individual block's page. After the output (directory or report file) is generated, its content will be added to the analysis filemap, resulting in new columns. In general, all columns corresponding to file path of new images (segmentation masks, etc.) start with the name of your analysis directory (e.g. 'analysis'). See each block's page to learn how their output will look like.
