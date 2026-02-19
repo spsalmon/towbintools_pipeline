@@ -6,7 +6,7 @@ from shiny import App
 recompute_features_at_molt = False
 # lazy_loading = False
 
-filemap_path = "/mnt/towbin.data/shared/spsalmon/pipeline_test_folder/analysis/report/analysis_filemap.parquet"
+filemap_path = "/mnt/towbin.data/shared/spsalmon/20260206_LIPSI_10x_125_615_pumping/analysis/report/analysis_filemap.parquet"
 
 filemap, filemap_save_path = open_filemap(
     filemap_path, open_annotated=True, lazy_loading=False

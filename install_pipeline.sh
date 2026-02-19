@@ -1,5 +1,10 @@
 #!/bin/bash
 
+# just in case, reset the repository to the latest version of main
+git fetch origin
+git checkout main
+git reset --hard origin/main
+
 # Update micromamba
 ~/.local/bin/micromamba self-update
 

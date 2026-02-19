@@ -43,14 +43,14 @@ def mask_preprocessing(mask):
     sum_mask = [s for s in sum_mask if s != 0]
     mean_mask_size = np.mean(sum_mask)
 
-    # remove planes with masks that are too small to zero
+    # remove planes with masks that are too small
     for i, m in enumerate(mask):
-        if np.sum(m) < mean_mask_size * 0.9:
+        if np.sum(m) < mean_mask_size * 0.8:
             mask[i] = np.zeros(m.shape, dtype=np.uint8)
 
     # remove small holes and median blur
-    # mask = np.array([binary_fill_holes(m) for m in mask]).astype(np.uint8)
-    mask = np.array([cv2.medianBlur(m, 7) for m in mask])
+    mask = np.array([binary_fill_holes(m) for m in mask]).astype(np.uint8)
+    mask = np.array([cv2.medianBlur(m, 5) for m in mask])
     return mask
 
 
@@ -244,6 +244,10 @@ def main(input_pickle, output_pickle, config, n_jobs):
     ), "4D images with both time and z dimensions are not supported yet."
     keep_biggest_object = config.get("keep_biggest_object", False)
     channel_to_allign = config.get("channel_to_allign", None)
+
+    # allows us to request the same number of cores and not run into OOM issues when straightening big stacks
+    # temporary fix
+    n_jobs = n_jobs if not is_stack else n_jobs // 4
 
     with parallel_config(backend="loky", n_jobs=n_jobs, inner_max_num_threads=1):
         Parallel()(
