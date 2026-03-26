@@ -40,6 +40,13 @@ def get_args() -> argparse.Namespace:
         required=True,
         help="Path to the output directory",
     )
+    parser.add_argument(
+        "--njobs",
+        dest="njobs",
+        type=int,
+        default=-1,
+        help="Number of parallel jobs to run (default: -1, which uses all available cores)",
+    )
 
     # Parse the arguments and return the resulting namespace object
     return parser.parse_args()
@@ -92,6 +99,7 @@ if __name__ == "__main__":
     args = get_args()
     input_dir = args.input_dir
     output_dir = args.output_dir
+    n_jobs = args.njobs
 
     os.makedirs(output_dir, exist_ok=True)
 
@@ -99,6 +107,6 @@ if __name__ == "__main__":
         os.path.join(input_dir, f) for f in os.listdir(input_dir) if f.endswith(".nd2")
     ]
 
-    Parallel(n_jobs=-1, prefer="processes")(
+    Parallel(n_jobs=n_jobs, prefer="processes")(
         delayed(convert_nd2_to_tiff)(f, output_dir) for f in tqdm(nd2_files)
     )

@@ -1,0 +1,958 @@
+import traceback
+
+import matplotlib.pyplot as plt
+import numpy as np
+import plotly.graph_objs as go
+import polars as pl
+import scipy.io as sio
+from app_components.backend import build_single_values_df
+from app_components.backend import check_use_experiment_time
+from app_components.backend import ECDYSIS_COLUMNS
+from app_components.backend import get_points_for_value_at_molts
+from app_components.backend import KEY_CONVERSION_MAP
+from app_components.backend import populate_column_choices
+from app_components.backend import process_feature_at_molt_columns
+from app_components.backend import set_marker_shape
+from app_components.ui_components import molt_annotation_buttons_server
+from app_components.ui_components import time_point_navigator_server
+from polars.exceptions import ColumnNotFoundError
+from shiny import reactive
+from shiny import render
+from shiny import ui
+from shinywidgets import render_widget
+from towbintools.foundation import image_handling
+from towbintools.foundation.file_handling import read_filemap
+from towbintools.foundation.file_handling import write_filemap
+from towbintools.foundation.utils import find_best_string_match
+
+
+def main_server(
+    input,
+    output,
+    session,
+    filemap=None,
+    filemap_save_path=None,
+    points=None,
+    times=None,
+    feature_columns=None,
+    custom_columns_choices=None,
+    default_plotted_column=None,
+):
+    use_experiment_time = check_use_experiment_time(filemap)
+    point_filemaps = filemap.partition_by("Point", maintain_order=True)
+
+    work_df_columns = [
+        "Time",
+        "Point",
+        "Death",
+        "Ignore",
+        "Arrest",
+    ] + custom_columns_choices
+
+    columns_to_get = [c for c in work_df_columns if c in filemap.columns]
+    # Remove duplicates while preserving order
+    seen = set()
+    columns_to_get_unique = []
+    for c in columns_to_get:
+        if c not in seen:
+            columns_to_get_unique.append(c)
+            seen.add(c)
+
+    print(f"Columns to get: {columns_to_get_unique}")
+    work_df = filemap.select(pl.col(columns_to_get_unique))
+    work_df = reactive.Value(work_df)
+
+    single_values_df = build_single_values_df(filemap)
+
+    single_values_of_points = single_values_df.partition_by(
+        "Point", maintain_order=True
+    )
+
+    single_values_of_points = reactive.Value(single_values_of_points)
+
+    custom_columns_list = reactive.Value(custom_columns_choices)
+
+    hatch, m1, m2, m3, m4 = (reactive.Value("") for _ in range(5))
+    value_at_hatch, value_at_m1, value_at_m2, value_at_m3, value_at_m4 = (
+        reactive.Value("") for _ in range(5)
+    )
+
+    ignore_start = reactive.Value("")
+    death = reactive.Value("")
+    arrest = reactive.Value("")
+
+    clicked_time = reactive.Value("")
+
+    current_point_filemap = reactive.Value("")
+    single_values_of_point = reactive.Value("")
+
+    custom_column_values = reactive.Value([])
+    column_to_plot = reactive.Value(default_plotted_column)
+
+    (current_point_index, current_point) = time_point_navigator_server(
+        "point",
+        choices=points,
+        all_df=single_values_of_points,
+        current_df=single_values_of_point,
+        save_on_switch=True,
+    )
+    (current_time_index, current_time) = time_point_navigator_server(
+        "time", choices=times, clicked_value=clicked_time
+    )
+
+    [
+        molt_annotation_buttons_server(
+            molt_name,
+            current_point_filemap,
+            single_values_of_point,
+            column_to_plot,
+            current_time,
+            current_time_index,
+            molt_time,
+            value_at_molt,
+            molt_name=molt_name,
+            use_experiment_time=use_experiment_time,
+        )
+        for molt_name, molt_time, value_at_molt in zip(
+            ECDYSIS_COLUMNS,
+            [hatch, m1, m2, m3, m4],
+            [value_at_hatch, value_at_m1, value_at_m2, value_at_m3, value_at_m4],
+        )
+    ]
+
+    # Create non-reactive holders for the latest values
+    latest_point = {"value": None}
+    latest_single_values = {"value": None}
+    latest_single_values_df = {"value": None}
+    latest_work_df = {"value": None}
+
+    @reactive.Effect
+    def cache_latest_for_save():
+        latest_point["value"] = current_point_index()
+        latest_single_values["value"] = single_values_of_point()
+        latest_single_values_df["value"] = single_values_of_points()
+        latest_work_df["value"] = work_df()
+
+    @reactive.Effect
+    def update_point_filemap():
+        current_point_filemap.set(point_filemaps[current_point_index()])
+        single_values_of_point.set(single_values_of_points()[current_point_index()])
+
+    @reactive.Effect
+    def update_column_to_plot():
+        column_to_plot.set(input.column_to_plot())
+
+    @reactive.Effect
+    @reactive.event(input.import_file)
+    def import_annotations():
+        file = input.import_file()
+        point = int(current_point_index())
+        if file is None:
+            return
+
+        (
+            _,
+            _,
+            custom_columns_choices,
+            _,
+            _,
+        ) = populate_column_choices(filemap)
+
+        datapath = file[0]["datapath"]
+        if datapath.endswith(".csv") or datapath.endswith(".parquet"):
+            print(f"Importing molts from {datapath} ...")
+            imported_df = read_filemap(datapath)
+
+            work_df_columns = [
+                "Death",
+                "Ignore",
+                "Arrest",
+            ] + custom_columns_choices
+
+            missing_work_df_columns = [
+                col for col in work_df_columns if col not in imported_df.columns
+            ]
+
+            current_work_df = work_df()
+
+            for col in missing_work_df_columns:
+                if col in current_work_df.columns:
+                    value = current_work_df.select(pl.col(col)).to_numpy().squeeze()
+
+                else:
+                    if col == "Death":
+                        value = np.nan
+                    elif col == "Ignore":
+                        value = False
+                    elif col == "Arrest":
+                        value = False
+                    else:
+                        value = np.nan
+
+                imported_df = imported_df.with_columns(pl.lit(value).alias(col))
+
+            necessary_columns = ["ExperimentTime"] + feature_columns
+            missing_columns = [
+                col for col in necessary_columns if col not in imported_df.columns
+            ]
+
+            for col in missing_columns:
+                value = filemap.select(pl.col(col)).to_numpy().squeeze()
+                imported_df = imported_df.with_columns(pl.lit(value).alias(col))
+
+            imported_df = process_feature_at_molt_columns(
+                imported_df,
+                feature_columns,
+                recompute_features_at_molt=False,
+            )
+
+            new_work_df = imported_df.select(pl.col(columns_to_get_unique))
+            work_df.set(new_work_df)
+
+        elif datapath.endswith(".mat"):
+            matlab_report = sio.loadmat(datapath, chars_as_strings=False)
+            new_matlab_report = {}
+            for key, value in matlab_report.items():
+                if key.startswith("__"):
+                    continue
+                try:
+                    new_key = KEY_CONVERSION_MAP.get(key)
+                    new_matlab_report[new_key] = value
+                except Exception as e:
+                    print(f"Error converting key {key}: {e}")
+
+            try:
+                ecdysis = new_matlab_report["ecdysis"]
+                ecdysis_df = pl.DataFrame(
+                    {
+                        "Point": range(len(ecdysis)),
+                        **{
+                            column: [
+                                (
+                                    float(molts[i]) - 1
+                                    if not np.isnan(molts[i])
+                                    else np.nan
+                                )
+                                for molts in ecdysis
+                            ]
+                            for i, column in enumerate(ECDYSIS_COLUMNS)
+                        },
+                    }
+                )
+
+                updated_filemap = filemap.drop(ECDYSIS_COLUMNS).join(
+                    ecdysis_df, on="Point", how="left"
+                )
+            except KeyError:
+                print("No molts found in the matlab report")
+                return
+
+            imported_df = process_feature_at_molt_columns(
+                updated_filemap,
+                feature_columns,
+                recompute_features_at_molt=True,
+            )
+
+        import_single_values_df = build_single_values_df(imported_df)
+
+        print(f"imported dataframe : {import_single_values_df}")
+        import_single_values_df = import_single_values_df.partition_by(
+            "Point", maintain_order=True
+        )
+        single_values_of_points.set(import_single_values_df)
+        single_values_of_point.set(import_single_values_df[point])
+
+    @reactive.calc
+    def get_images_of_point():
+        return current_point_filemap().select("raw").to_numpy().squeeze().tolist()
+
+    @reactive.calc
+    def get_segmentation_of_point():
+        if input.segmentation_overlay() == "None":
+            return []
+
+        return (
+            current_point_filemap()
+            .select(input.segmentation_overlay())
+            .to_numpy()
+            .squeeze()
+            .tolist()
+        )
+
+    @reactive.calc
+    def get_custom_annotations():
+        if input.custom_column() == "" or input.custom_column() == "None":
+            return []
+
+        return (
+            work_df()
+            .select(input.custom_column())
+            .to_numpy()
+            .squeeze()
+            .astype(float)
+            .tolist()
+        )
+
+    def save_filemap(
+        filemap,
+        filemap_save_path,
+        current_index,
+        current_single_values_df,
+        single_values_df,
+        work_df,
+    ):
+        print(f"Saving filemap to {filemap_save_path} ...")
+
+        # because the list of single values is only updated when the point is changed, change it here to make sure to include the latest changes
+        single_values_df[current_index] = current_single_values_df
+
+        single_values_columns = single_values_df[0].columns
+        single_values_columns.remove("Point")
+        columns_to_drop = [c for c in single_values_columns if c in filemap.columns]
+        if len(columns_to_drop) > 0:
+            filemap_to_save = filemap.drop(columns_to_drop)
+        else:
+            filemap_to_save = filemap
+
+        work_df_columns = work_df.columns
+        work_df_columns.remove("Point")
+        work_df_columns.remove("Time")
+
+        columns_to_drop = [c for c in work_df_columns if c in filemap.columns]
+        if len(columns_to_drop) > 0:
+            filemap_to_save = filemap_to_save.drop(columns_to_drop)
+
+        # combine the single_values_df into a big dataframe
+        combined_df = pl.concat(single_values_df, how="vertical")
+
+        filemap_to_save = filemap_to_save.join(combined_df, on=["Point"], how="left")
+
+        filemap_to_save = filemap_to_save.join(
+            work_df, on=["Point", "Time"], how="left"
+        )
+
+        write_filemap(filemap_to_save, filemap_save_path)
+        print("Filemap saved!")
+
+    @reactive.Effect
+    @reactive.event(input.save)
+    def save():
+        save_filemap(
+            filemap=filemap,
+            current_index=current_point_index(),
+            current_single_values_df=single_values_of_point(),
+            filemap_save_path=filemap_save_path,
+            single_values_df=single_values_of_points(),
+            work_df=work_df(),
+        )
+
+    @reactive.Effect
+    def get_hatch_and_molts():
+        # Get all molt times
+        hatch_and_molts = (
+            single_values_of_point()
+            .select(pl.col(ECDYSIS_COLUMNS))
+            .to_numpy()
+            .squeeze()
+        )
+
+        # Set molt times using unpacking
+        molt_values = [hatch, m1, m2, m3, m4]
+        for i, molt_value in enumerate(molt_values):
+            molt_value.set(hatch_and_molts[i])
+
+        # Get values at each molt
+        try:
+            column = input.column_to_plot()
+            molt_feature_values = [
+                value_at_hatch,
+                value_at_m1,
+                value_at_m2,
+                value_at_m3,
+                value_at_m4,
+            ]
+
+            for i, (molt_value, molt_name) in enumerate(
+                zip(molt_feature_values, ECDYSIS_COLUMNS)
+            ):
+                molt_value.set(
+                    single_values_of_point()
+                    .select(pl.col(f"{column}_at_{molt_name}"))
+                    .to_numpy()
+                    .squeeze()
+                )
+        except Exception as e:
+            print(f"Exception caught while getting value at hatch and molts: {e}")
+            for molt_value in molt_feature_values:
+                molt_value.set(np.nan)
+
+    @reactive.Effect
+    def set_ignore_start():
+        try:
+            df = work_df().filter(pl.col("Point") == int(current_point()))
+            print(df)
+            ignore_values = df.select(pl.col("Ignore")).to_numpy().squeeze()
+            time_values = df.select(pl.col("Time")).to_numpy().squeeze()
+            # find the first True value
+            true_indices = np.where(ignore_values)[0]
+            if true_indices.size > 0:
+                ignore_start.set(time_values[true_indices[0]])
+            else:
+                ignore_start.set("")
+
+        except ColumnNotFoundError:
+            ignore_start.set("")
+
+        print(f"Ignore start: {ignore_start()}")
+
+    @reactive.Effect
+    @reactive.event(input.set_ignore_point)
+    def set_ignore_point():
+        point = int(current_point())
+        df = work_df()
+
+        print(f"Setting ignore for point {point}")
+        if "Ignore" not in df.columns:
+            df = df.with_columns(pl.lit(False).alias("Ignore"))
+
+        if (
+            df.filter(pl.col("Point") == point)
+            .select(pl.col("Ignore"))
+            .to_numpy()
+            .all()
+        ):
+            work_df.set(
+                df.with_columns(
+                    pl.when(pl.col("Point") == point)
+                    .then(False)
+                    .otherwise(pl.col("Ignore"))
+                    .alias("Ignore")
+                )
+            )
+        else:
+            work_df.set(
+                df.with_columns(
+                    pl.when(pl.col("Point") == point)
+                    .then(True)
+                    .otherwise(pl.col("Ignore"))
+                    .alias("Ignore")
+                )
+            )
+
+        print(work_df().filter(pl.col("Point") == point).select(pl.col("Ignore")))
+
+    @reactive.Effect
+    @reactive.event(input.set_ignore_after)
+    def set_ignore_after():
+        point = int(current_point())
+        time = int(current_time())
+        df = work_df()
+        print(f"Setting ignore after for point {point}")
+        if "Ignore" not in df.columns:
+            df = df.with_columns(pl.lit(False).alias("Ignore"))
+
+        if (
+            df.filter((pl.col("Point") == point) & (pl.col("Time") >= time))
+            .select(pl.col("Ignore"))
+            .to_numpy()
+            .all()
+        ):
+            work_df.set(
+                df.with_columns(
+                    pl.when((pl.col("Point") == point) & (pl.col("Time") >= time))
+                    .then(False)
+                    .otherwise(pl.col("Ignore"))
+                    .alias("Ignore")
+                )
+            )
+        else:
+            work_df.set(
+                df.with_columns(
+                    pl.when((pl.col("Point") == point) & (pl.col("Time") >= time))
+                    .then(True)
+                    .otherwise(pl.col("Ignore"))
+                    .alias("Ignore")
+                )
+            )
+
+        print(work_df().filter(pl.col("Point") == point).select(pl.col("Ignore")))
+
+    @reactive.Effect
+    def get_death():
+        try:
+            d = (
+                work_df()
+                .filter(pl.col("Point") == int(current_point()))
+                .select(pl.col("Death"))
+                .to_numpy()
+                .squeeze()[0]
+            )
+            if d is None:
+                death.set("")
+            else:
+                death.set(d)
+        except ColumnNotFoundError:
+            death.set("")
+
+    @reactive.Effect
+    @reactive.event(input.set_death)
+    def set_death():
+        point = int(current_point())
+        time = int(current_time())
+
+        df = work_df()
+
+        if "Death" not in df.columns:
+            df = df.with_columns(pl.lit(np.nan).alias("Death"))
+
+        point_df = df.filter(pl.col("Point") == point)
+
+        if point_df.select(pl.col("Death")).to_numpy().squeeze()[0] == time:
+            df = df.with_columns(
+                pl.when(pl.col("Point") == point)
+                .then(np.nan)
+                .otherwise(pl.col("Death"))
+                .alias("Death")
+            )
+
+        else:
+            df = df.with_columns(
+                pl.when(pl.col("Point") == point)
+                .then(time)
+                .otherwise(pl.col("Death"))
+                .alias("Death")
+            )
+
+        work_df.set(df)
+
+    @reactive.Effect
+    @reactive.event(input.set_arrest)
+    def set_arrest():
+        point = int(current_point())
+
+        df = work_df()
+
+        if "Arrest" not in df.columns:
+            df = df.with_columns(pl.lit(False).alias("Arrest"))
+
+        point_df = df.filter(pl.col("Point") == point)
+
+        if np.all(point_df.select(pl.col("Arrest")).to_numpy().squeeze()):
+            df = df.with_columns(
+                pl.when(pl.col("Point") == point)
+                .then(False)
+                .otherwise(pl.col("Arrest"))
+                .alias("Arrest")
+            )
+
+        else:
+            df = df.with_columns(
+                pl.when(pl.col("Point") == point)
+                .then(True)
+                .otherwise(pl.col("Arrest"))
+                .alias("Arrest")
+            )
+
+        work_df.set(df)
+
+    @reactive.Effect
+    def get_arrest():
+        try:
+            arrest.set(
+                work_df()
+                .filter(pl.col("Point") == int(current_point()))
+                .select(pl.col("Arrest"))
+                .to_numpy()
+                .squeeze()[0]
+            )
+        except ColumnNotFoundError:
+            arrest.set(False)
+
+    @reactive.Effect
+    def reactive_get_custom_column_values():
+        print("reactive_get_custom_column_values")
+        custom_column = input.custom_column()
+
+        local_work_df = work_df()
+        work_df_columns = local_work_df.columns
+
+        if custom_column == "None" or custom_column == "":
+            custom_column_values.set([])
+            return
+        if custom_column not in work_df_columns:
+            local_work_df = local_work_df.with_columns(
+                pl.lit(np.nan).alias(custom_column)
+            )
+            work_df.set(local_work_df)
+            custom_column_values.set([])
+        else:
+            custom_column_values.set(
+                get_custom_column_values(
+                    local_work_df, custom_column, int(current_point())
+                )
+            )
+        print(f"Custom column values: {custom_column_values()}")
+
+    def get_custom_column_values(df, column, point):
+        if column == "None" or column == "":
+            return []
+        if column not in df.columns:
+            df = df.with_columns(pl.lit(np.nan).alias(column))
+        intermediate_df = df.filter(pl.col("Point") == point)
+
+        # convert the column to index in the time values
+        time = intermediate_df.select(pl.col("Time")).to_numpy().squeeze()
+        column_values = intermediate_df.select(pl.col(column)).to_numpy().squeeze()
+
+        non_nan_column_values = column_values[~np.isnan(column_values)]
+        column_values_as_indexes = np.full_like(non_nan_column_values, np.nan)
+        for i, value in enumerate(non_nan_column_values):
+            index = np.where(time == value)[0]
+            if index.size > 0:
+                column_values_as_indexes[i] = index[0]
+        return column_values_as_indexes
+
+    @reactive.Effect
+    @reactive.event(input.custom_annotation)
+    def set_custom_annotation():
+        try:
+            new_column_name = input.new_custom_column()
+            custom_column = input.custom_column()
+
+            local_work_df = work_df()
+            filemap_columns = filemap.columns
+            custom_columns = custom_columns_list()
+
+            if (new_column_name != "" and new_column_name != "None") and (
+                new_column_name not in custom_columns
+            ):
+                custom_columns.append(new_column_name)
+                custom_columns_list.set(custom_columns)
+                ui.update_selectize(
+                    "custom_column",
+                    choices=custom_columns_list(),
+                    selected=new_column_name,
+                )
+                ui.update_text("new_custom_column", value="")
+                custom_column = new_column_name
+
+            if custom_column == "" or custom_column == "None":
+                return
+
+            if custom_column not in filemap_columns:
+                local_work_df = local_work_df.with_columns(
+                    pl.lit(np.nan).alias(new_column_name)
+                )
+            elif custom_column not in local_work_df.columns:
+                new_column_values = (
+                    filemap.select(pl.col(custom_column)).to_numpy().squeeze()
+                )
+                local_work_df = local_work_df.with_columns(
+                    pl.lit(new_column_values).alias(custom_column)
+                )
+
+            time = int(current_time())
+            point = int(current_point())
+
+            local_work_df = local_work_df.with_columns(
+                pl.when((pl.col("Point") == point) & (pl.col("Time") == time))
+                .then(float(time))
+                .otherwise(pl.col(custom_column))
+                .alias(custom_column),
+            )
+            work_df.set(local_work_df)
+
+        except Exception as e:
+            print(f"Exception in set_custom_annotation: {e}")
+            traceback.print_exc()
+
+    @reactive.Effect
+    @reactive.event(input.reset_custom_annotation)
+    def reset_custom_annotation():
+        custom_column = input.custom_column()
+        if custom_column != "" and custom_column != "None":
+            try:
+                work_df.set(
+                    work_df().with_columns(
+                        pl.when(pl.col("Point") == int(current_point()))
+                        .then(np.nan)
+                        .otherwise(pl.col(custom_column))
+                        .alias(custom_column),
+                    )
+                )
+            except Exception as e:
+                print(f"Exception in reset_custom_annotation: {e}")
+
+    @output
+    @render.plot
+    def plot_image():
+        idx = current_time_index()
+        channel_str = input.channel()
+        channel = int(channel_str.split(" ")[-1]) - 1
+
+        images_of_point = get_images_of_point()
+        segmentation_of_point = get_segmentation_of_point()
+
+        img = images_of_point[idx]
+        img = image_handling.read_tiff_file(img)
+
+        # Select the correct channel/slice
+        if img.ndim == 3:
+            img_to_plot = img[channel]
+        elif img.ndim == 4:
+            img_to_plot = img[img.shape[0] // 2, channel, ...]
+        elif img.ndim == 2:
+            img_to_plot = img
+        else:
+            raise ValueError("Unexpected image dimensions")
+
+        channel_overlay_str = input.channel_overlay()
+        plot_overlay = channel_overlay_str != "None"
+        if plot_overlay:
+            channel_overlay = int(channel_overlay_str.split(" ")[-1]) - 1
+            overlay = img[channel_overlay]
+            overlay = image_handling.normalize_image(overlay, dest_dtype=np.float64)
+        else:
+            overlay = None  # Only create if needed
+
+        img_to_plot = image_handling.normalize_image(img_to_plot, dest_dtype=np.float64)
+
+        fig, ax = plt.subplots()
+        ax.imshow(img_to_plot, cmap="viridis")
+        if plot_overlay:
+            ax.imshow(overlay, cmap="magma", alpha=0.5)
+
+        if len(segmentation_of_point) > 0:
+            segmentation_path = segmentation_of_point[idx]
+            segmentation = image_handling.read_tiff_file(segmentation_path)
+            segmentation = segmentation.squeeze()
+            masked = np.ma.masked_array(segmentation, mask=(segmentation == 0))
+            ax.imshow(masked, alpha=0.5, cmap="autumn", interpolation="none")
+
+        # disable axis
+        ax.axis("off")
+
+        return fig
+
+    @reactive.calc
+    def create_figure():
+        print("create_figure")
+        data_of_point = current_point_filemap().select(
+            pl.col(
+                [
+                    "Time",
+                    input.column_to_plot(),
+                    "HatchTime",
+                    "M1",
+                    "M2",
+                    "M3",
+                    "M4",
+                ]
+            )
+        )
+
+        times_of_point = data_of_point.select(pl.col("Time")).to_numpy().squeeze()
+        values_of_point = (
+            data_of_point.select(pl.col(input.column_to_plot())).to_numpy().squeeze()
+        )
+
+        fig = go.FigureWidget()
+
+        fig.add_trace(
+            go.Scatter(
+                x=times_of_point,
+                y=values_of_point,
+                mode="markers",
+                # marker=markers,
+            )
+        )
+
+        def update_selected_time(trace, points, selector):
+            print("update_selected_time")
+            for point in points.xs:
+                clicked_time.set(str(point))
+
+        fig.data[0].on_click(update_selected_time)
+
+        if ignore_start() != "":
+            if not np.isnan(float(ignore_start())):
+                fig.update_layout(
+                    shapes=[
+                        dict(
+                            type="rect",
+                            xref="x",
+                            yref="paper",
+                            x0=float(ignore_start()),
+                            x1=max(data_of_point["Time"]) + 1,
+                            y0=0,
+                            y1=1,
+                            fillcolor="gray",
+                            opacity=0.5,
+                            layer="above",
+                            line_width=0,
+                        )
+                    ]
+                )
+
+        if death() != "":
+            if not np.isnan(float(death())):
+                fig.add_shape(
+                    dict(
+                        type="line",
+                        xref="x",
+                        yref="paper",
+                        x0=float(death()),
+                        y0=0,
+                        x1=float(death()),
+                        y1=1,
+                        line=dict(color="black", width=2),
+                    )
+                )
+
+        if arrest() != "" and arrest():
+            fig.add_shape(
+                dict(
+                    type="rect",
+                    xref="paper",
+                    yref="paper",
+                    x0=0,
+                    x1=1,
+                    y0=0,
+                    y1=1,
+                    fillcolor="red",
+                    opacity=0.5,
+                    layer="above",
+                    line_width=0,
+                )
+            )
+
+        return fig
+
+    @reactive.calc
+    def get_markers():
+        print("get_markers")
+        qc_columns = [col for col in current_point_filemap().columns if "qc" in col]
+        if len(qc_columns) == 0:
+            qc_column = qc_columns[0]
+        else:
+            qc_column = find_best_string_match(input.column_to_plot(), qc_columns)
+
+        data_of_point = current_point_filemap().select(
+            pl.col(
+                [
+                    "Time",
+                    input.column_to_plot(),
+                    qc_column,
+                    "HatchTime",
+                    "M1",
+                    "M2",
+                    "M3",
+                    "M4",
+                ]
+            )
+        )
+
+        times_of_point = data_of_point.select(pl.col("Time")).to_numpy().squeeze()
+        qcs_of_point = data_of_point.select(pl.col(qc_column)).to_numpy().squeeze()
+
+        custom_annotations_of_point = custom_column_values()
+        markers = set_marker_shape(
+            times_of_point,
+            current_time_index(),
+            qcs_of_point,
+            hatch(),
+            m1(),
+            m2(),
+            m3(),
+            m4(),
+            custom_annotations=custom_annotations_of_point,
+        )
+        return markers
+
+    @reactive.calc
+    def get_molt_scatter():
+        print("get_molt_scatter")
+        (
+            ecdys_list,
+            value_at_ecdys_list,
+            symbols,
+            colors,
+            sizes,
+            widths,
+        ) = get_points_for_value_at_molts(
+            hatch(),
+            m1(),
+            m2(),
+            m3(),
+            m4(),
+            value_at_hatch(),
+            value_at_m1(),
+            value_at_m2(),
+            value_at_m3(),
+            value_at_m4(),
+        )
+
+        return go.Scatter(
+            x=ecdys_list,
+            y=value_at_ecdys_list,
+            mode="markers",
+            marker=dict(
+                symbol=symbols,
+                size=sizes,
+                color=colors,
+                line=dict(width=widths, color=colors),
+            ),
+            hoverinfo="none",  # Disable hover information
+            hoverlabel=None,  # Disable hover label
+            hoveron=None,  # Disable hover interaction
+        )
+
+    @output
+    @render_widget
+    def plot_curve():
+        print("plot_curve")
+        fig = create_figure()
+        markers = get_markers()
+
+        # if the figure only has one trace, we can add the scatter trace
+        molt_scatter = get_molt_scatter()
+
+        if len(fig.data) == 1:
+            fig.add_trace(molt_scatter)
+        else:
+            # check if the scatter changed
+            if not np.array_equal(fig.data[1].x, molt_scatter.x) or not np.array_equal(
+                fig.data[1].y, molt_scatter.y
+            ):
+                data = list(fig.data)
+                data.pop(1)  # Remove the second trace
+                fig.data = data
+                fig.add_trace(molt_scatter)
+
+        # Instead of modifying fig.data[0].marker in-place, use update_traces
+        fig.update_traces(marker=markers, selector=0)
+
+        fig.update_layout(
+            xaxis_title="Time",
+            yaxis_title=input.column_to_plot(),
+            margin=dict(l=20, r=20, t=50, b=50),
+            height=input.curve_plot_height(),
+            width=input.curve_plot_width(),
+            showlegend=False,
+            yaxis_type="log" if input.log_scale() else "linear",
+            autosize=False,
+        )
+
+        return fig
+
+    def save_on_session_end():
+        save_filemap(
+            filemap=filemap,
+            current_index=latest_point["value"],
+            current_single_values_df=latest_single_values["value"],
+            filemap_save_path=filemap_save_path,
+            single_values_df=latest_single_values_df["value"],
+            work_df=latest_work_df["value"],
+        )
+
+    session.on_ended(save_on_session_end)

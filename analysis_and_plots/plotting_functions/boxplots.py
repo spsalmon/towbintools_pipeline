@@ -36,6 +36,7 @@ def _setup_figure(
         df["Order"].nunique(),
         figsize=(figsize[0] + 3, figsize[1]),
         sharey=False,
+        layout="constrained",
     )
 
     return fig, ax
@@ -323,11 +324,11 @@ def _plot_violinplot(
     titles,
     share_y_axis,
     plot_significance,
-    show_metric,
     significance_pairs,
     log_scale,
+    show_metric=False,
     test="Mann-Whitney",
-    hide_outliers=True,
+    hide_outliers=False,
 ):
     y_min, y_max = [], []
     for event_index in range(df["Order"].nunique()):
@@ -445,10 +446,10 @@ def _plot_boxplot(
     titles,
     share_y_axis,
     plot_significance,
-    show_metric,
     significance_pairs,
     log_scale,
-    hide_outliers=True,
+    show_metric=False,
+    hide_outliers=False,
     test="Mann-Whitney",
     return_data=False,
 ):
@@ -478,34 +479,29 @@ def _plot_boxplot(
             dodge=False,
             linewidth=2,
             legend="full",
+            linecolor="black",
+            log_scale=log_scale,
         )
 
         if hide_outliers:
-            data = df[df["Order"] == event_index]
             for condition in conditions_to_plot:
-                condition_data = data[data["Condition"] == condition]
-                mean = condition_data[column].mean()
-                std = condition_data[column].std()
-                outliers = condition_data[
-                    (condition_data[column] < mean - 3 * std)
-                    | (condition_data[column] > mean + 3 * std)
-                ]
-                # set outliers to NaN
-                df.loc[
-                    (df["Order"] == event_index)
-                    & (df["Condition"] == condition)
-                    & (df[column].isin(outliers[column])),
-                    "Outlier",
-                ] = True
+                mask = (df["Order"] == event_index) & (df["Condition"] == condition)
+                condition_data = df.loc[mask, column]
+
+                mean = condition_data.mean()
+                std = condition_data.std()
+
+                outlier_mask = mask & (
+                    (df[column] < mean - 3 * std) | (df[column] > mean + 3 * std)
+                )
+
+                df.loc[outlier_mask, "Outlier"] = True
 
         plot_df = df.copy()
+
         if hide_outliers:
-            plot_df.loc[
-                (plot_df["Order"] == event_index)
-                & (plot_df["Condition"] == condition)
-                & (plot_df[column].isin(outliers[column])),
-                column,
-            ] = True
+            plot_df.loc[df["Outlier"], column] = np.nan
+
         sns.swarmplot(
             data=plot_df[plot_df["Order"] == event_index],
             x="Condition",
@@ -515,6 +511,7 @@ def _plot_boxplot(
             alpha=0.5,
             color="black",
             dodge=False,
+            log_scale=log_scale,
         )
 
         current_ax.set_xlabel("")
@@ -562,7 +559,7 @@ def _plot_boxplot(
 def _set_all_y_limits(ax, y_min, y_max):
     global_min = min(y_min)
     global_max = max(y_max)
-    range_padding = (global_max - global_min) * 0.05  # 5% padding
+    range_padding = (global_max - global_min) * 0.1  # 5% padding
     global_min = global_min - range_padding
     global_max = global_max + range_padding
     for i in range(len(ax)):
@@ -603,7 +600,7 @@ def _set_labels_and_legend(
     fig.legend(
         legend_handles,
         legend_labels,
-        bbox_to_anchor=(0.9, 0.5),
+        bbox_to_anchor=(1.005, 0.5),
         loc="center left",
         title=None,
         frameon=True,
@@ -650,7 +647,7 @@ def violinplot(
                         "Condition": condition_id,
                         "Order": order,
                         "Description": condition_dict["description"],
-                        column: np.log(value) if log_scale else value,
+                        column: np.log10(value) if log_scale else value,
                     }
                 )
 
@@ -671,9 +668,9 @@ def violinplot(
         titles,
         share_y_axis,
         plot_significance,
-        show_metric,
         significance_pairs,
-        log_scale,
+        log_scale=log_scale,
+        show_metric=show_metric,
         hide_outliers=hide_outliers,
         test=significance_test,
     )
@@ -743,7 +740,8 @@ def boxplot(
                         "Condition": condition_id,
                         "Order": order,
                         "Description": condition_dict["description"],
-                        column: np.log(value) if log_scale else value,
+                        # column: np.log10(value) if log_scale else value,
+                        column: value,
                     }
                 )
 
@@ -764,10 +762,10 @@ def boxplot(
         titles,
         share_y_axis,
         plot_significance,
-        show_metric,
         significance_pairs,
-        hide_outliers,
-        log_scale,
+        hide_outliers=hide_outliers,
+        log_scale=log_scale,
+        show_metric=show_metric,
         test=significance_test,
     )
 
@@ -874,7 +872,7 @@ def violinplot_larval_stage(
         share_y_axis,
         plot_significance,
         significance_pairs,
-        log_scale,
+        log_scale=log_scale,
         hide_outliers=hide_outliers,
         test=significance_test,
     )

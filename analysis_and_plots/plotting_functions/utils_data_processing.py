@@ -24,7 +24,7 @@ def combine_series(
         elif operation == "multiply":
             new_series_values = series_one_values * series_two_values
         elif operation == "divide":
-            new_series_values = np.divide(series_one_values, series_two_values)
+            new_series_values = np.divide(series_one_values, series_two_values + 1e-8)
         condition[new_series_name] = new_series_values
     return conditions_struct
 

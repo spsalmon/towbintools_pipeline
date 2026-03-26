@@ -1,12 +1,11 @@
 from app_components.backend import open_filemap
+from app_components.server import main_server
 from app_components.ui import initialize_ui
-from app_components.ui import main_server
 from shiny import App
 
 recompute_features_at_molt = False
-# lazy_loading = False
 
-filemap_path = "/mnt/towbin.data/shared/spsalmon/20260206_LIPSI_10x_125_615_pumping/analysis/report/analysis_filemap.parquet"
+filemap_path = "/mnt/towbin.data/shared/plenart/20261403_squid_10x_wBT318_heath_stress_27_degree/analysis/report/analysis_filemap.csv"
 
 filemap, filemap_save_path = open_filemap(
     filemap_path, open_annotated=True, lazy_loading=False

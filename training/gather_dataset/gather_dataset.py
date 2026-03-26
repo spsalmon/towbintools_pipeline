@@ -180,6 +180,10 @@ def get_images_from_filemap(
     microscope = variation_to_unified_scope_name.get(microscope, microscope)
     database = pl.DataFrame()
     for filemap in filemaps_of_points:
+        # remove rows where raw is null
+        filemap = filemap.filter(pl.col("raw").is_not_null())
+        if filemap.height == 0:
+            continue
         point = filemap.select(pl.col("Point")).row(0)[0]
         if stage_proportions is None:
             # if no stage proportions are defined
@@ -277,19 +281,22 @@ def calculate_image_combinations(database_size, scope_proportions, stage_proport
 
 
 def process_row(row, output_dir, channel):
-    image_path = row["Image"]
-    image = read_tiff_file(image_path)
-    channel = channel[0] if isinstance(channel, list) else channel
-    if channel >= image.shape[0]:
-        channel = image.shape[0] - 1
-    image = image[channel, :, :]  # select the channel
-    image_name = row["OutputName"]
-    # save the image
-    imwrite(os.path.join(output_dir, image_name), image, compression="zlib")
+    try:
+        image_path = row["Image"]
+        image = read_tiff_file(image_path)
+        channel = channel[0] if isinstance(channel, list) else channel
+        if channel >= image.shape[0]:
+            channel = image.shape[0] - 1
+        image = image[channel, :, :]  # select the channel
+        image_name = row["OutputName"]
+        # save the image
+        imwrite(os.path.join(output_dir, image_name), image, compression="zlib")
+    except Exception as e:
+        print(f"Error processing image {row['Image']}: {e}")
 
 
 def extract_images(database, output_dir, channel):
-    Parallel(n_jobs=32)(
+    Parallel(n_jobs=1)(
         delayed(process_row)(row, output_dir, channel)
         for _, row in tqdm(database.iterrows())
     )

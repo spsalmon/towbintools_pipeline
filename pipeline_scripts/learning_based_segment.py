@@ -48,9 +48,10 @@ def predict_batch(model, images, image_shapes, device, n_classes):
     predictions = predictions.cpu().numpy()
     predictions = np.squeeze(predictions)
 
-    print(f"Raw prediction shape: {predictions.shape}")
-
     if predictions.ndim < 3:
+        predictions = np.expand_dims(predictions, axis=0)
+
+    if n_classes > 1 and predictions.ndim < 4:
         predictions = np.expand_dims(predictions, axis=0)
 
     if n_classes > 1:
@@ -136,11 +137,38 @@ def main(input_pickle, output_pickle, config, n_jobs):
 
             with torch.no_grad():
                 for i, batch in enumerate(dataloader):
-                    image_paths, images, image_shapes = batch
+                    image_paths, images, image_shapes, invalid_indices = batch
+                    batch_size = len(image_paths)
 
-                    predictions = predict_batch(
-                        model, images, image_shapes, device, n_classes
-                    )
+                    print(f"Invalid indices in batch {i}: {invalid_indices}")
+
+                    if len(image_paths) == 0:
+                        # if all images in the batch failed to load, create a batch of black masks
+                        predictions = np.zeros((batch_size, (10, 10)), dtype=np.uint8)
+                    else:
+                        if images.ndim == 3:
+                            images = images.unsqueeze(0)
+
+                        predictions = predict_batch(
+                            model, images, image_shapes, device, n_classes
+                        )
+
+                        # insert black masks for any images that failed to load
+                        if len(invalid_indices) > 0:
+                            predictions = np.array(predictions)
+                            print(
+                                f"Predictions shape for batch {i} before inserting black masks: {predictions.shape}"
+                            )
+                            for j in invalid_indices:
+                                predictions = np.insert(
+                                    predictions,
+                                    j,
+                                    np.zeros_like(predictions[0]),
+                                    axis=0,
+                                )
+                            print(
+                                f"Predictions shape after inserting black masks for batch {i}: {predictions.shape}"
+                            )
 
                     with parallel_config(backend="threading", n_jobs=n_jobs // 2):
                         Parallel()(
@@ -151,7 +179,7 @@ def main(input_pickle, output_pickle, config, n_jobs):
                         )
 
                     # remove the output paths that have been processed
-                    output_files = output_files[len(image_paths) :]
+                    output_files = output_files[batch_size:]
         else:
             # it's suboptimal, but for now we treat each image individually
             for input_file, output_file in zip(input_files, output_files):

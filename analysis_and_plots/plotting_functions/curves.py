@@ -15,6 +15,7 @@ def plot_aggregated_series(
     conditions_struct,
     series_column,
     conditions_to_plot,
+    x="time",
     experiment_time=True,
     aggregation="mean",
     n_points=100,
@@ -22,6 +23,7 @@ def plot_aggregated_series(
     log_scale=True,
     colors=None,
     legend=None,
+    x_axis_label=None,
     y_axis_label=None,
 ):
     color_palette = get_colors(conditions_to_plot, colors)
@@ -60,11 +62,18 @@ def plot_aggregated_series(
             if not experiment_time:
                 rescaled_time = rescaled_time * time_step / 60
             label = build_legend(condition_dict, legend)
-            plt.plot(
-                rescaled_time, aggregated_series, color=color_palette[i], label=label
-            )
+
+            if x == "time":
+                x_values = rescaled_time
+            elif x == "percentage":
+                x_values = np.linspace(0, 100, len(rescaled_time))
+            else:
+                raise ValueError(
+                    f"Invalid x value: {x}. Must be 'time' or 'percentage'."
+                )
+            plt.plot(x_values, aggregated_series, color=color_palette[i], label=label)
             plt.fill_between(
-                rescaled_time, ci_lower, ci_upper, color=color_palette[i], alpha=0.2
+                x_values, ci_lower, ci_upper, color=color_palette[i], alpha=0.2
             )
 
     if isinstance(series_column, list):
@@ -76,12 +85,15 @@ def plot_aggregated_series(
     handles, labels = plt.gca().get_legend_handles_labels()
     by_label = dict(zip(labels, handles))
     plt.legend(by_label.values(), by_label.keys())
-    plt.xlabel("time (h)")
     plt.yscale("log" if log_scale else "linear")
     if y_axis_label is not None:
         plt.ylabel(y_axis_label)
     else:
         plt.ylabel(series_column)
+    if x_axis_label is not None:
+        plt.xlabel(x_axis_label)
+    else:
+        plt.xlabel("time (h)" if x == "time" else "development completion (%)")
     fig = plt.gcf()
     plt.show()
     return fig

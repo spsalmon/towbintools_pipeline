@@ -167,8 +167,6 @@ elif image_directories is not None and mask_directories is not None:
         test_set_ratio=train_test_split_ratio,
     )
 
-    print(train_loader.dataset.image_slicers)
-
 elif training_dataframes is not None and validation_dataframes is not None:
     # combine the training dataframes together
     training_df = []

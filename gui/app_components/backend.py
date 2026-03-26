@@ -10,9 +10,17 @@ from towbintools.foundation.file_handling import write_filemap
 from towbintools.foundation.utils import find_best_string_match
 from towbintools.foundation.worm_features import get_features_to_compute_at_molt
 
-FEATURES_TO_COMPUTE_AT_MOLT = get_features_to_compute_at_molt()
 
+# constant definitions
+FEATURES_TO_COMPUTE_AT_MOLT = get_features_to_compute_at_molt()
 ECDYSIS_COLUMNS = ["HatchTime", "M1", "M2", "M3", "M4"]
+
+KEY_CONVERSION_MAP = {
+    "vol": "volume",
+    "len": "length",
+    "strClass": "qc",
+    "ecdys": "ecdysis",
+}
 
 
 def get_backup_path(filemap_folder, filemap_name, filemap_extension):
