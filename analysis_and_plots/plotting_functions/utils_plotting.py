@@ -6,7 +6,7 @@ import seaborn as sns
 # THIS PART IS MOSTLY ABOUT HANDLING LEGENDS, SAVING FIGURES, ETC.
 
 
-def save_figure(fig, name, directory, format="svg", dpi=300, transparent=False):
+def save_figure(fig, name, directory, format="svg", dpi=300, transparent=True):
     """
     Save a given matplotlib figure to the specified directory with the given name, in the chose format.
 

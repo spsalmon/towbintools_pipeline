@@ -1,7 +1,7 @@
 storage_path: "/mnt/towbin.data/shared"
-valid_subdirectories: ["spsalmon"]
+valid_subdirectories: ["spsalmon", "kstojanovski", "igheor"]
 
-database_path: "/mnt/towbin.data/shared/spsalmon/towbinlab_segmentation_database/datasets/60x_brightfield"
+database_path: "/mnt/towbin.data/shared/spsalmon/towbinlab_segmentation_database/datasets/chamber_segmentation"
 
 database_configs: {
   'brightfield': {
@@ -10,7 +10,7 @@ database_configs: {
       'scope_proportions': {'ziva': 1.0},
       'channel': [0],
       'strains': null,
-      'magnification': "60x",
+      'magnifications': ["40x", "60x"],
   },
 }
 
@@ -29,11 +29,9 @@ scopes_alt_names: {
 keywords_to_exclude: ["exclude", "fail", "failure", "crash"]
 keywords_to_include: ["lifespan"]
 
-experiments_to_consider: [
-  "/mnt/towbin.data/shared/spsalmon/20251023_115945_091_ZIVA_60x_397_405_yap_dynamics"
-]
+experiments_to_consider: null
 
-experient_to_always_include: []
+experiments_to_always_include: []
 experiments_to_exclude: [
   "20241111_squid_10x_wBT318_NaCl",
   "20241707_souvik_w318_ev_mex3_squid",

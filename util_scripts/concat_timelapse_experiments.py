@@ -8,47 +8,42 @@ from joblib import Parallel
 from towbintools.foundation.file_handling import get_dir_filemap
 from tqdm import tqdm
 
-experiment_dir = "/mnt/towbin.data/shared/spsalmon/test_concat_experiments"
-
+experiment_dir = (
+    "/mnt/towbin.data/shared/nschoonjans/20260227_Ziva_60X_405_EV-eat-6RNAi"
+)
 dir_list = [
-    "raw",
+    "raw_part1",
     "raw_part2",
     "raw_part3",
-    "raw_part4",
 ]
-dir_list = [os.path.join(experiment_dir, d) for d in dir_list]
 
+dir_list = [os.path.join(experiment_dir, d) for d in dir_list]
 output_dir = os.path.join(experiment_dir, "raw")
 backup_dir = os.path.join(experiment_dir, "backup")
-
 os.makedirs(backup_dir, exist_ok=True)
 os.makedirs(output_dir, exist_ok=True)
 
 
 def replace_time_in_filename(filename, new_time):
     match = re.search(r"Time(\d+)", filename)
-
     if not match:
         return ""
-
     original_time_str = match.group(1)
     original_digit_count = len(original_time_str)
-
     new_time_str = f"{new_time:0{original_digit_count}d}"
-
     new_filename = filename.replace(f"Time{original_time_str}", f"Time{new_time_str}")
-
     return new_filename
 
 
 def concat_timelapse_experiments(first_filemap, second_filemap):
     last_time = first_filemap["Time"].max()
-    second_filemap["Time"] += last_time + 1
+    second_filemap = second_filemap.copy()  # avoid mutating the original
+    second_filemap["Time"] = second_filemap["Time"] + last_time + 1
 
     first_filemap = first_filemap[first_filemap["ImagePath"].notna()]
     second_filemap = second_filemap[second_filemap["ImagePath"].notna()]
-    combined_filemap = pd.concat([first_filemap, second_filemap], ignore_index=True)
 
+    combined_filemap = pd.concat([first_filemap, second_filemap], ignore_index=True)
     combined_filemap.reset_index(drop=True, inplace=True)
     combined_filemap["NewFilename"] = combined_filemap.apply(
         lambda row: os.path.basename(
@@ -60,8 +55,115 @@ def concat_timelapse_experiments(first_filemap, second_filemap):
     return combined_filemap
 
 
+# ---------------------------------------------------------------------------
+# Safety checks – call these before touching any files
+# ---------------------------------------------------------------------------
+
+
+def check_no_empty_new_filenames(combined_filemap):
+    """Fail if any source filename had no Time\\d+ pattern and produced an empty NewFilename."""
+    bad = combined_filemap[combined_filemap["NewFilename"] == ""]
+    if not bad.empty:
+        raise ValueError(
+            f"The following {len(bad)} file(s) produced an empty NewFilename "
+            f"(no 'Time<digits>' pattern found in their path). "
+            f"They would be lost or cause an OS error:\n"
+            + bad[["ImagePath", "Time"]].to_string()
+        )
+
+
+def check_no_duplicate_output_filenames(combined_filemap):
+    """Fail if two different source files would be moved to the same destination.
+    Without this check, shutil.move silently overwrites the first file with the second.
+    """
+    dupes = combined_filemap[
+        combined_filemap.duplicated(subset=["NewFilename"], keep=False)
+    ]
+    if not dupes.empty:
+        raise ValueError(
+            f"The following {len(dupes)} rows share an output filename. "
+            f"Moving them would silently destroy data:\n"
+            + dupes[["ImagePath", "NewFilename", "Time", "Point"]].to_string()
+        )
+
+
+def check_no_duplicate_source_paths(combined_filemap):
+    """Fail if the same source file appears more than once (e.g. overlapping dir_list entries)."""
+    dupes = combined_filemap[
+        combined_filemap.duplicated(subset=["ImagePath"], keep=False)
+    ]
+    if not dupes.empty:
+        raise ValueError(
+            f"The following {len(dupes)} rows have duplicate source ImagePaths. "
+            f"This suggests overlapping input directories:\n"
+            + dupes[["ImagePath", "NewFilename"]].to_string()
+        )
+
+
+def check_source_files_exist(combined_filemap):
+    """Fail fast if any source file is already missing."""
+    missing = [p for p in combined_filemap["ImagePath"] if not os.path.isfile(p)]
+    if missing:
+        raise FileNotFoundError(
+            f"{len(missing)} source file(s) do not exist on disk. First 10:\n"
+            + "\n".join(missing[:10])
+        )
+
+
+def check_output_files_do_not_exist(combined_filemap):
+    """Warn (not fail) if an output path already exists – could indicate a partial previous run."""
+    existing = [p for p in combined_filemap["OutputPath"] if os.path.exists(p)]
+    if existing:
+        raise FileExistsError(
+            f"{len(existing)} output path(s) already exist. "
+            f"Re-running would silently overwrite them. "
+            f"Clear '{output_dir}' or resume from the saved CSV. First 10:\n"
+            + "\n".join(existing[:10])
+        )
+
+
+def check_file_counts_consistent(dir_list, combined_filemap):
+    """Fail if the total number of files in combined_filemap doesn't match
+    the total number of image files found across all input directories.
+    A mismatch means some files were silently dropped (e.g. by notna() filtering).
+    """
+    total_source = sum(
+        get_dir_filemap(d).to_pandas()["ImagePath"].notna().sum() for d in dir_list
+    )
+    total_combined = len(combined_filemap)
+    if total_source != total_combined:
+        raise ValueError(
+            f"File count mismatch: {total_source} source files found across input dirs, "
+            f"but combined_filemap has {total_combined} rows. "
+            f"Some files may have been silently dropped."
+        )
+
+
+def run_all_safety_checks(dir_list, combined_filemap):
+    print("Running pre-flight safety checks …")
+    check_no_empty_new_filenames(combined_filemap)
+    print("  ✓ No empty NewFilenames")
+    check_no_duplicate_output_filenames(combined_filemap)
+    print("  ✓ No duplicate output filenames")
+    check_no_duplicate_source_paths(combined_filemap)
+    print("  ✓ No duplicate source paths")
+    check_source_files_exist(combined_filemap)
+    print("  ✓ All source files exist on disk")
+    check_output_files_do_not_exist(combined_filemap)
+    print("  ✓ No output files already exist")
+    check_file_counts_consistent(dir_list, combined_filemap)
+    print("  ✓ File counts consistent")
+    print("All checks passed – safe to proceed.\n")
+
+
+# ---------------------------------------------------------------------------
+# Main combine + move logic
+# ---------------------------------------------------------------------------
+
+
 def combine_all_and_move(dir_list, output_dir):
     filemaps = [get_dir_filemap(d) for d in dir_list]
+    filemaps = [fm.to_pandas() for fm in filemaps]
 
     combined_filemap = filemaps[0]
     for next_filemap in filemaps[1:]:
@@ -70,22 +172,27 @@ def combine_all_and_move(dir_list, output_dir):
     combined_filemap["OutputPath"] = combined_filemap.apply(
         lambda row: os.path.join(output_dir, row["NewFilename"]), axis=1
     )
-
     combined_filemap.sort_values(by=["Point", "Time"], inplace=True)
 
-    combined_filemap.to_csv(
-        os.path.join(backup_dir, "combined_filemap.csv"), index=False
-    )
+    # --- Safety checks before touching any files ---
+    run_all_safety_checks(dir_list, combined_filemap)
+
+    # Save the move manifest so the operation is recoverable if interrupted
+    manifest_path = os.path.join(backup_dir, "combined_filemap.csv")
+    combined_filemap.to_csv(manifest_path, index=False)
+    print(f"Move manifest saved to: {manifest_path}\n")
 
     def move_file(src, dest):
-        """Move a single file from source to destination"""
+        """Move a single file; refuse to overwrite an existing destination."""
         try:
+            if os.path.exists(dest):
+                return f"✗ Skipped (dest exists): {os.path.basename(dest)}"
             shutil.move(src, dest)
             return f"✓ Moved: {os.path.basename(src)}"
         except Exception as e:
             return f"✗ Failed to move {os.path.basename(src)}: {str(e)}"
 
-    Parallel(n_jobs=32, backend="threading")(
+    results = Parallel(n_jobs=32, backend="threading")(
         delayed(move_file)(src, dest)
         for src, dest in tqdm(
             zip(combined_filemap["ImagePath"], combined_filemap["OutputPath"]),
@@ -94,9 +201,17 @@ def combine_all_and_move(dir_list, output_dir):
         )
     )
 
+    # Post-move summary
+    failures = [r for r in results if r.startswith("✗")]
+    print(
+        f"\nDone. {len(results) - len(failures)}/{len(results)} files moved successfully."
+    )
+    if failures:
+        print(f"{len(failures)} failure(s):")
+        for f in failures:
+            print(f"  {f}")
+
     return combined_filemap
 
-
-filemaps = [get_dir_filemap(d) for d in dir_list]
 
 combined_filemap = combine_all_and_move(dir_list, output_dir)

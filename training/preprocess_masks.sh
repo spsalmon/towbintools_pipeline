@@ -1,13 +1,13 @@
 #!/bin/bash
 
 #SBATCH -J preprocess
-#SBATCH -o preprocess.out
-#SBATCH -e preprocess.err
+#SBATCH -o ../sbatch_output/preprocess.out
+#SBATCH -e ../sbatch_output/preprocess.err
 #SBATCH -c 32
 #SBATCH -t 1:00:00
 #SBATCH --mem=32GB
 
-DATABASE_PATH="/mnt/towbin.data/shared/spsalmon/towbinlab_segmentation_database/datasets/60x_brightfield/brightfield/"
+DATABASE_PATH="/mnt/towbin.data/shared/spsalmon/towbinlab_segmentation_database/datasets/chamber_segmentation/brightfield/"
 PREPROCESSING_TYPE="binarize"  # Change this to the desired preprocessing type
 KEEP_ONLY_BIGGEST_OBJECT=true
 

@@ -1,8 +1,8 @@
 #!/bin/bash
 
 #SBATCH -J train
-#SBATCH -o train-%j.out
-#SBATCH -e train-%j.err
+#SBATCH -o ../sbatch_output/train-%j.out
+#SBATCH -e ../sbatch_output/train-%j.err
 #SBATCH -c 64
 #SBATCH -t 72:00:00
 #SBATCH --mem=64GB

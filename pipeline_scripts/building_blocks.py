@@ -62,11 +62,12 @@ OPTIONS_MAP = {
         "fluorescence_background_aggregation",
     ],
     "custom": [
-        "rerun_custom_script",
+        "rerun_custom",
         "custom_script_path",
         "custom_script_name",
         "custom_script_return_type",
         "custom_script_parameters",
+        "custom_script_requires_gpu",
     ],
 }
 
@@ -96,9 +97,6 @@ DEFAULT_OPTIONS = {
         "rerun_quality_control": [False],
         "qc_import_eggs_from": [None],
     },
-    # "classification": {
-    #     "rerun_classification": [False],
-    # },
     "molt_detection": {
         "rerun_molt_detection": [False],
         "molt_detection_method": ["legacy"],
@@ -114,7 +112,8 @@ DEFAULT_OPTIONS = {
         "fluorescence_background_aggregation": ["median"],
     },
     "custom": {
-        "rerun_custom_script": [False],
+        "rerun_custom": [False],
+        "custom_script_requires_gpu": [False],
     },
 }
 
@@ -584,6 +583,8 @@ class CustomBuildingBlock(BuildingBlock):
             block_config,
             block_config["custom_script_return_type"],
             script_path,
+            requires_gpu=block_config.get("custom_script_requires_gpu", False),
+            requires_filemap=False,
         )
 
     def get_output_name(self, config, subdir):
@@ -605,7 +606,7 @@ class CustomBuildingBlock(BuildingBlock):
             else:
                 output = os.path.join(
                     report_subdir,
-                    f"{subdir}_{custom_script_name}.{config['report_format']}",
+                    f"{custom_script_name}.{config['report_format']}",
                 )
 
         return output
@@ -614,7 +615,13 @@ class CustomBuildingBlock(BuildingBlock):
         return experiment_filemap, None
 
     def create_command(
-        self, input_pickle_path, output_pickle_path, pickled_block_config, config
+        self,
+        micromamba_path,
+        input_pickle_path,
+        output_pickle_path,
+        pickled_block_config,
+        config,
+        pickled_filemap_path=None,
     ):
         custom_script_path = self.block_config["custom_script_path"]
 
@@ -626,7 +633,7 @@ class CustomBuildingBlock(BuildingBlock):
         if custom_script_path.endswith(".sh"):
             command = f"bash {custom_script_path} -f {input_pickle_path} -o {output_pickle_path} {custom_script_parameters}"
         elif custom_script_path.endswith(".py"):
-            command = f"~/.local/bin/micromamba run -n towbintools python3 {custom_script_path} -f {input_pickle_path} -o {output_pickle_path} {custom_script_parameters}"
+            command = f"{micromamba_path} run -n towbintools python3 {custom_script_path} -f {input_pickle_path} -c {pickled_block_config} -o {output_pickle_path} {custom_script_parameters}"
         else:
             print(
                 f"Script type of {custom_script_path} is not supported. The pipeline only supports bash or python scripts."
