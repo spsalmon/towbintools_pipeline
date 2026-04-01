@@ -100,6 +100,10 @@ def main(input_pickle, output_pickle, config, n_jobs):
         input_files[0][0], channels_to_keep=segmentation_channels
     )
 
+    print(
+        f'Predicting on {"stacks" if is_stack else "individual images"} with segmentation channels: {segmentation_channels}'
+    )
+
     assert not (
         t_dim > 1 and z_dim > 1
     ), "4D images with both time and z dimensions are not supported yet."
