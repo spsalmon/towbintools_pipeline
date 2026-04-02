@@ -29,28 +29,18 @@ This will create a micromamba environment called towbintools, containing all req
 
 ## Windows
 
-1. You may have to install git first, follow instructions given [here](https://git-scm.com/install/windows). For all the other steps, please run them using Git Bash (not CMD, not Powershell).
+The easiest way to get things to work on Windows is to use Windows Subsystem for Linux (WSL) : follow [instructions to install](https://learn.microsoft.com/en-us/windows/wsl/install)
 
-2. Using Git Bash, clone the pipeline repo from github :
+1. Inside of a Powershell terminal run as administrator, run :
 
-```bash
-cd
-git clone https://github.com/spsalmon/towbintools_pipeline.git
+```PowerShell
+wsl --install -d Ubuntu
+wsl --set-default-version 2
+```
+2. To use WSL, inside of a terminal, run :
+
+```PowerShell
+wsl
 ```
 
-3. Install micromamba, using Git Bash: BE CAREFUL, THE PIPELINE EXPECTS YOU TO CHOSE THE BASE OPTIONS AND YES ALL THE TIME. You can also ollow instructions given [here](https://mamba.readthedocs.io/en/latest/installation/micromamba-installation.html)
-
-```bash
-"${SHELL}" <(curl -L micro.mamba.pm/install.sh)
-```
-
-Then restart Git Bash manually.
-
-4. Using Git Bash, run the installation script
-
-```bash
-cd ~/towbintools_pipeline
-bash install_pipeline.sh
-```
-
-Another option is to use Windows Subsystem for Linux (WSL, follow [instructions to install](https://learn.microsoft.com/en-us/windows/wsl/install)) and follow the Linux instructions inside of WSL.
+3. Follow Linux instructions inside of WSL.
