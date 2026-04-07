@@ -6,8 +6,7 @@ The documentation for the package used as a backbone for the pipeline can be fou
 
 ## RTFM
 
-There is a small wiki available here : <https://github.com/spsalmon/towbintools_pipeline/wiki/Building-Block> that should cover the basis of how to write your first configuration file.
-If you don't understand something, feel free to ask, and I'll update the wiki to make it clearer !
+You will find detailed explanations on how to install, update and use the pipeline here : <https://spsalmon.github.io/towbintools_pipeline/>
 
 ## How to install ?
 
@@ -140,8 +139,6 @@ bash run_pipeline.sh --config path_to_config_file
 
 I will update the pipeline frequently, so please try to keep up to date by running the following commands on a regular basis.
 
-### Update script
-
 Running the following script will update both the pipeline and the underlying towbintools python package
 
 ```bash
@@ -172,19 +169,3 @@ git branch my-saved-work
 ```
 
 This way, your changes will be changed into a new branch. Note that this branch will to be updated. Overall, I would advise to not modify anything directly. Copy your config file(s) to a backup folder and just reset the folder everytime you want to update it.
-
-### Updating the package
-
-It's also good to update the towbintools package from time to time even if the bugs and changes will be less frequent as it is more stable, to do so :
-
-First activate the environment :
-
-```bash
-micromamba activate towbintools
-```
-
-Then upgrade the package :
-
-```bash
-pip install --upgrade towbintools
-```
