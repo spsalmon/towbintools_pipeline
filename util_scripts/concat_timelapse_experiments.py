@@ -9,12 +9,12 @@ from towbintools.foundation.file_handling import get_dir_filemap
 from tqdm import tqdm
 
 experiment_dir = (
-    "/mnt/towbin.data/shared/nschoonjans/20260227_Ziva_60X_405_EV-eat-6RNAi"
+    "/mnt/towbin.data/shared/nschoonjans/20260312_Ziva_60X_wBT443_training-dataset"
 )
 dir_list = [
-    "raw_part1",
-    "raw_part2",
-    "raw_part3",
+    "part1",
+    "part2",
+    "part3",
 ]
 
 dir_list = [os.path.join(experiment_dir, d) for d in dir_list]
