@@ -1,0 +1,37 @@
+image_directories: ["/mnt/towbin.data/shared/spsalmon/stardist_database/60x_emr1_col10GFP_classification_dataset/raw_planes"]
+mask_directories: ["/mnt/towbin.data/shared/spsalmon/stardist_database/60x_emr1_col10GFP_classification_dataset/semantic_masks"]
+
+save_dir: '/mnt/towbin.data/shared/spsalmon/stardist_database/60x_emr1_col10GFP_classification_dataset/model/'
+model_name: 'nuclear_classification_unet_b0'
+
+pretrained: True
+
+continue_training_from_checkpoint: null
+
+n_classes: 2
+channels_to_segment: [0]
+
+architecture: 'Unet'
+pretrained_encoder: 'efficientnet-b0'
+pretrained_weights: 'imagenet'
+
+deep_supervision: False
+
+learning_rate: 1.0e-4
+normalization_parameters: {'type': 'percentile', 'lo': 1, 'hi': 99, 'axis': [-2, -1]}
+
+train_on_tiles: True
+tiler_config: {'tile_size':[1024, 1024], 'tile_step':[256, 256]}
+
+loss: 'MultiClassFocalLoss'
+value_to_ignore: -1
+
+max_epochs: 500
+batch_size: 8
+accumulate_grad_batches: 3
+num_workers: 24
+deterministic: True # slower training but ensures reproducibility
+
+save_best_k_models: 1
+train_val_split_ratio: 0.20
+train_test_split_ratio: 0.1

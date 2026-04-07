@@ -7,6 +7,10 @@ validation_dataframes:
 test_dataframes:
   - '/mnt/towbin.data/shared/spsalmon/towbinlab_segmentation_database/towbintools_paper/germline/test_dataframe.csv'
 
+# if you don't have dataframes yet, you may input directories directly
+# image_directories: ["/mnt/towbin.data/shared/spsalmon/towbinlab_segmentation_database/datasets/chamber_segmentation/brightfield/good_images"]
+# mask_directories: ["/mnt/towbin.data/shared/spsalmon/towbinlab_segmentation_database/datasets/chamber_segmentation/brightfield/binarized_and_cleaned_masks"]
+
 save_dir: '/mnt/towbin.data/shared/spsalmon/towbinlab_segmentation_database/models/paper/germline/'
 model_name: 'towbintools_medium'
 
