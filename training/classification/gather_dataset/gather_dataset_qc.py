@@ -8,6 +8,7 @@ import yaml
 from tifffile import imwrite
 from towbintools.data_analysis.time_series import correct_series_with_classification
 from towbintools.data_analysis.time_series import smooth_series_classified
+from towbintools.foundation.file_handling import read_filemap
 from towbintools.foundation.image_handling import read_tiff_file
 from tqdm import tqdm
 
@@ -150,14 +151,10 @@ def get_images_from_filemap(
     lmbda=0.0075,
     extra_adulthood_time=40,
     n_picks=10,
+    get_classes=True,
 ):
-    global variation_to_unified_scope_name
     experiment_name = filemap_path.split("/")[-4]
-    filemap_df = pl.read_csv(
-        filemap_path,
-        infer_schema_length=10000,
-        null_values=["np.nan", "[nan]", "", "NaN", "nan", "NA", "N/A"],
-    )
+    filemap_df = read_filemap(filemap_path)
 
     # if Ignore is in the columns, remove all rows where Ignore is True
     if "Ignore" in filemap_df.columns:
@@ -165,7 +162,12 @@ def get_images_from_filemap(
 
     # first check if the filemap has the required columns
     worm_type_columns = [column for column in filemap_df.columns if "qc" in column]
-    channel_name = f"ch{channel[0] + 1}"
+
+    channel_names = []
+    for channel_number in channel:
+        channel_names.append(f"ch{channel_number + 1}")
+    channel_name = "_".join(channel_names)
+
     if (
         "ExperimentTime" not in filemap_df.columns
         or filemap_df["ExperimentTime"].is_null().all()
@@ -194,11 +196,7 @@ def get_images_from_filemap(
     straigthened_raw_columns = [
         column for column in filemap_df.columns if (straigthened_raw in column)
     ]
-    if len(straigthened_raw_columns) == 0:
-        print(
-            f"Skipping experiment {experiment_name} as it does not have straightened raw images for channel {channel_name}."
-        )
-        return database
+
     # remove the previous raw column if it exists
     if "raw" in filemap_df.columns:
         filemap_df = filemap_df.drop("raw")
@@ -208,19 +206,10 @@ def get_images_from_filemap(
         for column in filemap_df.columns
         if ((channel_name in column) and ("volume" in column))
     ]
-    # if len(worm_type_columns) == 0 or len(seg_columns) == 0 or len(volume_columns) == 0:
-    if len(worm_type_columns) == 0 or len(volume_columns) == 0:
-        print(
-            f"Skipping experiment {experiment_name} as it does not have worm type or segmentation columns."
-        )
-        return database
-    seg_column = seg_columns[0]
-    worm_type_column = worm_type_columns[0]
 
     rows = []
 
     filemaps_of_points = filemap_df.partition_by("Point")
-    # stage_proportions = database_config.get("stage_proportions", None)
 
     microscope = [scope for scope in valid_scopes_expanded if scope in experiment_name][
         0
@@ -229,118 +218,189 @@ def get_images_from_filemap(
 
     print(f"Microscope found: {microscope} in experiment {experiment_name}")
 
-    for filemap in filemaps_of_points:
-        # randomly ignore the point 50% of the time to reduce dataset size
-        if np.random.rand() < 0.25:
-            continue
-        if "M4" in filemap.columns:
-            # if M4 is annotated, remove rows where Time > M4 + extra_adulthood_time
-            m4 = filemap.select(pl.col("M4")).row(0)[0]
-            if m4 is not None and not np.isnan(m4):
-                filemap = filemap.filter(pl.col("Time") <= m4 + extra_adulthood_time)
+    print(f"Get classes: {get_classes} for experiment {experiment_name}")
+    seg_column = seg_columns[0]
+    if get_classes:
+        if len(worm_type_columns) == 0:
+            # make a fake qc column with all good if no qc column exists, so we can still use the data for training but just label everything as good
+            filemap_df = filemap_df.with_columns(pl.lit("worm").alias("placeholder_qc"))
+            worm_type_columns = ["placeholder_qc"]
 
-        # remove rows with time too close to the molts
-        # we need to do this because the series is not smooth around the molts
-        molts = ["M1", "M2", "M3", "M4"]
-        for molt in molts:
-            if molt in filemap.columns:
-                molt_time = filemap.select(pl.col(molt)).row(0)[0]
-                if molt_time is not None and not np.isnan(molt_time):
+        if len(straigthened_raw_columns) == 0:
+            print(
+                f"Skipping experiment {experiment_name} as it does not have straightened raw images for channel {channel_name}."
+            )
+            return database
+
+        if len(volume_columns) == 0:
+            print(
+                f"Skipping experiment {experiment_name} as it does not have volume columns."
+            )
+            return database
+
+        worm_type_column = worm_type_columns[0]
+
+        for filemap in filemaps_of_points:
+            if "M4" in filemap.columns:
+                # if M4 is annotated, remove rows where Time > M4 + extra_adulthood_time
+                m4 = filemap.select(pl.col("M4")).row(0)[0]
+                if m4 is not None and not np.isnan(m4):
                     filemap = filemap.filter(
-                        (pl.col("Time") < molt_time - 4)
-                        | (pl.col("Time") > molt_time + 4)
+                        pl.col("Time") <= m4 + extra_adulthood_time
                     )
 
-        point = filemap.select(pl.col("Point")).row(0)[0]
-        volume = filemap.select(pl.col(volume_columns[0])).to_numpy().squeeze()
-        # skip point if less than 10 data points
-        if np.sum(~np.isnan(volume)) < 10:
-            continue
-        worm_types = filemap.select(pl.col(worm_type_column)).to_numpy().squeeze()
-        corrected_volume = correct_series_with_classification(volume, worm_types)
+            # remove rows with time too close to the molts
+            # we need to do this because the series is not smooth around the molts
+            molts = ["M1", "M2", "M3", "M4"]
+            for molt in molts:
+                if molt in filemap.columns:
+                    molt_time = filemap.select(pl.col(molt)).row(0)[0]
+                    if molt_time is not None and not np.isnan(molt_time):
+                        filemap = filemap.filter(
+                            (pl.col("Time") < molt_time - 4)
+                            | (pl.col("Time") > molt_time + 4)
+                        )
 
-        experiment_time = filemap.select(pl.col("ExperimentTime")).to_numpy().squeeze()
+            point = filemap.select(pl.col("Point")).row(0)[0]
+            volume = filemap.select(pl.col(volume_columns[0])).to_numpy().squeeze()
+            # skip point if less than 10 data points
+            if np.sum(~np.isnan(volume)) < 10:
+                continue
+            worm_types = filemap.select(pl.col(worm_type_column)).to_numpy().squeeze()
+            corrected_volume = correct_series_with_classification(volume, worm_types)
 
-        smoothed_volume = smooth_series_classified(
-            volume,
-            experiment_time,
-            qc=worm_types,
-            lmbda=lmbda,
-        )
-
-        normalized_residuals = (corrected_volume - smoothed_volume) / smoothed_volume
-
-        confirmed_errors = np.where(worm_types == "error")[0]
-        threshold_value = np.quantile(np.abs(normalized_residuals), threshold)
-        potential_errors = np.where(np.abs(normalized_residuals) > threshold_value)[0]
-        potential_good = np.where(np.abs(normalized_residuals) <= threshold_value)[0]
-        # remove confirmed errors from potential errors
-        potential_errors = np.setdiff1d(potential_errors, confirmed_errors)
-        # remove confirmed errors from potential good
-        potential_good = np.setdiff1d(potential_good, confirmed_errors)
-
-        # drop 95% of potential good to reduce dataset size
-        if len(potential_good) > 0:
-            potential_good = np.random.choice(
-                potential_good, size=int(len(potential_good) * 0.05), replace=False
+            experiment_time = (
+                filemap.select(pl.col("ExperimentTime")).to_numpy().squeeze()
             )
-        eggs = np.where(worm_types == "egg")[0]
 
-        # Vectorized creation of all rows
-        indices = np.concatenate(
-            [potential_errors, potential_good, eggs, confirmed_errors]
-        )
-        classes = np.concatenate(
-            [
-                np.full(len(potential_errors), "potential_error"),
-                np.full(len(potential_good), "good"),
-                np.full(len(eggs), "egg"),
-                np.full(len(confirmed_errors), "error"),
+            smoothed_volume = smooth_series_classified(
+                volume,
+                experiment_time,
+                qc=worm_types,
+                lmbda=lmbda,
+            )
+
+            normalized_residuals = (
+                corrected_volume - smoothed_volume
+            ) / smoothed_volume
+
+            confirmed_errors = np.where(worm_types == "error")[0]
+            threshold_value = np.quantile(np.abs(normalized_residuals), threshold)
+            potential_errors = np.where(np.abs(normalized_residuals) > threshold_value)[
+                0
             ]
+            potential_good = np.where(np.abs(normalized_residuals) <= threshold_value)[
+                0
+            ]
+            # remove confirmed errors from potential errors
+            potential_errors = np.setdiff1d(potential_errors, confirmed_errors)
+            # remove confirmed errors from potential good
+            potential_good = np.setdiff1d(potential_good, confirmed_errors)
+
+            # drop 95% of potential good to reduce dataset size
+            if len(potential_good) > 0:
+                potential_good = np.random.choice(
+                    potential_good, size=int(len(potential_good) * 0.05), replace=False
+                )
+            eggs = np.where(worm_types == "egg")[0]
+
+            # Vectorized creation of all rows
+            indices = np.concatenate(
+                [potential_errors, potential_good, eggs, confirmed_errors]
+            )
+            classes = np.concatenate(
+                [
+                    np.full(len(potential_errors), "potential_error"),
+                    np.full(len(potential_good), "good"),
+                    np.full(len(eggs), "egg"),
+                    np.full(len(confirmed_errors), "error"),
+                ]
+            )
+
+            images = filemap.select(pl.col("raw")).to_numpy().squeeze()[indices]
+            # replace external.data/TowbinLab by towbin.data/shared
+            images = [img.replace("TowbinLab", "shared") for img in images]
+            images = [img.replace("external.data", "towbin.data") for img in images]
+
+            masks = filemap.select(pl.col(seg_column)).to_numpy().squeeze()[indices]
+            masks = [m.replace("TowbinLab", "shared") for m in masks]
+            masks = [m.replace("external.data", "towbin.data") for m in masks]
+
+            # only keep if both image and mask exist
+            valid_indices = [
+                i
+                for i, (img, msk) in enumerate(zip(images, masks))
+                if os.path.exists(img) and os.path.exists(msk)
+            ]
+            classes = [classes[i] for i in valid_indices]
+            images = [images[i] for i in valid_indices]
+            masks = [masks[i] for i in valid_indices]
+            filemap_rows = [
+                {
+                    "Class": clss,
+                    "Image": img,
+                    "Microscope": microscope,
+                    "Point": point,
+                    "Stage": "unknown",
+                    "Mask": mask,
+                }
+                for clss, img, mask in zip(classes, images, masks)
+                # for clss, img in zip(classes, images)
+            ]
+            rows.extend(filemap_rows)
+        database = pl.DataFrame(
+            rows,
+            schema={
+                "Class": pl.Utf8,
+                "Image": pl.Utf8,
+                "Microscope": pl.Utf8,
+                "Point": pl.Int64,
+                "Stage": pl.Utf8,
+                "Mask": pl.Utf8,
+            },
         )
+    else:
+        for filemap in filemaps_of_points:
+            point = filemap.select(pl.col("Point")).row(0)[0]
+            images = filemap.select(pl.col("raw")).to_numpy().squeeze()
+            images = [img.replace("TowbinLab", "shared") for img in images]
+            images = [img.replace("external.data", "towbin.data") for img in images]
 
-        images = filemap.select(pl.col("raw")).to_numpy().squeeze()[indices]
-        # replace external.data/TowbinLab by towbin.data/shared
-        images = [img.replace("TowbinLab", "shared") for img in images]
-        images = [img.replace("external.data", "towbin.data") for img in images]
+            masks = filemap.select(pl.col(seg_column)).to_numpy().squeeze()
+            masks = [m.replace("TowbinLab", "shared") for m in masks]
+            masks = [m.replace("external.data", "towbin.data") for m in masks]
 
-        masks = filemap.select(pl.col(seg_column)).to_numpy().squeeze()[indices]
-        masks = [m.replace("TowbinLab", "shared") for m in masks]
-        masks = [m.replace("external.data", "towbin.data") for m in masks]
+            valid_indices = [
+                i
+                for i, (img, msk) in enumerate(zip(images, masks))
+                if os.path.exists(img) and os.path.exists(msk)
+            ]
+            images = [images[i] for i in valid_indices]
+            masks = [masks[i] for i in valid_indices]
 
-        # only keep if both image and mask exist
-        valid_indices = [
-            i
-            for i, (img, msk) in enumerate(zip(images, masks))
-            if os.path.exists(img) and os.path.exists(msk)
-        ]
-        classes = [classes[i] for i in valid_indices]
-        images = [images[i] for i in valid_indices]
-        masks = [masks[i] for i in valid_indices]
-        filemap_rows = [
-            {
-                "Class": clss,
-                "Image": img,
-                "Microscope": microscope,
-                "Point": point,
-                "Stage": "unknown",
-                "Mask": mask,
-            }
-            for clss, img, mask in zip(classes, images, masks)
-            # for clss, img in zip(classes, images)
-        ]
-        rows.extend(filemap_rows)
-    database = pl.DataFrame(
-        rows,
-        schema={
-            "Class": pl.Utf8,
-            "Image": pl.Utf8,
-            "Microscope": pl.Utf8,
-            "Point": pl.Int64,
-            "Stage": pl.Utf8,
-            "Mask": pl.Utf8,
-        },
-    )
+            filemap_rows = [
+                {
+                    "Class": "unknown",
+                    "Image": img,
+                    "Microscope": microscope,
+                    "Point": point,
+                    "Stage": "unknown",
+                    "Mask": mask,
+                }
+                for img, mask in zip(images, masks)
+            ]
+            rows.extend(filemap_rows)
+        database = pl.DataFrame(
+            rows,
+            schema={
+                "Class": pl.Utf8,
+                "Image": pl.Utf8,
+                "Microscope": pl.Utf8,
+                "Point": pl.Int64,
+                "Stage": pl.Utf8,
+                "Mask": pl.Utf8,
+            },
+        )
 
     return database
 
@@ -392,8 +452,13 @@ experiments_to_exclude = config.get("experiments_to_exclude", [])
 n_picks_per_stage = config.get("n_picks_per_stage", 10)
 class_proportions = config.get(
     "class_proportions",
-    {"good": 0.4, "potential_error": 0.25, "error": 0.25, "egg": 0.1},
+    None,
 )
+
+get_classes = class_proportions is not None
+
+print(f"Extracting classes: {get_classes}")
+
 lmbda = config.get("lambda", 0.0075)
 threshold = config.get("threshold", 0.95)
 valid_scopes_expanded = []
@@ -464,47 +529,52 @@ for database_name, database_config in database_configs.items():
         }
     )
     for filemap in filemaps:
-        try:
-            database = database.vstack(
-                get_images_from_filemap(
-                    filemap,
-                    database_config,
-                    valid_scopes_expanded,
-                    channel=channel,
-                    lmbda=lmbda,
-                    threshold=threshold,
-                    extra_adulthood_time=extra_adulthood_time,
-                    n_picks=n_picks_per_stage,
-                )
+        # try:
+        database = database.vstack(
+            get_images_from_filemap(
+                filemap,
+                database_config,
+                valid_scopes_expanded,
+                channel=channel,
+                lmbda=lmbda,
+                threshold=threshold,
+                extra_adulthood_time=extra_adulthood_time,
+                n_picks=n_picks_per_stage,
+                get_classes=get_classes,
             )
-        except Exception as e:
-            print(f"Error processing filemap {filemap}: {e}")
-            continue
+        )
+        # except Exception as e:
+        #     print(f"Error processing filemap {filemap}: {e}")
+        #     continue
 
-    # calculate number of images per class
-    class_counts = {}
     total_images = database_config.get("size", 1000)
-    for cls, prop in class_proportions.items():
-        class_counts[cls] = int(total_images * prop)
-    # sample images per class
-    sampled_database = pl.DataFrame(
-        schema={
-            "Class": pl.Utf8,
-            "Image": pl.Utf8,
-            "Microscope": pl.Utf8,
-            "Point": pl.Int64,
-            "Stage": pl.Utf8,
-            "Mask": pl.Utf8,
-        }
-    )
-    for cls, count in class_counts.items():
-        class_images = database.filter(pl.col("Class") == cls)
-        n = min(count, class_images.height)
-        class_images = class_images.sample(n, with_replacement=False)
-        sampled_database = sampled_database.vstack(class_images)
+    if get_classes:
+        # calculate number of images per class
+        class_counts = {}
 
-    # sort the dataset by class to group similar images together
-    sampled_database = sampled_database.sort("Class")
+        for cls, prop in class_proportions.items():
+            class_counts[cls] = int(total_images * prop)
+        # sample images per class
+        sampled_database = pl.DataFrame(
+            schema={
+                "Class": pl.Utf8,
+                "Image": pl.Utf8,
+                "Microscope": pl.Utf8,
+                "Point": pl.Int64,
+                "Stage": pl.Utf8,
+                "Mask": pl.Utf8,
+            }
+        )
+        for cls, count in class_counts.items():
+            class_images = database.filter(pl.col("Class") == cls)
+            n = min(count, class_images.height)
+            class_images = class_images.sample(n, with_replacement=False)
+            sampled_database = sampled_database.vstack(class_images)
+
+        # sort the dataset by class to group similar images together
+        sampled_database = sampled_database.sort("Class")
+    else:
+        sampled_database = database.sample(total_images, with_replacement=False)
 
     # create output names
     def get_output_name(i, row):

@@ -1,30 +1,28 @@
 storage_path: "/mnt/towbin.data/shared"
-valid_subdirectories: ["plenart", "kstojanovski"]
+valid_subdirectories: ["fdell"]
 
-database_path: "/mnt/towbin.data/shared/spsalmon/towbinlab_classification_database/datasets/10x_pharynx_qc"
+database_path: "/mnt/towbin.data/shared/spsalmon/towbinlab_classification_database/datasets/fluorescent_bacteria_qc"
 
 database_configs: {
-  'pharynx': {
+  'fluorescent_bacteria': {
       'size': 2000,
-      # 'stage_proportions': {'L1': 0.25, 'L2': 0.25, 'L3': 0.25, 'L4': 0.25,},
-      'scope_proportions': {'ti2': 0.5, 'squid': 0.5},
-      'channel': [0],
-      'strains': ["186", "160", "125", "318", "446"],
+      'channel': [0, 1],
       'magnification': "10x",
   },
 }
 
-class_proportions: {"error": 0.0, "potential_error": 0.5, "good": 0.5, "egg": 0.0}
+class_proportions: null
 # smoother configuration
-lambda: 0.0075
+lambda: null
 # threshold quantile
-threshold: 0.90
+threshold: null
+get_straightened: true
 
 # sets a limit on how far after M4 images will be included
 extra_adulthood_time: 40
 n_picks_per_stage: 50
 
-valid_scopes: ["squid", "ti2"]
+valid_scopes: ["ziva", "kinetix", "orca"]
 scopes_alt_names: {
   'crest': ['Crest', 'crest', 'CREST'],
   'squid': ['Squid', 'squid', 'SQUID'],
@@ -35,7 +33,7 @@ scopes_alt_names: {
 keywords_to_exclude: ["exclude", "fail", "failure", "crash"]
 keywords_to_include: []
 
-experiments_to_consider: ["/mnt/towbin.data/shared/plenart/20232707_Ti2_wbt125_measuring_measurement_error_for_organ_size_paper"]
+experiments_to_consider: ["/mnt/towbin.data/shared/fdell/Starvation_recovery_wild_strains/20260319_ziva_1day"]
 
 experiments_to_always_include: []
 experiments_to_exclude: [
