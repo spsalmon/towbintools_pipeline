@@ -144,8 +144,6 @@ def main(input_pickle, output_pickle, config, n_jobs):
                     image_paths, images, image_shapes, invalid_indices = batch
                     batch_size = len(image_paths) + len(invalid_indices)
 
-                    print(f"Invalid indices in batch {i}: {invalid_indices}")
-
                     if len(image_paths) == 0:
                         # if all images in the batch failed to load, create a batch of black masks
                         predictions = np.zeros((batch_size, (10, 10)), dtype=np.uint8)
@@ -168,15 +166,6 @@ def main(input_pickle, output_pickle, config, n_jobs):
                                     axis=0,
                                 )
                             predictions = list(predictions)
-
-                    print(
-                        f"Predictions shape for batch {i}: {len(predictions)}, batch size: {batch_size}"
-                    )
-
-                    if len(predictions) != batch_size:
-                        print(
-                            f"!!!! WARNING: Number of predictions ({len(predictions)}) does not match batch size ({batch_size}). This may indicate an issue with the data loading or prediction process. !!!!"
-                        )
 
                     with parallel_config(backend="threading", n_jobs=n_jobs // 2):
                         Parallel()(
