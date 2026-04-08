@@ -142,7 +142,7 @@ def main(input_pickle, output_pickle, config, n_jobs):
             with torch.no_grad():
                 for i, batch in enumerate(dataloader):
                     image_paths, images, image_shapes, invalid_indices = batch
-                    batch_size = len(image_paths)
+                    batch_size = len(image_paths) + len(invalid_indices)
 
                     print(f"Invalid indices in batch {i}: {invalid_indices}")
 
