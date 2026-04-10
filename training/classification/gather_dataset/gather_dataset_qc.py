@@ -362,6 +362,12 @@ def get_images_from_filemap(
     else:
         for filemap in filemaps_of_points:
             point = filemap.select(pl.col("Point")).row(0)[0]
+
+            # if we have volume information, we can already remove all images where it's nan or 0
+            if len(volume_columns) > 0:
+                filemap = filemap.filter(pl.col(volume_columns[0]).is_not_nan())
+                filemap = filemap.filter(pl.col(volume_columns[0]) != 0)
+
             images = filemap.select(pl.col("raw")).to_numpy().squeeze()
             images = [img.replace("TowbinLab", "shared") for img in images]
             images = [img.replace("external.data", "towbin.data") for img in images]

@@ -89,14 +89,14 @@ def main_server(
     custom_column_values = reactive.Value([])
     column_to_plot = reactive.Value(default_plotted_column)
 
-    (current_point_index, current_point) = time_point_navigator_server(
+    current_point_index, current_point = time_point_navigator_server(
         "point",
         choices=points,
         all_df=single_values_of_points,
         current_df=single_values_of_point,
         save_on_switch=True,
     )
-    (current_time_index, current_time) = time_point_navigator_server(
+    current_time_index, current_time = time_point_navigator_server(
         "time", choices=times, clicked_value=clicked_time
     )
 
@@ -602,7 +602,9 @@ def main_server(
 
         # convert the column to index in the time values
         time = intermediate_df.select(pl.col("Time")).to_numpy().squeeze()
-        column_values = intermediate_df.select(pl.col(column)).to_numpy().squeeze()
+        column_values = (
+            intermediate_df.select(pl.col(column)).to_numpy().squeeze().astype(float)
+        )
 
         non_nan_column_values = column_values[~np.isnan(column_values)]
         column_values_as_indexes = np.full_like(non_nan_column_values, np.nan)
