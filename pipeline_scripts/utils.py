@@ -216,10 +216,23 @@ def create_temp_folders(temp_dir):
 
 
 def process_input_output_files(input_files, output_dir, rerun):
-    if np.any(input_files is None) or np.any(input_files == ""):
-        return None, None
     try:
-        output_file = os.path.join(output_dir, os.path.basename(input_files[0]))
+        input_files = list(input_files)
+    except TypeError:
+        return None, None
+
+    if len(input_files) == 0:
+        return None, None
+
+    # Validate each element because input_files is a row-like container.
+    if any(
+        (file is None) or (not isinstance(file, str)) or (file.strip() == "")
+        for file in input_files
+    ):
+        return None, None
+
+    try:
+        output_file = os.path.join(output_dir, os.path.basename(input_files[0].strip()))
     except Exception as e:
         print(f"Raised exception {e} for files {input_files}")
         return None, None

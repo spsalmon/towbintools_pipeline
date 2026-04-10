@@ -5,13 +5,16 @@ from shiny import App
 
 recompute_features_at_molt = False
 
-filemap_path = "/mnt/towbin.data/shared/plenart/20261403_squid_10x_wBT318_heath_stress_27_degree/analysis/report/analysis_filemap.csv"
+filemap_path = r"/mnt/towbin.data/shared/plenart/20261403_squid_10x_wBT318_heath_stress_27_degree/analysis/report/analysis_filemap.csv"
+
+print("Opening the filemap ...")
 
 filemap, filemap_save_path = open_filemap(
     filemap_path, open_annotated=True, lazy_loading=False
 )
 
 print("Creating the app ...")
+
 (
     app_ui,
     filemap,
