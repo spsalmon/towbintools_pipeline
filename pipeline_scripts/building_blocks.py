@@ -24,6 +24,7 @@ OPTIONS_MAP = {
         "predict_on_tiles",
         "tiler_config",
         "enforce_n_channels",
+        "scale_factor",
         "activation_layer",
         "batch_size",
     ],
@@ -84,6 +85,7 @@ DEFAULT_OPTIONS = {
         "activation_layer": [None],
         "model_path": [None],
         "batch_size": [1],
+        "scale_factor": [1.0],
     },
     "straightening": {
         "rerun_straightening": [False],

@@ -33,7 +33,7 @@ rerun_molt_detection: [ False ]
 # segmentation parameters
 segmentation_column: [ 'raw' ]
 segmentation_name_suffix: [ null ]
-segmentation_method: [ "deep_learning", "deep_learning" ]
+segmentation_method: [ "deep_learning" ]
 segmentation_channels: [ [ 1 ], [ 0 ] ]
 
 

@@ -8,9 +8,7 @@ from joblib import Parallel
 from towbintools.foundation.file_handling import get_dir_filemap
 from tqdm import tqdm
 
-experiment_dir = (
-    "/mnt/towbin.data/shared/nschoonjans/20260312_Ziva_60X_wBT443_training-dataset"
-)
+experiment_dir = "/mnt/towbin.data/shared/nschoonjans/20260402_Ziva_60X_397-405-AID_nuclear_shape_chambers"
 dir_list = [
     "part1",
     "part2",
@@ -18,7 +16,7 @@ dir_list = [
 ]
 
 dir_list = [os.path.join(experiment_dir, d) for d in dir_list]
-output_dir = os.path.join(experiment_dir, "raw")
+output_dir = os.path.join(experiment_dir, "raw_nd2")
 backup_dir = os.path.join(experiment_dir, "backup")
 os.makedirs(backup_dir, exist_ok=True)
 os.makedirs(output_dir, exist_ok=True)
@@ -62,13 +60,15 @@ def concat_timelapse_experiments(first_filemap, second_filemap):
 
 def check_no_empty_new_filenames(combined_filemap):
     """Fail if any source filename had no Time\\d+ pattern and produced an empty NewFilename."""
-    bad = combined_filemap[combined_filemap["NewFilename"] == ""]
+    bad = combined_filemap[
+        (combined_filemap["NewFilename"] == "") & (combined_filemap["ImagePath"] != "")
+    ]
     if not bad.empty:
         raise ValueError(
             f"The following {len(bad)} file(s) produced an empty NewFilename "
             f"(no 'Time<digits>' pattern found in their path). "
             f"They would be lost or cause an OS error:\n"
-            + bad[["ImagePath", "Time"]].to_string()
+            + bad[["ImagePath", "Time", "Point"]].to_string()
         )
 
 
@@ -79,6 +79,7 @@ def check_no_duplicate_output_filenames(combined_filemap):
     dupes = combined_filemap[
         combined_filemap.duplicated(subset=["NewFilename"], keep=False)
     ]
+    dupes = dupes[dupes["ImagePath"] != ""]  # ignore rows with missing source paths
     if not dupes.empty:
         raise ValueError(
             f"The following {len(dupes)} rows share an output filename. "
@@ -92,17 +93,20 @@ def check_no_duplicate_source_paths(combined_filemap):
     dupes = combined_filemap[
         combined_filemap.duplicated(subset=["ImagePath"], keep=False)
     ]
+    dupes = dupes[dupes["ImagePath"] != ""]  # ignore rows with missing source paths
     if not dupes.empty:
         raise ValueError(
             f"The following {len(dupes)} rows have duplicate source ImagePaths. "
             f"This suggests overlapping input directories:\n"
-            + dupes[["ImagePath", "NewFilename"]].to_string()
+            + dupes[["ImagePath", "NewFilename", "Time", "Point"]].to_string()
         )
 
 
 def check_source_files_exist(combined_filemap):
     """Fail fast if any source file is already missing."""
-    missing = [p for p in combined_filemap["ImagePath"] if not os.path.isfile(p)]
+    missing = [
+        p for p in combined_filemap["ImagePath"] if p != "" and not os.path.isfile(p)
+    ]
     if missing:
         raise FileNotFoundError(
             f"{len(missing)} source file(s) do not exist on disk. First 10:\n"
@@ -112,7 +116,11 @@ def check_source_files_exist(combined_filemap):
 
 def check_output_files_do_not_exist(combined_filemap):
     """Warn (not fail) if an output path already exists – could indicate a partial previous run."""
-    existing = [p for p in combined_filemap["OutputPath"] if os.path.exists(p)]
+    existing = [
+        p
+        for p in combined_filemap["OutputPath"]
+        if p != "" and os.path.exists(p) and not os.path.isdir(p)
+    ]
     if existing:
         raise FileExistsError(
             f"{len(existing)} output path(s) already exist. "
