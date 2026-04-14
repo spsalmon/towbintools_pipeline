@@ -20,6 +20,18 @@ usage() {
     echo "Usage: $0 [-c <config_file> | --config <config_file>]" >&2
     exit 1
 }
+# function to save version control info to a file in the backup directory
+save_version_control_info() {
+    local backup_dir="$1"
+    local git_info_file="$backup_dir/git_info.txt"
+
+    {
+        echo "Git Branch: $(git rev-parse --abbrev-ref HEAD)"
+        echo "Git Commit: $(git rev-parse HEAD)"
+        echo "Git Status:"
+        git status
+    } > "$git_info_file"
+}
 
 # Parse command line arguments
 while [[ $# -gt 0 ]]; do
@@ -50,6 +62,9 @@ TEMP_DIR="$TEMP_DIR/pipeline_$SLURM_JOB_ID"
 mkdir -p "$TEMP_DIR"
 # Copy the configuration file to the temporary directory
 cp "$CONFIG_FILE" "$TEMP_DIR"
+
+# Save version control info to the backup directory
+save_version_control_info "$TEMP_DIR"
 
 # Move logs to temp dir and update SLURM to write there going forward
 mv "./sbatch_output/pipeline-${SLURM_JOB_ID}.out" "$TEMP_DIR/"

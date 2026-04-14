@@ -114,10 +114,13 @@ def straighten_and_save(
         logger.exception(
             f"Straightening failed for {source_image_path} with error: {e}"
         )
+        if isinstance(image, dict):
+            image = image["straighten"]
+
         straightened_image = np.zeros_like(image).astype(np.uint8)
         # # add empty channel dimension if is_stack is True
-        # if is_stack:
-        #     straightened_image = straightened_image[:, np.newaxis, ...]
+        if is_stack:
+            straightened_image = straightened_image[:, np.newaxis, ...]
 
     if straightened_image.ndim == 2:
         imwrite(

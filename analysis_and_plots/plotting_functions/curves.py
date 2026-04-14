@@ -25,6 +25,7 @@ def plot_aggregated_series(
     legend=None,
     x_axis_label=None,
     y_axis_label=None,
+    xlim=None,
 ):
     color_palette = get_colors(conditions_to_plot, colors)
 
@@ -71,6 +72,14 @@ def plot_aggregated_series(
                 raise ValueError(
                     f"Invalid x value: {x}. Must be 'time' or 'percentage'."
                 )
+
+            if xlim is not None:
+                x_values_not_in_xlim = (x_values < xlim[0]) | (x_values > xlim[1])
+                x_values = x_values[~x_values_not_in_xlim]
+                aggregated_series = aggregated_series[~x_values_not_in_xlim]
+                ci_lower = ci_lower[~x_values_not_in_xlim]
+                ci_upper = ci_upper[~x_values_not_in_xlim]
+
             plt.plot(x_values, aggregated_series, color=color_palette[i], label=label)
             plt.fill_between(
                 x_values, ci_lower, ci_upper, color=color_palette[i], alpha=0.2
@@ -94,6 +103,7 @@ def plot_aggregated_series(
         plt.xlabel(x_axis_label)
     else:
         plt.xlabel("time (h)" if x == "time" else "development completion (%)")
+
     fig = plt.gcf()
     plt.show()
     return fig

@@ -6,20 +6,22 @@ from joblib import delayed
 from joblib import Parallel
 from tqdm import tqdm
 
-experiment_dir = "/mnt/towbin.data/shared/kstojanovski/20220629_Ti2_20x_160-182-190_pumping_25C_20220629_154238_325"
+experiment_dir = (
+    "/mnt/towbin.data/shared/nschoonjans/20260312_Ziva_60X_wBT443_training-dataset"
+)
 image_dir = os.path.join(experiment_dir, "raw")
 
-# re_template = r"Channel\s*([A-Za-z0-9_,\s]+?)\s*_Seq"
-# pattern_to_output = {
-#     "GFP,WF mCherry,WF Brightfield": "raw",
-#     "WF GFP": "raw_movies",
-# }
-
-re_template = r"\.(\w+)$"
+re_template = r"Channel\s*([A-Za-z0-9_,\s]+?)\s*_Seq"
 pattern_to_output = {
-    "tiff": "raw",
-    "nd2": "raw_movies",
+    "GFP,mCherry,DIA,DIA": "raw",
+    "DIA,DIA": "raw_stacks",
 }
+
+# re_template = r"\.(\w+)$"
+# pattern_to_output = {
+#     "tiff": "raw",
+#     "nd2": "raw_movies",
+# }
 
 for subdir in pattern_to_output.values():
     os.makedirs(os.path.join(experiment_dir, subdir), exist_ok=True)

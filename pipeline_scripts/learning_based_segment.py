@@ -1,9 +1,11 @@
 import logging
 import os
 
+import cv2
 import numpy as np
 import torch
 import utils
+from cv2 import resize
 from joblib import delayed
 from joblib import Parallel
 from joblib import parallel_config
@@ -37,7 +39,7 @@ def reshape_images_to_original_shape(images, original_shapes, padded_or_cropped=
     return reshaped_images
 
 
-def predict_batch(model, images, image_shapes, device, n_classes):
+def predict_batch(model, images, image_shapes, device, n_classes, scale_factor=1.0):
     if not isinstance(images, torch.Tensor):
         images = torch.from_numpy(images)
     images = images.to(device)
@@ -66,6 +68,19 @@ def predict_batch(model, images, image_shapes, device, n_classes):
     predictions = reshape_images_to_original_shape(
         predictions, image_shapes, padded_or_cropped="pad"
     )
+
+    if scale_factor != 1.0:
+        predictions = [
+            resize(
+                prediction,
+                (
+                    int(prediction.shape[0] * 1 / scale_factor),
+                    int(prediction.shape[1] * 1 / scale_factor),
+                ),
+                interpolation=cv2.INTER_NEAREST,
+            ).astype(np.uint8)
+            for prediction in predictions
+        ]
     return predictions
 
 
@@ -119,6 +134,7 @@ def main(input_pickle, output_pickle, config, n_jobs):
         n_classes = model.n_classes
 
         enforce_n_channels = config.get("enforce_n_channels", None)
+        scale_factor = config.get("scale_factor", 1.0)
         preprocessing_fn = get_prediction_augmentation_from_model(
             model, enforce_n_channels=enforce_n_channels
         )
@@ -128,7 +144,10 @@ def main(input_pickle, output_pickle, config, n_jobs):
 
         if not is_stack:
             dataset = SegmentationPredictionDataset(
-                input_files, segmentation_channels, preprocessing_fn
+                input_files,
+                segmentation_channels,
+                preprocessing_fn,
+                scale_factor=scale_factor,
             )
             dataloader = DataLoader(
                 dataset,
@@ -152,7 +171,12 @@ def main(input_pickle, output_pickle, config, n_jobs):
                             images = images.unsqueeze(0)
 
                         predictions = predict_batch(
-                            model, images, image_shapes, device, n_classes
+                            model,
+                            images,
+                            image_shapes,
+                            device,
+                            n_classes,
+                            scale_factor=scale_factor,
                         )
 
                         # insert black masks for any images that failed to load
@@ -186,6 +210,7 @@ def main(input_pickle, output_pickle, config, n_jobs):
                     transform=preprocessing_fn,
                     enforce_divisibility_by=32,
                     pad_or_crop="pad",
+                    scale_factor=scale_factor,
                 )
 
                 stack_shape = dataset.stack_shape
@@ -202,10 +227,32 @@ def main(input_pickle, output_pickle, config, n_jobs):
                 segmented_planes = []
                 for batch in dataloader:
                     predictions = predict_batch(
-                        model, batch, original_shapes, device, n_classes
+                        model,
+                        batch,
+                        original_shapes,
+                        device,
+                        n_classes,
+                        scale_factor=1.0,
                     )
                     segmented_planes.extend(predictions)
-                segmented_planes = np.stack(segmented_planes, axis=0)
+
+                # in the 3D case it's more elegant to rescale the whole stack at once
+                resized_planes = []
+                if scale_factor != 1.0:
+                    for plane in segmented_planes:
+                        resized_plane = resize(
+                            plane,
+                            (
+                                int(plane.shape[0] * 1 / scale_factor),
+                                int(plane.shape[1] * 1 / scale_factor),
+                            ),
+                            interpolation=cv2.INTER_NEAREST,
+                        ).astype(np.uint8)
+                        resized_planes.append(resized_plane)
+                    segmented_planes = np.stack(resized_planes, axis=0)
+                else:
+                    segmented_planes = np.stack(segmented_planes, axis=0)
+
                 save_prediction(
                     segmented_planes,
                     output_file,
