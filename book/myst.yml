@@ -36,8 +36,8 @@ project:
         - file: building_blocks/Straightening.ipynb
         - file: building_blocks/MorphologyComputation.ipynb
         - file: building_blocks/QualityControl.ipynb
-        # - file: building_blocks/FluorescenceQuantification.md
-        # - file: building_blocks/MoltDetection.md
+        - file: building_blocks/FluorescenceQuantification.ipynb
+        - file: building_blocks/MoltDetection.ipynb
         # - file: building_blocks/CustomBlock.md
 site:
   options:
