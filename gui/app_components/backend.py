@@ -10,7 +10,6 @@ from towbintools.foundation.file_handling import write_filemap
 from towbintools.foundation.utils import find_best_string_match
 from towbintools.foundation.worm_features import get_features_to_compute_at_molt
 
-
 # constant definitions
 FEATURES_TO_COMPUTE_AT_MOLT = get_features_to_compute_at_molt()
 ECDYSIS_COLUMNS = ["HatchTime", "M1", "M2", "M3", "M4"]
@@ -528,8 +527,6 @@ def _compute_series_at_molt(
             time[i],
             qcs[i],
         )
-
-        print(new_series_at_ecdysis[i])
         new_series_at_ecdysis[i][idx_values_to_recompute] = recomputed_values
 
     return new_series_at_ecdysis

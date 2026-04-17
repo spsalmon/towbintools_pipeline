@@ -5,7 +5,7 @@ from shiny import App
 
 recompute_features_at_molt = False
 
-filemap_path = r"/mnt/towbin.data/shared/aslesarchuk/20251121_ZIVA_20x_col_125_wBT585_586_587_588_173430_370/analysis/report/analysis_filemap.parquet"
+filemap_path = r"/mnt/towbin.data/shared/agraf/20260327_Squid5_160_182_186_RNAi_cap1_25C_10x/analysis/report/analysis_filemap.csv"
 
 print("Opening the filemap ...")
 

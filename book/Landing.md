@@ -12,4 +12,4 @@ Head to the **Getting Started** section to learn how to [install the pipeline](h
 
 You can find information on how to [customize the pipeline execution](link), [retrain models](link) or [use the GUI](link) or in the **Usage** section
 
-The **Building Block** sections contains [detailed explanation of all the parameters of every block](link).
+The **Building Block** sections contains [detailed explanation of all the parameters of every block](https://spsalmon.github.io/towbintools_pipeline/buildingblock/).
