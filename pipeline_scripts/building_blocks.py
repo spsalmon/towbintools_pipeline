@@ -59,7 +59,7 @@ OPTIONS_MAP = {
         "rerun_fluorescence_quantification",
         "fluorescence_quantification_source",
         "fluorescence_quantification_masks",
-        "fluorescence_quantification_aggregation",
+        "fluorescence_quantification_aggregations",
         "fluorescence_background_aggregation",
     ],
     "custom": [
@@ -110,7 +110,6 @@ DEFAULT_OPTIONS = {
     },
     "fluorescence_quantification": {
         "rerun_fluorescence_quantification": [False],
-        "fluorescence_quantification_aggregation": ["median"],
         "fluorescence_background_aggregation": ["median"],
     },
     "custom": {
@@ -539,16 +538,13 @@ class FluorescenceQuantificationBuildingBlock(BuildingBlock):
         fluorescence_quantification_masks_name = self.block_config[
             "fluorescence_quantification_masks"
         ].split("/")[-1]
-        aggregation = self.block_config["fluorescence_quantification_aggregation"]
 
-        output_name_suffix = (
-            f"{aggregation}_on_{fluorescence_quantification_masks_name}"
-        )
+        output_name_suffix = f"on_{fluorescence_quantification_masks_name}"
 
         return get_output_name(
             config,
             fluorescence_quantification_source,
-            "fluo",
+            "fluo_quant",
             channels=fluorescence_quantification_channel,
             return_subdir=False,
             add_raw=False,
