@@ -7,8 +7,8 @@ To be efficiently implemented, all workflows need to be divided into single buil
 - [straightening](https://spsalmon.github.io/towbintools_pipeline/straightening/) : "straightening" building block
 - [morphology computation](https://spsalmon.github.io/towbintools_pipeline/morphologycomputation/) : "morphology_computation" building block
 - [quality_control](https://spsalmon.github.io/towbintools_pipeline/qualitycontrol/) : "classification" building block
-- **molt detection** : "molt_detection" building block
 - **fluorescence quantification** : "fluorescence_quantification" building block
+- **molt detection** : "molt_detection" building block
 - **custom script** : "custom" building block (allowing you to run a foreign script as part of a pipeline)
 
 More may be added in the future and others might be merged together as to facilitate the creation of more complex and personalized pipelines.

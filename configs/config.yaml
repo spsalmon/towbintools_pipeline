@@ -60,7 +60,6 @@ qc_import_eggs_from: [ null, "ch2_seg_str_qc" ]
 molt_detection_method: [ "deep_learning" ]
 molt_detection_model_path: [ './models/molt_detection_model.ckpt' ]
 molt_detection_columns: [ [ 'ch2_seg_str_volume' ] ]
-molt_detection_worm_type: [ 'ch2_seg_str_qc' ]
 
 # fluo quantification parameters
 fluorescence_quantification_source: [ [ 'raw', 0 ] ]

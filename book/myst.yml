@@ -16,6 +16,7 @@ project:
         - file: usage/PipelineInput.md
         - file: usage/CustomizePipeline.md
         - file: usage/PipelineOutput.md
+        - file: usage/UsingGUI.md
     - title: Training
       children:
         - file: training/Training.md
@@ -27,6 +28,7 @@ project:
           children:
             - file: training/GatheringQCDataset.md
             - file: training/TrainingQCModels.md
+        - file: training/TrainingMoltDetectionModels.md
     - title: Building Blocks
       children:
         - file: building_blocks/BuildingBlock.md

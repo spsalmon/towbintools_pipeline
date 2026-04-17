@@ -101,7 +101,7 @@ DEFAULT_OPTIONS = {
     },
     "molt_detection": {
         "rerun_molt_detection": [False],
-        "molt_detection_method": ["legacy"],
+        "molt_detection_method": ["deep_learning"],
         "molt_detection_model_path": ["./models/molt_detection_model.ckpt"],
         "molt_detection_batch_size": [1],
         "molt_detection_volume": [
