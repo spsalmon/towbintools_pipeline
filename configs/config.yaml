@@ -10,6 +10,9 @@ pixelsize: [ 0.65 ]
 
 get_experiment_time: True
 
+time_regex: 'Time(\d+)'
+point_regex: 'Point(\d+)'
+
 building_blocks:
   - "segmentation"
   - "segmentation"

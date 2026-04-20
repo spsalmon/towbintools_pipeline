@@ -155,15 +155,16 @@ class BuildingBlock(ABC):
         input_pickle_path,
         output_pickle_path,
         pickled_block_config,
+        pickled_config,
         config,
         pickled_filemap_path=None,
     ):
         script_path = self.script_path
 
         if script_path.endswith(".sh"):
-            command = f"bash {script_path} -i {input_pickle_path} -o {output_pickle_path} -c {pickled_block_config}"
+            command = f"bash {script_path} --input {input_pickle_path} -output {output_pickle_path} --block_config {pickled_block_config} --config {pickled_config}"
         elif script_path.endswith(".py"):
-            command = f"{micromamba_path} run -n towbintools python3 {script_path} -i {input_pickle_path} -o {output_pickle_path} -c {pickled_block_config} -j {config['sbatch_cpus']}"
+            command = f"{micromamba_path} run -n towbintools python3 {script_path} --input {input_pickle_path} --output {output_pickle_path} --block_config {pickled_block_config} --config {pickled_config} -n_jobs {config['sbatch_cpus']}"
         else:
             raise ValueError(
                 f"Script type of {script_path} is not supported. The pipeline only supports bash or python scripts."
@@ -197,11 +198,13 @@ class BuildingBlock(ABC):
                     input_pickle_path,
                     output_pickle_path,
                     pickled_block_config,
+                    pickled_config,
                 ) = pickle_objects(
                     temp_dir,
                     {"path": f"{self.name}_input_files", "obj": input_files},
                     {"path": f"{self.name}_output_files", "obj": output_files},
                     {"path": f"{self.name}_block_config", "obj": block_config},
+                    {"path": f"{self.name}_config", "obj": config},
                 )
 
                 command = self.create_command(
@@ -209,6 +212,7 @@ class BuildingBlock(ABC):
                     input_pickle_path,
                     output_pickle_path,
                     pickled_block_config,
+                    pickled_config,
                     config,
                     pickled_filemap_path=pickled_filemap_path,
                 )
@@ -252,10 +256,13 @@ class BuildingBlock(ABC):
             )
 
             if len(input_files) != 0 and rerun:
-                input_pickle_path, pickled_block_config = pickle_objects(
-                    temp_dir,
-                    {"path": "input_files", "obj": input_files},
-                    {"path": "block_config", "obj": block_config},
+                input_pickle_path, pickled_block_config, pickled_config = (
+                    pickle_objects(
+                        temp_dir,
+                        {"path": "input_files", "obj": input_files},
+                        {"path": "block_config", "obj": block_config},
+                        {"path": "config", "obj": config},
+                    )
                 )
 
                 command = self.create_command(
@@ -263,6 +270,7 @@ class BuildingBlock(ABC):
                     input_pickle_path,
                     output_file,
                     pickled_block_config,
+                    pickled_config,
                     config,
                     pickled_filemap_path=pickled_filemap_path,
                 )

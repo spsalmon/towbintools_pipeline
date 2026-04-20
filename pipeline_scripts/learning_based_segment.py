@@ -8,7 +8,7 @@ import utils
 from cv2 import resize
 from joblib import delayed
 from joblib import Parallel
-from joblib import parallel_config
+from joblib import parallel_block_config
 from tifffile import imwrite
 from torch.utils.data import DataLoader
 from towbintools.deep_learning.deep_learning_tools import (
@@ -103,13 +103,13 @@ def save_prediction(prediction, output_path, z_dim=None, t_dim=None):
         )
 
 
-def main(input_pickle, output_pickle, config, n_jobs):
+def main(input_pickle, output_pickle, block_config, n_jobs):
     """Main function."""
-    config = utils.load_pickles(config)[0]
+    block_config = utils.load_pickles(block_config)[0]
     input_files, output_files = utils.load_pickles(input_pickle, output_pickle)
     os.makedirs(os.path.dirname(output_files[0]), exist_ok=True)
 
-    segmentation_channels = config.get("segmentation_channels", None)
+    segmentation_channels = block_config.get("segmentation_channels", None)
 
     is_stack, (z_dim, t_dim) = image_handling.check_if_stack(
         input_files[0][0], channels_to_keep=segmentation_channels
@@ -123,23 +123,25 @@ def main(input_pickle, output_pickle, config, n_jobs):
         t_dim > 1 and z_dim > 1
     ), "4D images with both time and z dimensions are not supported yet."
 
-    if config["segmentation_method"] == "deep_learning":
-        if config["model_path"] is None:
+    if block_config["segmentation_method"] == "deep_learning":
+        if block_config["model_path"] is None:
             raise ValueError(
-                "model_path must be set in the config file for deep learning segmentation."
+                "model_path must be set in the block_config file for deep learning segmentation."
             )
 
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-        model = load_segmentation_model_from_checkpoint(config["model_path"]).to(device)
+        model = load_segmentation_model_from_checkpoint(block_config["model_path"]).to(
+            device
+        )
         n_classes = model.n_classes
 
-        enforce_n_channels = config.get("enforce_n_channels", None)
-        scale_factor = config.get("scale_factor", 1.0)
+        enforce_n_channels = block_config.get("enforce_n_channels", None)
+        scale_factor = block_config.get("scale_factor", 1.0)
         preprocessing_fn = get_prediction_augmentation_from_model(
             model, enforce_n_channels=enforce_n_channels
         )
 
-        batch_size = config["batch_size"]
+        batch_size = block_config["batch_size"]
         model.eval()
 
         if not is_stack:
@@ -191,7 +193,7 @@ def main(input_pickle, output_pickle, config, n_jobs):
                                 )
                             predictions = list(predictions)
 
-                    with parallel_config(backend="threading", n_jobs=n_jobs // 2):
+                    with parallel_block_config(backend="threading", n_jobs=n_jobs // 2):
                         Parallel()(
                             delayed(save_prediction)(prediction, output_path)
                             for prediction, output_path in zip(
@@ -263,4 +265,4 @@ def main(input_pickle, output_pickle, config, n_jobs):
 
 if __name__ == "__main__":
     args = utils.basic_get_args()
-    main(args.input, args.output, args.config, args.n_jobs)
+    main(args.input, args.output, args.block_config, args.n_jobs)

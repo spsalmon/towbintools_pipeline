@@ -20,25 +20,32 @@ def compute_morphological_features_from_file_path(
     point_regex=r"Point(\d+)",
 ):
     """Compute the volume of a straightened mask."""
+    try:
+        time, point = extract_time_point(
+            straightened_mask_path, time_regex, point_regex
+        )
+    except Exception as e:
+        print(f"Time regex: {time_regex}, Point regex: {point_regex}")
+        logging.warning(
+            f"Could not extract time and point from {straightened_mask_path}: {e}"
+        )
+        return None
+
     str_mask = image_handling.read_tiff_file(straightened_mask_path)
 
     features = worm_features.compute_mask_morphological_features(
         str_mask, pixelsize, features
     )
 
-    try:
-        time, point = extract_time_point(
-            straightened_mask_path, time_regex, point_regex
-        )
-        features["Time"] = time
-        features["Point"] = point
-        return features
-    except ValueError:
-        return None
+    features["Time"] = time
+    features["Point"] = point
+
+    return features
 
 
-def main(input_pickle, output_file, config, n_jobs):
+def main(input_pickle, output_file, block_config, config, n_jobs):
     """Main function."""
+    block_config = utils.load_pickles(block_config)[0]
     config = utils.load_pickles(config)[0]
 
     input_files = utils.load_pickles(input_pickle)[0]
@@ -52,8 +59,8 @@ def main(input_pickle, output_file, config, n_jobs):
         morphological_features = Parallel()(
             delayed(compute_morphological_features_from_file_path)(
                 input_file,
-                config["pixelsize"],
-                config["morphological_features"],
+                block_config["pixelsize"],
+                block_config["morphological_features"],
                 time_regex,
                 point_regex,
             )
@@ -67,7 +74,7 @@ def main(input_pickle, output_file, config, n_jobs):
 
     # rename columns to match the rest of the pipeline
     output_file_basename = os.path.basename(output_file).split("_morphology")[0]
-    for feature in config["morphological_features"]:
+    for feature in block_config["morphological_features"]:
         morphological_features_dataframe = morphological_features_dataframe.rename(
             {
                 feature: f"{output_file_basename}_{feature}",
@@ -78,4 +85,4 @@ def main(input_pickle, output_file, config, n_jobs):
 
 if __name__ == "__main__":
     args = utils.basic_get_args()
-    main(args.input, args.output, args.config, args.n_jobs)
+    main(args.input, args.output, args.block_config, args.config, args.n_jobs)

@@ -13,13 +13,13 @@ from towbintools.foundation.file_handling import write_filemap
 from utils import extract_time_point
 
 
-def main(input_pickle, output_file, config, filemap, n_jobs=-1):
+def main(input_pickle, output_file, block_config, filemap, n_jobs=-1):
     """Main function."""
 
-    config = utils.load_pickles(config)[0]
+    block_config = utils.load_pickles(block_config)[0]
 
-    time_regex = config.get("time_regex", r"Time(\d+)")
-    point_regex = config.get("point_regex", r"Point(\d+)")
+    time_regex = block_config.get("time_regex", r"Time(\d+)")
+    point_regex = block_config.get("point_regex", r"Point(\d+)")
 
     input_files = utils.load_pickles(input_pickle)[0]
     input_images = [f["image_path"] for f in input_files]
@@ -29,7 +29,7 @@ def main(input_pickle, output_file, config, filemap, n_jobs=-1):
 
     os.makedirs(os.path.dirname(output_file), exist_ok=True)
 
-    classifier_path = config["qc_model_path"]
+    classifier_path = block_config["qc_model_path"]
     model_path_and_classes = load(classifier_path)
 
     features = Parallel(n_jobs=n_jobs)(
@@ -48,7 +48,7 @@ def main(input_pickle, output_file, config, filemap, n_jobs=-1):
 
     egg_model_path = model_path_and_classes.get("egg_model_path", None)
     qc_model_path = model_path_and_classes["qc_model_path"]
-    import_eggs_from = config.get("qc_import_eggs_from", None)
+    import_eggs_from = block_config.get("qc_import_eggs_from", None)
 
     qc_classifier = xgb.XGBClassifier()
     qc_classifier.load_model(qc_model_path)
@@ -153,4 +153,4 @@ def main(input_pickle, output_file, config, filemap, n_jobs=-1):
 
 if __name__ == "__main__":
     args = utils.basic_get_args()
-    main(args.input, args.output, args.config, args.filemap, args.n_jobs)
+    main(args.input, args.output, args.block_config, args.filemap, args.n_jobs)
