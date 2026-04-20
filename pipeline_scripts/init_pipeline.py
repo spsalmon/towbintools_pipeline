@@ -80,6 +80,9 @@ def main(global_config, temp_dir_basename, temp_dir, subdir=None):
     report_format = config.get("report_format", "csv")
     config["report_format"] = report_format
 
+    time_regex = config.get("time_regex", r"Time(\d+)")
+    point_regex = config.get("point_regex", r"Point(\d+)")
+
     sync_backup_folder(temp_dir, pipeline_backup_dir)
 
     extract_experiment_time = config.get("get_experiment_time", True)
@@ -89,7 +92,7 @@ def main(global_config, temp_dir_basename, temp_dir, subdir=None):
         os.path.join(report_subdir, f"analysis_filemap.{report_format}")
     ):
         try:
-            experiment_filemap = get_dir_filemap(raw_subdir)
+            experiment_filemap = get_dir_filemap(raw_subdir, time_regex, point_regex)
         except Exception as e:
             print(f"Error generating filemap from directory: {e}")
             experiment_filemap = pl.DataFrame()

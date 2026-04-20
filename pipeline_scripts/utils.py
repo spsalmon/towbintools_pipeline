@@ -496,7 +496,12 @@ def basic_get_args() -> argparse.Namespace:
         help="Input file paths (saved in a pickle file) or single filepath (CSV file for example).",
     )
     parser.add_argument("-o", "--output", help="Output file path or pickle.")
-    parser.add_argument("-c", "--config", help="Pickled config dictionary.")
+    parser.add_argument(
+        "-b",
+        "--block_config",
+        help="Pickled configuration of the current block's (dictionary)",
+    )
+    parser.add_argument("-c", "--config", help="Pickled FULL config dictionary.")
     parser.add_argument(
         "-j", "--n_jobs", type=int, help="Number of jobs for parallel execution."
     )

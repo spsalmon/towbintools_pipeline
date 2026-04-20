@@ -229,10 +229,10 @@ def straighten_2D_image(image, mask):
         ).astype(np.uint16)
 
 
-def main(input_pickle, output_pickle, config, n_jobs):
-    config = utils.load_pickles(config)[0]
+def main(input_pickle, output_pickle, block_config, n_jobs):
+    block_config = utils.load_pickles(block_config)[0]
     start_logger_if_necessary()
-    logging.debug(f"Using config: {config}")
+    logging.debug(f"Using block_config: {block_config}")
 
     input_files, output_files = utils.load_pickles(input_pickle, output_pickle)
     source_files = [f["source_image_path"] for f in input_files]
@@ -240,13 +240,13 @@ def main(input_pickle, output_pickle, config, n_jobs):
     os.makedirs(os.path.dirname(output_files[0]), exist_ok=True)
 
     is_stack, (z_dim, t_dim) = check_if_stack(
-        source_files[0], channels_to_keep=config["straightening_source"][1]
+        source_files[0], channels_to_keep=block_config["straightening_source"][1]
     )
     assert not (
         t_dim > 1 and z_dim > 1
     ), "4D images with both time and z dimensions are not supported yet."
-    keep_biggest_object = config.get("keep_biggest_object", False)
-    channel_to_allign = config.get("channel_to_allign", None)
+    keep_biggest_object = block_config.get("keep_biggest_object", False)
+    channel_to_allign = block_config.get("channel_to_allign", None)
 
     # allows us to request the same number of cores and not run into OOM issues when straightening big stacks
     # temporary fix
@@ -256,7 +256,7 @@ def main(input_pickle, output_pickle, config, n_jobs):
         Parallel()(
             delayed(straighten_and_save)(
                 source_file,
-                config["straightening_source"][1],
+                block_config["straightening_source"][1],
                 mask_file,
                 output_path,
                 is_stack=is_stack,
@@ -271,4 +271,4 @@ def main(input_pickle, output_pickle, config, n_jobs):
 
 if __name__ == "__main__":
     args = utils.basic_get_args()
-    main(args.input, args.output, args.config, args.n_jobs)
+    main(args.input, args.output, args.block_config, args.n_jobs)

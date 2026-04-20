@@ -275,14 +275,14 @@ def compute_features_at_molt(analysis_filemap, molt_dataframe, point):
             molt_time = float(molt_values[i])
             try:
                 if not np.isnan(molt_time):
-                    features_at_molt[
-                        f"{column}_at_{molt}"
-                    ] = compute_series_at_time_classified(
-                        column_data,
-                        molt_time,
-                        time_values,
-                        worm_types,
-                    ).item()
+                    features_at_molt[f"{column}_at_{molt}"] = (
+                        compute_series_at_time_classified(
+                            column_data,
+                            molt_time,
+                            time_values,
+                            worm_types,
+                        ).item()
+                    )
                 else:
                     features_at_molt[f"{column}_at_{molt}"] = np.nan
             except Exception as e:
@@ -292,31 +292,34 @@ def compute_features_at_molt(analysis_filemap, molt_dataframe, point):
     return features_at_molt
 
 
-def main(input_dataframe_path, output_file, config, n_jobs):
+def main(input_dataframe_path, output_file, block_config, n_jobs):
     """Main function."""
 
-    config = utils.load_pickles(config)[0]
+    block_config = utils.load_pickles(block_config)[0]
 
-    method = config.get("molt_detection_method", "legacy")
+    method = block_config.get("molt_detection_method", "legacy")
 
     if method == "deep_learning":
-        model_path = config.get("molt_detection_model_path", None)
+        model_path = block_config.get("molt_detection_model_path", None)
         if model_path is None:
             raise ValueError("Model path must be provided for deep learning method.")
         if not os.path.exists(model_path):
             raise FileNotFoundError(f"Model file not found: {model_path}")
 
-    if "molt_detection_columns" not in config and "molt_detection_volume" in config:
+    if (
+        "molt_detection_columns" not in block_config
+        and "molt_detection_volume" in block_config
+    ):
         warnings.warn(
             "The option 'molt_detection_volume' is deprecated and will be removed in a future version. Use 'molt_detection_columns' instead.",
             DeprecationWarning,
             stacklevel=2,
         )
 
-    if "molt_detection_columns" not in config:
-        molt_detection_columns = [config["molt_detection_volume"]]
+    if "molt_detection_columns" not in block_config:
+        molt_detection_columns = [block_config["molt_detection_volume"]]
     else:
-        molt_detection_columns = config["molt_detection_columns"]
+        molt_detection_columns = block_config["molt_detection_columns"]
 
     analysis_filemap = utils.load_pickles(input_dataframe_path)[0]
     analysis_filemap = read_filemap(analysis_filemap)
@@ -339,7 +342,7 @@ def main(input_dataframe_path, output_file, config, n_jobs):
             analysis_filemap,
             molt_detection_columns,
             model_path,
-            batch_size=config.get("molt_detection_batch_size", 1),
+            batch_size=block_config.get("molt_detection_batch_size", 1),
         )
 
     # compute other features at each molt
@@ -365,4 +368,4 @@ def main(input_dataframe_path, output_file, config, n_jobs):
 
 if __name__ == "__main__":
     args = utils.basic_get_args()
-    main(args.input, args.output, args.config, args.n_jobs)
+    main(args.input, args.output, args.block_config, args.n_jobs)

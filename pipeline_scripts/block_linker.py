@@ -48,6 +48,8 @@ def update_experiment_filemap(
     previous_block,
     previous_subdir,
     report_subdir,
+    time_regex=r"Time(\d+)",
+    point_regex=r"Point(\d+)",
 ):
     """Update experiment_filemap based on previous block's return type."""
     filemap_path = config["filemap_path"]
@@ -62,7 +64,7 @@ def update_experiment_filemap(
             )
         else:
             experiment_filemap = add_dir_to_experiment_filemap(
-                experiment_filemap, result, column_name
+                experiment_filemap, result, column_name, time_regex, point_regex
             )
         write_filemap(experiment_filemap, filemap_path)
     elif previous_block.return_type == "csv":
@@ -109,6 +111,9 @@ def main():
             previous["config"],
         )
 
+        time_regex = previous_config.get("time_regex", r"Time(\d+)")
+        point_regex = previous_config.get("point_regex", r"Point(\d+)")
+
         report_subdir = previous_config["report_subdir"]
         pipeline_backup_dir = previous_config["pipeline_backup_dir"]
 
@@ -125,6 +130,8 @@ def main():
             previous_block,
             previous_subdir,
             report_subdir,
+            time_regex,
+            point_regex,
         )
 
     # Run current block if available

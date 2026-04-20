@@ -74,14 +74,14 @@ def segment_and_save(
         return False
 
 
-def main(input_pickle, output_pickle, config, n_jobs):
+def main(input_pickle, output_pickle, block_config, n_jobs):
     """Main function."""
-    config = utils.load_pickles(config)[0]
+    block_config = utils.load_pickles(block_config)[0]
     input_files, output_files = utils.load_pickles(input_pickle, output_pickle)
     os.makedirs(os.path.dirname(output_files[0]), exist_ok=True)
 
-    segmentation_channels = config.get("segmentation_channels", None)
-    segmentation_method = config.get("segmentation_method", None)
+    segmentation_channels = block_config.get("segmentation_channels", None)
+    segmentation_method = block_config.get("segmentation_method", None)
 
     is_stack, (z_dim, t_dim) = check_if_stack(
         input_files[0][0], channels_to_keep=segmentation_channels
@@ -99,8 +99,8 @@ def main(input_pickle, output_pickle, config, n_jobs):
                     method=segmentation_method,
                     channels=segmentation_channels,
                     is_stack=is_stack,
-                    pixelsize=config["pixelsize"],
-                    gaussian_filter_sigma=config["gaussian_filter_sigma"],
+                    pixelsize=block_config["pixelsize"],
+                    gaussian_filter_sigma=block_config["gaussian_filter_sigma"],
                 )
                 for input_file, output_path in zip(input_files, output_files)
             )
@@ -112,8 +112,8 @@ def main(input_pickle, output_pickle, config, n_jobs):
                 method=segmentation_method,
                 channels=segmentation_channels,
                 is_stack=is_stack,
-                pixelsize=config["pixelsize"],
-                gaussian_filter_sigma=config["gaussian_filter_sigma"],
+                pixelsize=block_config["pixelsize"],
+                gaussian_filter_sigma=block_config["gaussian_filter_sigma"],
                 n_jobs=n_jobs,
                 z_dim=z_dim,
                 t_dim=t_dim,
@@ -122,4 +122,4 @@ def main(input_pickle, output_pickle, config, n_jobs):
 
 if __name__ == "__main__":
     args = utils.basic_get_args()
-    main(args.input, args.output, args.config, args.n_jobs)
+    main(args.input, args.output, args.block_config, args.n_jobs)
