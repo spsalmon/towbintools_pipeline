@@ -1,7 +1,6 @@
 import argparse
 import os
 import pickle
-import re
 
 import numpy as np
 import polars as pl
@@ -10,6 +9,7 @@ import skimage.filters
 from joblib import delayed
 from joblib import Parallel
 from scipy.signal import find_peaks
+from towbintools.foundation.file_handling import extract_time_point
 from towbintools.foundation.file_handling import write_filemap
 from towbintools.foundation.image_handling import normalize_image
 from towbintools.foundation.image_handling import read_tiff_file
@@ -49,25 +49,29 @@ def get_args():
     return parser.parse_args()
 
 
-def process_movie(movie_path, std_coeff, distance, width, height, frame_rate):
+def process_movie(
+    movie_path,
+    std_coeff,
+    distance,
+    width,
+    height,
+    frame_rate,
+    time_regex=r"Time(\d+)",
+    point_regex=r"Point(\d+)",
+):
+
+    try:
+        time, point = extract_time_point(movie_path, time_regex, point_regex)
+    except ValueError:
+        return None
+
     movie = read_tiff_file(movie_path)
     pumping_rate = get_pumping_rate(
         movie, std_coeff, distance, width, height, frame_rate
     )
-    time_pattern = re.compile(r"Time(\d+)")
-    point_pattern = re.compile(r"Point(\d+)")
 
-    time_match = time_pattern.search(movie_path)
-    point_match = point_pattern.search(movie_path)
-
-    if time_match and point_match:
-        time = int(time_match.group(1))
-        point = int(point_match.group(1))
-        row = {"Time": time, "Point": point, "pumping_rate": pumping_rate}
-
-        return row
-    else:
-        raise ValueError("Could not extract time and point from file name.")
+    row = {"Time": time, "Point": point, "pumping_rate": pumping_rate}
+    return row
 
 
 def get_pumping_rate(movie, std_coeff, distance, width, height, frame_rate):
@@ -127,6 +131,10 @@ def get_pumping_rate(movie, std_coeff, distance, width, height, frame_rate):
 def main():
     args = get_args()
     filemap = load_pickles(args.filemap)[0]
+    config = load_pickles(args.config)[0]
+
+    time_regex = config.get("time_regex", r"Time(\d+)")
+    point_regex = config.get("point_regex", r"Point(\d+)")
 
     output = args.output
     input_column = args.input_column
@@ -143,7 +151,16 @@ def main():
     print(f"Processing {len(input_files)} movies for pumping rate estimation.")
 
     rows = Parallel(n_jobs=-1, backend="multiprocessing")(
-        delayed(process_movie)(movie_path, std_coeff, dist, width, height, frame_rate)
+        delayed(process_movie)(
+            movie_path,
+            std_coeff,
+            dist,
+            width,
+            height,
+            frame_rate,
+            time_regex,
+            point_regex,
+        )
         for movie_path in input_files
     )
 

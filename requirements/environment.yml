@@ -38,3 +38,4 @@ dependencies:
     - shinywidgets
     - statannotations
     - tensorboard
+    - bayesian-optimization
