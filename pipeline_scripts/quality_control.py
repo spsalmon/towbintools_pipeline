@@ -1,5 +1,4 @@
 import os
-import re
 
 import numpy as np
 import pandas as pd
@@ -11,26 +10,16 @@ from joblib import load
 from joblib import Parallel
 from towbintools.classification.qc_tools import compute_qc_features
 from towbintools.foundation.file_handling import write_filemap
-
-
-def extract_time_point_and_worm_type(path):
-    time_pattern = re.compile(r"Time(\d+)")
-    point_pattern = re.compile(r"Point(\d+)")
-
-    time_match = time_pattern.search(path)
-    point_match = point_pattern.search(path)
-    if time_match and point_match:
-        time = int(time_match.group(1))
-        point = int(point_match.group(1))
-        return {"Time": time, "Point": point}
-    else:
-        raise ValueError("Could not extract time and point from file name.")
+from utils import extract_time_point
 
 
 def main(input_pickle, output_file, config, filemap, n_jobs=-1):
     """Main function."""
 
     config = utils.load_pickles(config)[0]
+
+    time_regex = config.get("time_regex", r"Time(\d+)")
+    point_regex = config.get("point_regex", r"Point(\d+)")
 
     input_files = utils.load_pickles(input_pickle)[0]
     input_images = [f["image_path"] for f in input_files]
@@ -137,14 +126,28 @@ def main(input_pickle, output_file, config, filemap, n_jobs=-1):
     for idx, valid_idx in enumerate(valid_indices):
         full_predictions[valid_idx] = predictions[idx]
 
-    time_points = Parallel(n_jobs=-1)(
-        delayed(extract_time_point_and_worm_type)(path) for path in input_masks
-    )
-    time_points_df = pl.DataFrame(time_points)
+    # time_points = Parallel(n_jobs=-1)(
+    #     delayed(extract_time_point)(path, time_regex, point_regex) for path in input_masks
+    # )
+
     col_name = os.path.splitext(os.path.basename(output_file))[0]
-    worm_types_dataframe = time_points_df.select(["Time", "Point"]).with_columns(
-        pl.Series(col_name, full_predictions)
-    )
+
+    rows = []
+    for i, path in enumerate(input_masks):
+        try:
+            time_point = extract_time_point(path, time_regex, point_regex)
+            rows.append(
+                {
+                    "Time": time_point[0],
+                    "Point": time_point[1],
+                    col_name: full_predictions[i],
+                }
+            )
+        except ValueError:
+            print(f"Could not extract time and point from path: {path}. Skipping.")
+
+    worm_types_dataframe = pl.DataFrame(rows)
+
     write_filemap(worm_types_dataframe, output_file)
 
 

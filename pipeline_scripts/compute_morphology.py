@@ -1,6 +1,5 @@
 import logging
 import os
-import re
 
 import polars as pl
 import utils
@@ -9,11 +8,16 @@ from joblib import Parallel
 from joblib import parallel_config
 from towbintools.foundation import image_handling
 from towbintools.foundation import worm_features
+from towbintools.foundation.file_handling import extract_time_point
 from towbintools.foundation.file_handling import write_filemap
 
 
 def compute_morphological_features_from_file_path(
-    straightened_mask_path, pixelsize, features
+    straightened_mask_path,
+    pixelsize,
+    features,
+    time_regex=r"Time(\d+)",
+    point_regex=r"Point(\d+)",
 ):
     """Compute the volume of a straightened mask."""
     str_mask = image_handling.read_tiff_file(straightened_mask_path)
@@ -22,19 +26,15 @@ def compute_morphological_features_from_file_path(
         str_mask, pixelsize, features
     )
 
-    time_pattern = re.compile(r"Time(\d+)")
-    point_pattern = re.compile(r"Point(\d+)")
-
-    time_match = time_pattern.search(straightened_mask_path)
-    point_match = point_pattern.search(straightened_mask_path)
-    if time_match and point_match:
-        time = int(time_match.group(1))
-        point = int(point_match.group(1))
+    try:
+        time, point = extract_time_point(
+            straightened_mask_path, time_regex, point_regex
+        )
         features["Time"] = time
         features["Point"] = point
         return features
-    else:
-        raise ValueError("Could not extract time and point from file name.")
+    except ValueError:
+        return None
 
 
 def main(input_pickle, output_file, config, n_jobs):
@@ -44,14 +44,25 @@ def main(input_pickle, output_file, config, n_jobs):
     input_files = utils.load_pickles(input_pickle)[0]
     logging.info(f"Computing volume for {len(input_files)} files.")
 
+    time_regex = config.get("time_regex", r"Time(\d+)")
+    point_regex = config.get("point_regex", r"Point(\d+)")
+
     os.makedirs(os.path.dirname(output_file), exist_ok=True)
     with parallel_config(backend="loky", n_jobs=n_jobs):
         morphological_features = Parallel()(
             delayed(compute_morphological_features_from_file_path)(
-                input_file, config["pixelsize"], config["morphological_features"]
+                input_file,
+                config["pixelsize"],
+                config["morphological_features"],
+                time_regex,
+                point_regex,
             )
             for input_file in input_files
         )
+
+    # filter out None values (files where time and point could not be extracted)
+    morphological_features = [f for f in morphological_features if f is not None]
+
     morphological_features_dataframe = pl.DataFrame(morphological_features)
 
     # rename columns to match the rest of the pipeline

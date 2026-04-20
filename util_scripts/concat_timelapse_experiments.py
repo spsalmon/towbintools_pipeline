@@ -14,6 +14,8 @@ dir_list = [
     "part2",
     "part3",
 ]
+time_regex = r"Time(\d+)"
+point_regex = r"Point(\d+)"
 
 dir_list = [os.path.join(experiment_dir, d) for d in dir_list]
 output_dir = os.path.join(experiment_dir, "raw_nd2")
@@ -22,14 +24,15 @@ os.makedirs(backup_dir, exist_ok=True)
 os.makedirs(output_dir, exist_ok=True)
 
 
-def replace_time_in_filename(filename, new_time):
-    match = re.search(r"Time(\d+)", filename)
+def replace_time_in_filename(filename, new_time, time_regex=r"Time(\d+)"):
+    match = re.search(time_regex, filename)
     if not match:
         return ""
     original_time_str = match.group(1)
+    original_prefix = match.group(0)[: match.start(1) - match.start(0)]
     original_digit_count = len(original_time_str)
     new_time_str = f"{new_time:0{original_digit_count}d}"
-    new_filename = filename.replace(f"Time{original_time_str}", f"Time{new_time_str}")
+    new_filename = re.sub(time_regex, f"{original_prefix}{new_time_str}", filename)
     return new_filename
 
 
@@ -136,7 +139,11 @@ def check_file_counts_consistent(dir_list, combined_filemap):
     A mismatch means some files were silently dropped (e.g. by notna() filtering).
     """
     total_source = sum(
-        get_dir_filemap(d).to_pandas()["ImagePath"].notna().sum() for d in dir_list
+        get_dir_filemap(d, time_regex=time_regex, point_regex=point_regex)
+        .to_pandas()["ImagePath"]
+        .notna()
+        .sum()
+        for d in dir_list
     )
     total_combined = len(combined_filemap)
     if total_source != total_combined:
@@ -170,7 +177,10 @@ def run_all_safety_checks(dir_list, combined_filemap):
 
 
 def combine_all_and_move(dir_list, output_dir):
-    filemaps = [get_dir_filemap(d) for d in dir_list]
+    filemaps = [
+        get_dir_filemap(d, time_regex=time_regex, point_regex=point_regex)
+        for d in dir_list
+    ]
     filemaps = [fm.to_pandas() for fm in filemaps]
 
     combined_filemap = filemaps[0]

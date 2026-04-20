@@ -110,8 +110,10 @@ def train_xgb_model(
     return model
 
 
-dataset_path = "/mnt/towbin.data/shared/spsalmon/towbinlab_classification_database/datasets/10x_pharynx_qc/pharynx"
-output_path = "/mnt/towbin.data/shared/spsalmon/towbinlab_classification_database/models/10x_pharynx_qc"
+dataset_path = (
+    "/mnt/towbin.data/shared/fdell/models/fluorescent_bacteria_qc/fluorescent_bacteria/"
+)
+output_path = "/mnt/towbin.data/shared/spsalmon/towbinlab_classification_database/models/fluorescent_bacteria_qc"
 os.makedirs(output_path, exist_ok=True)
 model_name = "qc_xgb_model.pkl"
 egg_classifier_name = "egg_xgb_model.json"
@@ -128,12 +130,12 @@ image_dir = os.path.join(dataset_path, "images")
 mask_dir = os.path.join(dataset_path, "masks")
 annotation_csv_path = os.path.join(dataset_path, "annotations", "annotations.csv")
 annotations_df = pd.read_csv(annotation_csv_path)
+# replace \ with /
+annotations_df["ImagePath"] = annotations_df["ImagePath"].str.replace("\\", "/")
 # replace //izbkingston with /mnt
 annotations_df["ImagePath"] = annotations_df["ImagePath"].str.replace(
     "//izbkingston", "/mnt"
 )
-# replace \ with /
-annotations_df["ImagePath"] = annotations_df["ImagePath"].str.replace("\\", "/")
 # add the mask paths to the dataframe
 annotations_df["MaskPath"] = annotations_df["ImagePath"].apply(
     lambda x: os.path.join(mask_dir, os.path.basename(x))
