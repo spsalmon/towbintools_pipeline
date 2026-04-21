@@ -1,0 +1,47 @@
+# Gathering a Segmentation Dataset
+
+Like many other parts of the pipeline, this is also configured through a YAML configuration file.
+
+storage_path: "/mnt/towbin.data/shared"
+valid_subdirectories: ["spsalmon", "kstojanovski", "igheor"]
+
+database_path: "/mnt/towbin.data/shared/spsalmon/towbinlab_segmentation_database/datasets/chamber_segmentation"
+
+database_configs: {
+  'brightfield': {
+      'size': 1000,
+      'stage_proportions': null,
+      'scope_proportions': {'ziva': 1.0},
+      'channel': [0],
+      'strains': null,
+      'magnifications': ["40x", "60x"],
+  },
+}
+
+# sets a limit on how far after M4 images will be included
+extra_adulthood_time: 40
+n_picks_per_stage: 50
+
+valid_scopes: ["ziva"]
+scopes_alt_names: {
+  'crest': ['Crest', 'crest', 'CREST'],
+  'squid': ['Squid', 'squid', 'SQUID'],
+  'ti2': ['Ti2', 'ti2', 'TI2', 'orca', 'Orca', 'ORCA'],
+  'ziva': ['ziva', 'ZIVA', 'Ziva']
+}
+
+keywords_to_exclude: ["exclude", "fail", "failure", "crash"]
+keywords_to_include: ["lifespan"]
+
+experiments_to_consider: null
+
+experiments_to_always_include: []
+experiments_to_exclude: [
+  "20241111_squid_10x_wBT318_NaCl",
+  "20241707_souvik_w318_ev_mex3_squid",
+  "20240515_squid1_10x_wbt160_25C_2024-05-15_15-31-45.506118",
+  "20240212_squid_wbt318_Nacl",
+  "20241912_squid_10x_wBT_344_415",
+  "20252401_squid_10x_wBT318_reproduction",
+  "20252001_squid_10x_wBT318_NaCl",
+]

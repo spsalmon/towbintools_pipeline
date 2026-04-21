@@ -16,6 +16,9 @@ analysis_dir_name: "analysis"
 raw_dir_name: "raw"
 report_format: "parquet"
 pixelsize: [ 0.65 ]
+get_experiment_time: True
+time_regex: 'Time(\d+)'
+point_regex: 'Point(\d+)'
 ```
 
 - **experiment_dir** : the root of your experiment
@@ -23,12 +26,13 @@ pixelsize: [ 0.65 ]
 - **raw_dir_name** : directory where all your raw images are saved
 - **report_format** : either "csv" or "parquet". Parquet files will be much smaller than CSVs (usefull for big experiments), but are less convenient to edit
 - **pixelsize** : physical size in µm of a pixel (depends on your microscope, camera and objective)
+- **get_experiment_time** : if True, the actual time the images were acquired at will be extracted for the metadata. This can take quite a while but is very usefull for downstream analysis
+- **time_regex** : the regular expression used to extract the time index from the filename. The default one works for filenames like TimeX_PointY_(...).tiff, but you can change it to fit your naming scheme. The part in brackets will be extracted as the time index.
+- **point_regex** : same as time_regex but for the point index (unique identifier for each worm). The part in brackets will be extracted as the point index.
 
 If you have different imaging modalities during your timelapse (let's say you acquire a picture of each worm every 10 minutes but also take a Z-stack every hour), you should split them in different raw directories (e.g. raw and raw_stack). You can then run a pipeline for each of those directories and merge them at the end simply by joining the two dataframes.
 
 ```yaml
-get_experiment_time: True
-
 building_blocks:
   - "segmentation"
   - "segmentation"
@@ -50,7 +54,6 @@ rerun_quality_control: [ False ]
 rerun_molt_detection: [ False ]
 ```
 
-- **get_experiment_time** : if True, the actual time the images were acquired at will be extracted for the metadata. This can take quite a while but is very usefull for downstream analysis
 - **building_blocks** : the list of atomic tasks that you want the pipeline to perform. In this case, 2 segmentations, 3 straightenings, etc.
 - **rerun** : if False, images that were already processed will be skipped, only missing ones will be processed. For blocks like morphology_computation, the whole block is skipped if the resulting file "(...).csv" already exists. If true, everything is reprocessed.
 

@@ -12,18 +12,17 @@ project:
         - file: getting_started/Update.md
         - file: getting_started/RunningFirstPipeline.md
     - title: Usage
-      # children:
-      #   - file: usage/PipelineInput.md
-      #   - file: usage/CustomizePipeline.md
-      #   - file: usage/PipelineOutput.md
+      children:
+        - file: usage/PipelineInput.md
+        - file: usage/PipelineOutput.md
       #   - file: usage/UsingGUI.md
     - title: Training
-      # children:
-      #   - file: training/Training.md
-      #   - title: Training Segmentation Models
-      #     children:
-      #       - file: training/GatheringSegmentationDataset.md
-      #       - file: training/TrainingSegmentationModels.md
+      children:
+        - file: training/Training.md
+        - title: Training Segmentation Models
+          children:
+            - file: training/GatheringSegmentationDataset.md
+            - file: training/TrainingSegmentationModels.md
       #   - title: Training Quality Control Models
       #     children:
       #       - file: training/GatheringQCDataset.md
