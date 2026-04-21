@@ -89,8 +89,8 @@ def check_use_experiment_time(filemap):
         return False
 
 
-def infer_n_channels(filemap):
-    first_image_path = filemap.select(pl.col("raw")).to_numpy().squeeze()[0]
+def infer_n_channels(filemap, raw_column="raw"):
+    first_image_path = filemap.select(pl.col(raw_column)).to_numpy().squeeze()[0]
     first_image = image_handling.read_tiff_file(first_image_path)
 
     if first_image.ndim == 3:
@@ -110,7 +110,6 @@ def populate_column_choices(filemap):
         "Time",
         "ExperimentTime",
         "Point",
-        "raw",
         "HatchTime",
         "M1",
         "M2",
@@ -122,6 +121,9 @@ def populate_column_choices(filemap):
         "Dead",
     ]
 
+    raw_columns = [column for column in filemap.columns if "raw" in column]
+    usual_columns.extend(raw_columns)
+    raw_column = raw_columns[0]
     usual_columns.extend([column for column in filemap.columns if "qc" in column])
 
     for feature in FEATURES_TO_COMPUTE_AT_MOLT:
@@ -181,6 +183,7 @@ def populate_column_choices(filemap):
 
     return (
         filemap,
+        raw_column,
         feature_columns,
         custom_columns_choices,
         default_plotted_column,
