@@ -141,11 +141,9 @@ def initialize_ui(filemap, recompute_features_at_molt=False):
     if not isinstance(points, list):
         points = [points]
 
-    n_channels = infer_n_channels(filemap)
-    list_channels = ["None"] + [f"Channel {i+1}" for i in range(n_channels)]
-
     (
         filemap,
+        raw_column,
         feature_columns,
         custom_columns_choices,
         default_plotted_column,
@@ -157,6 +155,9 @@ def initialize_ui(filemap, recompute_features_at_molt=False):
         feature_columns,
         recompute_features_at_molt=recompute_features_at_molt,
     )
+
+    n_channels = infer_n_channels(filemap, raw_column=raw_column)
+    list_channels = ["None"] + [f"Channel {i+1}" for i in range(n_channels)]
 
     molt_annotator = create_molt_annotator(ECDYSIS_COLUMNS, custom_columns_choices)
     timepoint_selector = create_timepoint_selector(
@@ -172,6 +173,7 @@ def initialize_ui(filemap, recompute_features_at_molt=False):
     return (
         app_ui,
         filemap,
+        raw_column,
         feature_columns,
         custom_columns_choices,
         points,

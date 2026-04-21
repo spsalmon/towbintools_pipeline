@@ -34,6 +34,7 @@ def main_server(
     filemap_save_path=None,
     points=None,
     times=None,
+    raw_column="raw",
     feature_columns=None,
     custom_columns_choices=None,
     default_plotted_column=None,
@@ -264,7 +265,7 @@ def main_server(
 
     @reactive.calc
     def get_images_of_point():
-        return current_point_filemap().select("raw").to_numpy().squeeze().tolist()
+        return current_point_filemap().select(raw_column).to_numpy().squeeze().tolist()
 
     @reactive.calc
     def get_segmentation_of_point():

@@ -18,6 +18,7 @@ print("Creating the app ...")
 (
     app_ui,
     filemap,
+    raw_column,
     feature_columns,
     custom_columns_choices,
     points,
@@ -33,6 +34,7 @@ def s(input, output, session):
         session,
         filemap=filemap,
         filemap_save_path=filemap_save_path,
+        raw_column=raw_column,
         feature_columns=feature_columns,
         custom_columns_choices=custom_columns_choices,
         points=points,
