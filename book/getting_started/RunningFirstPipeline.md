@@ -6,7 +6,7 @@ The pipeline is configure using YAML files.
 For now, the basic assumption is that your images follow this specific naming scheme : TimeX_PointY_(...).tiff where Time refers to the index in your time loop and Point is the number that we will use as
 the unique identifier for the position (individual worm if each position contains one worm). All images (planes, channels, etc.) for a given position at a given time should be stored in the same OME-TIFF file.
 
-The pipeline works using atomic [building blocks](https://spsalmon.github.io/towbintools_pipeline/buildingblock/), head to the **Building Block** section to learn more about them.
+The pipeline works using atomic [building blocks](https://spsalmon.github.io/towbintools_pipeline/building-blocks/buildingblock/), head to the **Building Block** section to learn more about them.
 
 After installing the pipeline you will find an example of a working pipeline for measuring organ and body size over development. Let's break it down!
 
@@ -64,7 +64,7 @@ sbatch_gpus: "rtx6000:1"
 Those options control the amount of RAM, CPU cores, and GPU allocated to each building block, as well as their time limit. GPUs will only get allocated to jobs that can make use of them (segmentation, molt detection, or
 custom script requiring GPU).
 
-After that, you should fill add the parameters for all of your building blocks. Those are described in detail [here](https://spsalmon.github.io/towbintools_pipeline/buildingblock/).
+After that, you should fill add the parameters for all of your building blocks. Those are described in detail [here](https://spsalmon.github.io/towbintools_pipeline/building-blocks/buildingblock/).
 
 ## Running the pipeline
 

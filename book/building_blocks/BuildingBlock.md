@@ -3,21 +3,20 @@
 A building block represents a single atomic task, such as : segment the first channel of those images, straighten the second channel of those images using this set of masks, etc.
 To be efficiently implemented, all workflows need to be divided into single building blocks.
 
-- [segmentation](https://spsalmon.github.io/towbintools_pipeline/segmentation/) : "segmentation" building block
-- [straightening](https://spsalmon.github.io/towbintools_pipeline/straightening/) : "straightening" building block
-- [morphology computation](https://spsalmon.github.io/towbintools_pipeline/morphologycomputation/) : "morphology_computation" building block
-- [quality_control](https://spsalmon.github.io/towbintools_pipeline/qualitycontrol/) : "classification" building block
-- **fluorescence quantification** : "fluorescence_quantification" building block
-- **molt detection** : "molt_detection" building block
-- **custom script** : "custom" building block (allowing you to run a foreign script as part of a pipeline)
+- [segmentation](https://spsalmon.github.io/towbintools_pipeline/building-blocks/segmentation/) : "segmentation" building block
+- [straightening](https://spsalmon.github.io/towbintools_pipeline/building-blocks/straightening/) : "straightening" building block
+- [morphology computation](https://spsalmon.github.io/towbintools_pipeline/building-blocks/morphology-computation/) : "morphology_computation" building block
+- [quality_control](https://spsalmon.github.io/towbintools_pipeline/building-blocks/quality-control/) : "classification" building block
+- [fluorescence quantification](https://spsalmon.github.io/towbintools_pipeline/building-blocks/fluorescence-quantification/) : "fluorescence_quantification" building block
+- [molt detection](https://spsalmon.github.io/towbintools_pipeline/building-blocks/molt-detection/) : "molt_detection" building block
+- [custom script](https://spsalmon.github.io/towbintools_pipeline/building-blocks/custom/) : "custom" building block (allowing you to run a foreign script as part of a pipeline)
 
 More may be added in the future and others might be merged together as to facilitate the creation of more complex and personalized pipelines.
 
 ## Configuration
 
 
-Configurations of all the building blocks are centralized in a big YAML configuration file. YAML is a human readable data serialization language (you can easily read it, a computer can to). Each configuration option is a list. By default those lists only contain 1 element (either an int, a string or another list). To reduce the size and redundency of the configurations, everything can be written in a factorized manner. If you have multiple building blocks of the same type in your analysis workflow, configuration options with **only one element** will be the same for all the building block of this type. For example : you have two segmentation blocks, the segmentation method is set to:
-
+Configurations of all the building blocks are centralized in a big YAML configuration file. YAML is a human readable data serialization language (you can easily read it, a computer can to). Each configuration option is a list. By default those lists only contain 1 element (either an int, a string or another list). To reduce the size and redundency of the configurations, everything can be written in a factorized manner. If you have multiple building blocks of the same type in your analysis workflow, configuration options with **only one element** will be the same for all the building block of this type. For example : you have two segmentation blocks, the segmentation method is set to.
 
 
 ```yaml
@@ -42,7 +41,7 @@ The first segmentation block would use deep learning and the second one would us
 
 Here is a small graphical explanation.
 
-![building_block_explanation](images/building_block_explanation.png)
+![building_block_explanation](../images/building_block_explanation.png)
 
 If you ever want to leave an option empty, use the keyword **null**.
 
