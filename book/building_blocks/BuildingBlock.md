@@ -5,10 +5,10 @@ To be efficiently implemented, all workflows need to be divided into single buil
 
 - [segmentation](https://spsalmon.github.io/towbintools_pipeline/building-blocks/segmentation/) : "segmentation" building block
 - [straightening](https://spsalmon.github.io/towbintools_pipeline/building-blocks/straightening/) : "straightening" building block
-- [morphology computation](https://spsalmon.github.io/towbintools_pipeline/building-blocks/morphology-computation/) : "morphology_computation" building block
-- [quality_control](https://spsalmon.github.io/towbintools_pipeline/building-blocks/quality-control/) : "classification" building block
-- [fluorescence quantification](https://spsalmon.github.io/towbintools_pipeline/building-blocks/fluorescence-quantification/) : "fluorescence_quantification" building block
-- [molt detection](https://spsalmon.github.io/towbintools_pipeline/building-blocks/molt-detection/) : "molt_detection" building block
+- [morphology computation](https://spsalmon.github.io/towbintools_pipeline/building-blocks/morphologycomputation/) : "morphology_computation" building block
+- [quality_control](https://spsalmon.github.io/towbintools_pipeline/building-blocks/qualitycontrol/) : "classification" building block
+- [fluorescence quantification](https://spsalmon.github.io/towbintools_pipeline/building-blocks/fluorescencequantification/) : "fluorescence_quantification" building block
+- [molt detection](https://spsalmon.github.io/towbintools_pipeline/building-blocks/moltdetection/) : "molt_detection" building block
 - [custom script](https://spsalmon.github.io/towbintools_pipeline/building-blocks/custom/) : "custom" building block (allowing you to run a foreign script as part of a pipeline)
 
 More may be added in the future and others might be merged together as to facilitate the creation of more complex and personalized pipelines.
