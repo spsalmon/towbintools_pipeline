@@ -59,12 +59,13 @@ def quantify_fluorescence_from_file_path(
     return measurements
 
 
-def main(input_pickle, output_file, block_config, n_jobs):
+def main(input_pickle, output_file, block_config, config, n_jobs):
     """Main function."""
     block_config = utils.load_pickles(block_config)[0]
+    config = utils.load_pickles(config)[0]
 
-    time_regex = block_config.get("time_regex", r"Time(\d+)")
-    point_regex = block_config.get("point_regex", r"Point(\d+)")
+    time_regex = config.get("time_regex", r"Time(\d+)")
+    point_regex = config.get("point_regex", r"Point(\d+)")
 
     input_files = utils.load_pickles(input_pickle)[0]
     source_files = [f["source_image_path"] for f in input_files]
@@ -108,4 +109,4 @@ def main(input_pickle, output_file, block_config, n_jobs):
 
 if __name__ == "__main__":
     args = utils.basic_get_args()
-    main(args.input, args.output, args.block_config, args.n_jobs)
+    main(args.input, args.output, args.block_config, args.config, args.n_jobs)

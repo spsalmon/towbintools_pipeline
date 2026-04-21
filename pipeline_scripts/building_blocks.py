@@ -164,7 +164,7 @@ class BuildingBlock(ABC):
         if script_path.endswith(".sh"):
             command = f"bash {script_path} --input {input_pickle_path} -output {output_pickle_path} --block_config {pickled_block_config} --config {pickled_config}"
         elif script_path.endswith(".py"):
-            command = f"{micromamba_path} run -n towbintools python3 {script_path} --input {input_pickle_path} --output {output_pickle_path} --block_config {pickled_block_config} --config {pickled_config} -n_jobs {config['sbatch_cpus']}"
+            command = f"{micromamba_path} run -n towbintools python3 {script_path} --input {input_pickle_path} --output {output_pickle_path} --block_config {pickled_block_config} --config {pickled_config} --n_jobs {config['sbatch_cpus']}"
         else:
             raise ValueError(
                 f"Script type of {script_path} is not supported. The pipeline only supports bash or python scripts."
