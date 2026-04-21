@@ -292,10 +292,11 @@ def compute_features_at_molt(analysis_filemap, molt_dataframe, point):
     return features_at_molt
 
 
-def main(input_dataframe_path, output_file, block_config, n_jobs):
+def main(input_dataframe_path, output_file, block_config, config, n_jobs):
     """Main function."""
 
     block_config = utils.load_pickles(block_config)[0]
+    config = utils.load_pickles(config)[0]
 
     method = block_config.get("molt_detection_method", "legacy")
 
@@ -368,4 +369,4 @@ def main(input_dataframe_path, output_file, block_config, n_jobs):
 
 if __name__ == "__main__":
     args = utils.basic_get_args()
-    main(args.input, args.output, args.block_config, args.n_jobs)
+    main(args.input, args.output, args.block_config, args.config, args.n_jobs)

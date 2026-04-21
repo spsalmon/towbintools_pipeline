@@ -9,17 +9,18 @@ from joblib import delayed
 from joblib import load
 from joblib import Parallel
 from towbintools.classification.qc_tools import compute_qc_features
+from towbintools.foundation.file_handling import extract_time_point
 from towbintools.foundation.file_handling import write_filemap
-from utils import extract_time_point
 
 
-def main(input_pickle, output_file, block_config, filemap, n_jobs=-1):
+def main(input_pickle, output_file, block_config, config, filemap, n_jobs=-1):
     """Main function."""
 
     block_config = utils.load_pickles(block_config)[0]
+    config = utils.load_pickles(config)[0]
 
-    time_regex = block_config.get("time_regex", r"Time(\d+)")
-    point_regex = block_config.get("point_regex", r"Point(\d+)")
+    time_regex = config.get("time_regex", r"Time(\d+)")
+    point_regex = config.get("point_regex", r"Point(\d+)")
 
     input_files = utils.load_pickles(input_pickle)[0]
     input_images = [f["image_path"] for f in input_files]
@@ -153,4 +154,11 @@ def main(input_pickle, output_file, block_config, filemap, n_jobs=-1):
 
 if __name__ == "__main__":
     args = utils.basic_get_args()
-    main(args.input, args.output, args.block_config, args.filemap, args.n_jobs)
+    main(
+        args.input,
+        args.output,
+        args.block_config,
+        args.config,
+        args.filemap,
+        args.n_jobs,
+    )

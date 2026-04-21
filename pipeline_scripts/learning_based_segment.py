@@ -8,7 +8,7 @@ import utils
 from cv2 import resize
 from joblib import delayed
 from joblib import Parallel
-from joblib import parallel_block_config
+from joblib import parallel_config
 from tifffile import imwrite
 from torch.utils.data import DataLoader
 from towbintools.deep_learning.deep_learning_tools import (
@@ -193,7 +193,7 @@ def main(input_pickle, output_pickle, block_config, n_jobs):
                                 )
                             predictions = list(predictions)
 
-                    with parallel_block_config(backend="threading", n_jobs=n_jobs // 2):
+                    with parallel_config(backend="threading", n_jobs=n_jobs // 2):
                         Parallel()(
                             delayed(save_prediction)(prediction, output_path)
                             for prediction, output_path in zip(
