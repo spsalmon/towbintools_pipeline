@@ -28,18 +28,19 @@ def load_pickles(*pickle_paths):
 def get_args():
     parser = argparse.ArgumentParser()
     parser.add_argument("-f", "--filemap", type=str, help="pickled filemap")
+    parser.add_argument("-b", "--block_config", type=str, help="pickled block config")
     parser.add_argument("-c", "--config", type=str, help="pickled config")
     parser.add_argument("-o", "--output", type=str, help="output")
     parser.add_argument(
-        "--input-column", type=str, help="column in filemap to use as input"
+        "--input_column", type=str, help="column in filemap to use as input"
     )
     parser.add_argument(
-        "--frame-rate", type=float, help="frame rate of the input movies"
+        "--frame_rate", type=float, help="frame rate of the input movies"
     )
     parser.add_argument("--height", type=int, help="minimum height for peak detection")
     parser.add_argument("--width", type=int, help="minimum width for peak detection")
     parser.add_argument(
-        "--std-coeff",
+        "--std_coeff",
         type=float,
         help="coefficient of standard deviation for peak detection prominence",
     )

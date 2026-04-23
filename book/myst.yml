@@ -37,7 +37,7 @@ project:
         - file: building_blocks/QualityControl.ipynb
         - file: building_blocks/FluorescenceQuantification.ipynb
         - file: building_blocks/MoltDetection.ipynb
-        # - file: building_blocks/CustomBlock.md
+        - file: building_blocks/Custom.ipynb
 site:
   options:
     logo: images/logo_dark.png

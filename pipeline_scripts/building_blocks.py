@@ -626,7 +626,7 @@ class CustomBuildingBlock(BuildingBlock):
         input_pickle_path,
         output_pickle_path,
         pickled_block_config,
-        config,
+        pickled_config,
         pickled_filemap_path=None,
     ):
         custom_script_path = self.block_config["custom_script_path"]
@@ -637,9 +637,9 @@ class CustomBuildingBlock(BuildingBlock):
         )
 
         if custom_script_path.endswith(".sh"):
-            command = f"bash {custom_script_path} -f {input_pickle_path} -o {output_pickle_path} {custom_script_parameters}"
+            command = f"bash {custom_script_path} --filemap {input_pickle_path} --output {output_pickle_path} --block_config {pickled_block_config} --config {pickled_config} {custom_script_parameters}"
         elif custom_script_path.endswith(".py"):
-            command = f"{micromamba_path} run -n towbintools python3 {custom_script_path} -f {input_pickle_path} -c {pickled_block_config} -o {output_pickle_path} {custom_script_parameters}"
+            command = f"{micromamba_path} run -n towbintools python3 {custom_script_path} --filemap {input_pickle_path} --block_config {pickled_block_config} --output {output_pickle_path} --config {pickled_config} {custom_script_parameters}"
         else:
             print(
                 f"Script type of {custom_script_path} is not supported. The pipeline only supports bash or python scripts."

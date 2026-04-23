@@ -4,14 +4,20 @@ raw_dir_name: "raw"
 report_format: "parquet"
 pixelsize: [ 0.65 ]
 
-#########################################################################################################
-################################# IMAGE ANALYSIS PIPELINE CONFIGURATION #################################
-#########################################################################################################
-
 get_experiment_time: True
 
 time_regex: 'Time(\d+)'
 point_regex: 'Point(\d+)'
+
+# SLURM parameters
+sbatch_memory: 64G
+sbatch_time: 0-48:00:00
+sbatch_cpus: 32
+sbatch_gpus: "rtx6000:1"
+
+#########################################################################################################
+################################# IMAGE ANALYSIS PIPELINE CONFIGURATION #################################
+#########################################################################################################
 
 building_blocks:
   - "segmentation"
@@ -30,9 +36,9 @@ building_blocks:
 rerun_segmentation: [ False ]
 rerun_straightening: [ False ]
 rerun_morphology_computation: [ False ]
+rerun_fluorescence_quantification: [ False ]
 rerun_quality_control: [ False ]
 rerun_molt_detection: [ False ]
-rerun_fluorescence_quantification: [ False ]
 
 # segmentation parameters
 segmentation_column: [ 'raw' ]
@@ -69,9 +75,3 @@ fluorescence_quantification_source: [ [ 'raw', 0 ] ]
 fluorescence_quantification_masks: [ 'analysis/ch2_seg' ]
 fluorescence_quantification_aggregations: [ ['sum', 'std', 'mean'] ]
 fluorescence_background_aggregation: [ 'median' ]
-
-# sbatch parameters
-sbatch_memory: 64G
-sbatch_time: 0-48:00:00
-sbatch_cpus: 32
-sbatch_gpus: "rtx6000:1"

@@ -2,13 +2,13 @@
 
 ## Building your configuration
 
-The pipeline is configure using YAML files.
+The pipeline is configured using YAML files.
 For now, the basic assumption is that your images follow this specific naming scheme : TimeX_PointY_(...).tiff where Time refers to the index in your time loop and Point is the number that we will use as
-the unique identifier for the position (individual worm if each position contains one worm). All images (planes, channels, etc.) for a given position at a given time should be stored in the same OME-TIFF file.
+the unique identifier for the position (individual worm if each position contains one worm). All images (planes, channels, etc.) for a given position at a given time should be stored in the same OME-TIFF file. For more details on input formats and assumptions, head to [pipeline input](https://spsalmon.github.io/towbintools_pipeline/usage/pipelineinput/).
 
 The pipeline works using atomic [building blocks](https://spsalmon.github.io/towbintools_pipeline/building-blocks/buildingblock/), head to the **Building Block** section to learn more about them.
 
-After installing the pipeline you will find an example of a working pipeline for measuring organ and body size over development. Let's break it down!
+After installing the pipeline you will find an example of a working configuration for measuring organ and body size over  in the 'configs/' directory. Let's break it down!
 
 ```yaml
 experiment_dir: "/mnt/towbin.data/shared/spsalmon/pipeline_test_folder/"
@@ -33,6 +33,17 @@ point_regex: 'Point(\d+)'
 If you have different imaging modalities during your timelapse (let's say you acquire a picture of each worm every 10 minutes but also take a Z-stack every hour), you should split them in different raw directories (e.g. raw and raw_stack). You can then run a pipeline for each of those directories and merge them at the end simply by joining the two dataframes.
 
 ```yaml
+use_slurm: True
+sbatch_memory: 64G
+sbatch_time: 0-48:00:00
+sbatch_cpus: 32
+sbatch_gpus: "rtx6000:1"
+```
+
+Those options control the amount of RAM, CPU cores, and GPU allocated to each building block, as well as their time limit. GPUs will only get allocated to jobs that can make use of them (segmentation, molt detection, or
+custom script requiring GPU). If you don't have access to a cluster and want to run the pipeline on your local machine, simply set **use_slurm** to False and the building blocks will be run sequentially (NOT IMPLEMENTED YET).
+
+```yaml
 building_blocks:
   - "segmentation"
   - "segmentation"
@@ -51,24 +62,28 @@ rerun_segmentation: [ False ]
 rerun_straightening: [ False ]
 rerun_morphology_computation: [ False ]
 rerun_quality_control: [ False ]
+rerun_fluorescence_quantification: [ False ]
+rerun_quality_control: [ False ]
 rerun_molt_detection: [ False ]
 ```
 
 - **building_blocks** : the list of atomic tasks that you want the pipeline to perform. In this case, 2 segmentations, 3 straightenings, etc.
 - **rerun** : if False, images that were already processed will be skipped, only missing ones will be processed. For blocks like morphology_computation, the whole block is skipped if the resulting file "(...).csv" already exists. If true, everything is reprocessed.
 
+After that, you should fill add the parameters for all of your building blocks. Those are described in detail [here](https://spsalmon.github.io/towbintools_pipeline/building-blocks/buildingblock/). Here is an example of configuration for the two segmentation blocks:
+
 ```yaml
-sbatch_memory: 64G
-sbatch_time: 0-48:00:00
-sbatch_cpus: 32
-sbatch_gpus: "rtx6000:1"
+# segmentation parameters
+segmentation_column: [ 'raw' ]
+segmentation_name_suffix: [ null ]
+segmentation_method: [ "deep_learning" ]
+segmentation_channels: [ [ 1 ], [ 0 ] ]
+
+
+# deep learning segmentation parameters
+model_path: [ "/mnt/towbin.data/shared/spsalmon/towbinlab_segmentation_database/models/paper/body/towbintools_medium/best_light.ckpt", "/mnt/towbin.data/shared/spsalmon/towbinlab_segmentation_database/models/paper/pharynx/towbintools_medium/best_light.ckpt" ]
+batch_size: [ 4 ]
 ```
-
-Those options control the amount of RAM, CPU cores, and GPU allocated to each building block, as well as their time limit. GPUs will only get allocated to jobs that can make use of them (segmentation, molt detection, or
-custom script requiring GPU).
-
-After that, you should fill add the parameters for all of your building blocks. Those are described in detail [here](https://spsalmon.github.io/towbintools_pipeline/building-blocks/buildingblock/).
-
 ## Running the pipeline
 
 Once your configuration is finished, you can save it anywhere. Let's assume you saved it in ~/towbintools_pipeline/configs/my_configuration.yaml. I recommend picking a folder where you will centralize all your configuration. The configuration you run on an experiment will always be backed up in the analysis/report folder of said experiment. To run this specific configuration :
