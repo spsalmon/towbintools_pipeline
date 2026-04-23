@@ -6,11 +6,11 @@ from shiny import App
 recompute_features_at_molt = False
 
 filemap_path = r"/mnt/towbin.data/shared/fdell/Starvation_recovery_wild_strains/20260327_orca_0day/analysis/report/analysis_filemap.csv"
-
+open_annotated = True
 print("Opening the filemap ...")
 
 filemap, filemap_save_path = open_filemap(
-    filemap_path, open_annotated=True, lazy_loading=False
+    filemap_path, open_annotated=open_annotated, lazy_loading=False
 )
 
 print("Creating the app ...")
