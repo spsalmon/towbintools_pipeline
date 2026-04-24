@@ -16,6 +16,7 @@ project:
         - file: usage/PipelineInput.md
         - file: usage/PipelineOutput.md
         - file: usage/UsingGUI.md
+        - file: usage/Plotting.md
     - title: Training
       children:
         - file: training/Training.md

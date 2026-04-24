@@ -12,6 +12,15 @@ from shinywidgets import output_widget
 def create_molt_annotator(ecdysis_list_id, custom_columns_choices):
     return ui.column(
         7,
+        ui.tags.script("""
+        Shiny.addCustomMessageHandler('resize_plot', function(msg) {
+            var el = document.getElementById('plot_curve');
+            if (el) {
+                el.style.height = msg.height + 'px';
+                el.style.width  = msg.width  + 'px';
+            }
+        });
+        """),
         ui.row(output_widget("plot_curve")),
         ui.row(
             [molt_annotation_buttons(molt, molt=molt) for molt in ecdysis_list_id],
