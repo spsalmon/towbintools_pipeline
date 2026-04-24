@@ -136,7 +136,7 @@ def time_point_navigator_server(
             raise ValueError("You need to specify which dataframe to save")
         if index() != "":
             df_list = all_df()
-            df_list[index()] = current_df()
+            df_list[int(index())] = current_df()
             all_df.set(df_list)
 
     @reactive.Effect

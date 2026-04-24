@@ -1,20 +1,19 @@
+import os
+
 from app_components.backend import open_filemap
 from app_components.server import main_server
 from app_components.ui import initialize_ui
 from shiny import App
 
-recompute_features_at_molt = False
+recompute_features_at_molt = os.environ.get("RECOMPUTE_FEATURES", "0") == "1"
+open_annotated = os.environ.get("OPEN_ANNOTATED", "1") == "1"
+filemap_path = os.environ.get("FILEMAP_PATH", "")
 
-filemap_path = r"/mnt/towbin.data/shared/fdell/Starvation_recovery_wild_strains/20260327_orca_0day/analysis/report/analysis_filemap.csv"
-open_annotated = True
 print("Opening the filemap ...")
-
 filemap, filemap_save_path = open_filemap(
     filemap_path, open_annotated=open_annotated, lazy_loading=False
 )
-
 print("Creating the app ...")
-
 (
     app_ui,
     filemap,
@@ -27,7 +26,7 @@ print("Creating the app ...")
 ) = initialize_ui(filemap, recompute_features_at_molt=recompute_features_at_molt)
 
 
-def s(input, output, session):
+def server(input, output, session):
     return main_server(
         input,
         output,
@@ -43,4 +42,4 @@ def s(input, output, session):
     )
 
 
-app = App(app_ui, s)
+app = App(app_ui, server)
