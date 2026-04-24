@@ -1,3 +1,4 @@
+import asyncio
 import traceback
 
 import matplotlib.pyplot as plt
@@ -126,6 +127,25 @@ def main_server(
     latest_single_values = {"value": None}
     latest_single_values_df = {"value": None}
     latest_work_df = {"value": None}
+
+    _fig = go.FigureWidget()
+    _fig.add_trace(go.Scatter(x=[], y=[], mode="markers", name="data"))  # trace 0: data
+    _fig.add_trace(
+        go.Scatter(
+            x=[],
+            y=[],
+            mode="markers",  # trace 1: molt markers
+            hoverinfo="none",
+            hoverlabel=None,
+            hoveron=None,
+        )
+    )
+
+    def _on_click(trace, points, selector):
+        for x in points.xs:
+            clicked_time.set(str(x))
+
+    _fig.data[0].on_click(_on_click)
 
     @reactive.Effect
     def cache_latest_for_save():
@@ -737,128 +757,44 @@ def main_server(
 
         return fig
 
-    @reactive.calc
-    def create_figure():
-        print("create_figure")
-        data_of_point = current_point_filemap().select(
-            pl.col(
-                [
-                    "Time",
-                    input.column_to_plot(),
-                    "HatchTime",
-                    "M1",
-                    "M2",
-                    "M3",
-                    "M4",
-                ]
-            )
+    @output
+    @render_widget
+    def plot_curve():
+        return _fig
+
+    @reactive.Effect
+    def _update_plot_container_size():
+        h = input.curve_plot_height()
+        w = input.curve_plot_width()
+        with _fig.batch_update():
+            _fig.update_layout(height=h, width=w)
+        asyncio.ensure_future(
+            session.send_custom_message("resize_plot", {"height": h, "width": w})
         )
 
-        times_of_point = data_of_point.select(pl.col("Time")).to_numpy().squeeze()
-        values_of_point = (
-            data_of_point.select(pl.col(input.column_to_plot())).to_numpy().squeeze()
-        )
+    def _is_finite_number(val):
+        try:
+            return np.isfinite(float(val))
+        except (TypeError, ValueError):
+            return False
 
-        fig = go.FigureWidget()
+    @reactive.Effect
+    def _update_curve():
+        # --- data trace ---
+        col = input.column_to_plot()
+        pf = current_point_filemap()
 
-        fig.add_trace(
-            go.Scatter(
-                x=times_of_point,
-                y=values_of_point,
-                mode="markers",
-                # marker=markers,
-            )
-        )
+        times_of_point = pf.select(pl.col("Time")).to_numpy().squeeze()
+        values_of_point = pf.select(pl.col(col)).to_numpy().squeeze()
 
-        def update_selected_time(trace, points, selector):
-            print("update_selected_time")
-            for point in points.xs:
-                clicked_time.set(str(point))
-
-        fig.data[0].on_click(update_selected_time)
-
-        if ignore_start() != "":
-            if not np.isnan(float(ignore_start())):
-                fig.update_layout(
-                    shapes=[
-                        dict(
-                            type="rect",
-                            xref="x",
-                            yref="paper",
-                            x0=float(ignore_start()),
-                            x1=max(data_of_point["Time"]) + 1,
-                            y0=0,
-                            y1=1,
-                            fillcolor="gray",
-                            opacity=0.5,
-                            layer="above",
-                            line_width=0,
-                        )
-                    ]
-                )
-
-        if death() != "":
-            if not np.isnan(float(death())):
-                fig.add_shape(
-                    dict(
-                        type="line",
-                        xref="x",
-                        yref="paper",
-                        x0=float(death()),
-                        y0=0,
-                        x1=float(death()),
-                        y1=1,
-                        line=dict(color="black", width=2),
-                    )
-                )
-
-        if arrest() != "" and arrest():
-            fig.add_shape(
-                dict(
-                    type="rect",
-                    xref="paper",
-                    yref="paper",
-                    x0=0,
-                    x1=1,
-                    y0=0,
-                    y1=1,
-                    fillcolor="red",
-                    opacity=0.5,
-                    layer="above",
-                    line_width=0,
-                )
-            )
-
-        return fig
-
-    @reactive.calc
-    def get_markers():
-        print("get_markers")
-        qc_columns = [col for col in current_point_filemap().columns if "qc" in col]
+        # markers
+        qc_columns = [c for c in pf.columns if "qc" in c]
         if len(qc_columns) == 0:
             qc_column = qc_columns[0]
         else:
-            qc_column = find_best_string_match(input.column_to_plot(), qc_columns)
+            qc_column = find_best_string_match(col, qc_columns)
 
-        data_of_point = current_point_filemap().select(
-            pl.col(
-                [
-                    "Time",
-                    input.column_to_plot(),
-                    qc_column,
-                    "HatchTime",
-                    "M1",
-                    "M2",
-                    "M3",
-                    "M4",
-                ]
-            )
-        )
-
-        times_of_point = data_of_point.select(pl.col("Time")).to_numpy().squeeze()
-        qcs_of_point = data_of_point.select(pl.col(qc_column)).to_numpy().squeeze()
-
-        custom_annotations_of_point = custom_column_values()
+        qcs_of_point = pf.select(pl.col(qc_column)).to_numpy().squeeze()
         markers = set_marker_shape(
             times_of_point,
             current_time_index(),
@@ -868,16 +804,13 @@ def main_server(
             m2(),
             m3(),
             m4(),
-            custom_annotations=custom_annotations_of_point,
+            custom_annotations=custom_column_values(),
         )
-        return markers
 
-    @reactive.calc
-    def get_molt_scatter():
-        print("get_molt_scatter")
+        # molt scatter
         (
-            ecdys_list,
-            value_at_ecdys_list,
+            ecdys_x,
+            ecdys_y,
             symbols,
             colors,
             sizes,
@@ -895,58 +828,196 @@ def main_server(
             value_at_m4(),
         )
 
-        return go.Scatter(
-            x=ecdys_list,
-            y=value_at_ecdys_list,
-            mode="markers",
-            marker=dict(
+        # shapes (ignore region, death line, arrest overlay)
+        shapes = []
+        if _is_finite_number(ignore_start()):
+            shapes.append(
+                dict(
+                    type="rect",
+                    xref="x",
+                    yref="paper",
+                    x0=float(ignore_start()),
+                    x1=float(max(times_of_point)) + 1,
+                    y0=0,
+                    y1=1,
+                    fillcolor="gray",
+                    opacity=0.5,
+                    layer="above",
+                    line_width=0,
+                )
+            )
+        if _is_finite_number(death()):
+            shapes.append(
+                dict(
+                    type="line",
+                    xref="x",
+                    yref="paper",
+                    x0=float(death()),
+                    y0=0,
+                    x1=float(death()),
+                    y1=1,
+                    line=dict(color="black", width=2),
+                )
+            )
+
+        arrest_shapes = []
+        if arrest() != "" and arrest():
+            arrest_shapes.append(
+                dict(
+                    type="rect",
+                    xref="paper",
+                    yref="paper",
+                    x0=0,
+                    x1=1,
+                    y0=0,
+                    y1=1,
+                    fillcolor="red",
+                    opacity=0.5,
+                    layer="above",
+                    line_width=0,
+                )
+            )
+
+        with _fig.batch_update():
+            _fig.layout.shapes = []  # clear first
+            _fig.data[0].x = times_of_point
+            _fig.data[0].y = values_of_point
+            _fig.data[0].marker = markers
+
+            _fig.data[1].x = ecdys_x
+            _fig.data[1].y = ecdys_y
+            _fig.data[1].marker = dict(
                 symbol=symbols,
                 size=sizes,
                 color=colors,
                 line=dict(width=widths, color=colors),
-            ),
-            hoverinfo="none",  # Disable hover information
-            hoverlabel=None,  # Disable hover label
-            hoveron=None,  # Disable hover interaction
-        )
+            )
 
-    @output
-    @render_widget
-    def plot_curve():
-        print("plot_curve")
-        fig = create_figure()
-        markers = get_markers()
-
-        # if the figure only has one trace, we can add the scatter trace
-        molt_scatter = get_molt_scatter()
-
-        if len(fig.data) == 1:
-            fig.add_trace(molt_scatter)
-        else:
-            # check if the scatter changed
-            if not np.array_equal(fig.data[1].x, molt_scatter.x) or not np.array_equal(
-                fig.data[1].y, molt_scatter.y
-            ):
-                data = list(fig.data)
-                data.pop(1)  # Remove the second trace
-                fig.data = data
-                fig.add_trace(molt_scatter)
-
-        # Instead of modifying fig.data[0].marker in-place, use update_traces
-        fig.update_traces(marker=markers, selector=0)
-
-        fig.update_layout(
+        _fig.update_layout(
             xaxis_title="Time",
-            yaxis_title=input.column_to_plot(),
+            yaxis_title=col,
             margin=dict(l=20, r=20, t=50, b=50),
-            height=input.curve_plot_height(),
-            width=input.curve_plot_width(),
             showlegend=False,
             yaxis_type="log" if input.log_scale() else "linear",
-            autosize=False,
+            shapes=shapes + arrest_shapes,
         )
 
-        return fig
+    # @reactive.calc
+    # def get_markers():
+    #     print("get_markers")
+    #     qc_columns = [col for col in current_point_filemap().columns if "qc" in col]
+    #     if len(qc_columns) == 0:
+    #         qc_column = qc_columns[0]
+    #     else:
+    #         qc_column = find_best_string_match(input.column_to_plot(), qc_columns)
+
+    #     data_of_point = current_point_filemap().select(
+    #         pl.col(
+    #             [
+    #                 "Time",
+    #                 input.column_to_plot(),
+    #                 qc_column,
+    #                 "HatchTime",
+    #                 "M1",
+    #                 "M2",
+    #                 "M3",
+    #                 "M4",
+    #             ]
+    #         )
+    #     )
+
+    #     times_of_point = data_of_point.select(pl.col("Time")).to_numpy().squeeze()
+    #     qcs_of_point = data_of_point.select(pl.col(qc_column)).to_numpy().squeeze()
+
+    #     custom_annotations_of_point = custom_column_values()
+    #     markers = set_marker_shape(
+    #         times_of_point,
+    #         current_time_index(),
+    #         qcs_of_point,
+    #         hatch(),
+    #         m1(),
+    #         m2(),
+    #         m3(),
+    #         m4(),
+    #         custom_annotations=custom_annotations_of_point,
+    #     )
+    #     return markers
+
+    # @reactive.calc
+    # def get_molt_scatter():
+    #     print("get_molt_scatter")
+    #     (
+    #         ecdys_list,
+    #         value_at_ecdys_list,
+    #         symbols,
+    #         colors,
+    #         sizes,
+    #         widths,
+    #     ) = get_points_for_value_at_molts(
+    #         hatch(),
+    #         m1(),
+    #         m2(),
+    #         m3(),
+    #         m4(),
+    #         value_at_hatch(),
+    #         value_at_m1(),
+    #         value_at_m2(),
+    #         value_at_m3(),
+    #         value_at_m4(),
+    #     )
+
+    #     return go.Scatter(
+    #         x=ecdys_list,
+    #         y=value_at_ecdys_list,
+    #         mode="markers",
+    #         marker=dict(
+    #             symbol=symbols,
+    #             size=sizes,
+    #             color=colors,
+    #             line=dict(width=widths, color=colors),
+    #         ),
+    #         hoverinfo="none",  # Disable hover information
+    #         hoverlabel=None,  # Disable hover label
+    #         hoveron=None,  # Disable hover interaction
+    #     )
+
+    # @output
+    # @render_widget
+    # def plot_curve():
+    #     print("plot_curve")
+    #     fig = create_figure()
+    #     markers = get_markers()
+
+    #     # if the figure only has one trace, we can add the scatter trace
+    #     molt_scatter = get_molt_scatter()
+
+    #     if len(fig.data) == 1:
+    #         fig.add_trace(molt_scatter)
+    #     else:
+    #         # check if the scatter changed
+    #         if not np.array_equal(fig.data[1].x, molt_scatter.x) or not np.array_equal(
+    #             fig.data[1].y, molt_scatter.y
+    #         ):
+    #             data = list(fig.data)
+    #             data.pop(1)  # Remove the second trace
+    #             fig.data = data
+    #             fig.add_trace(molt_scatter)
+
+    #     # Instead of modifying fig.data[0].marker in-place, use update_traces
+    #     fig.update_traces(marker=markers, selector=0)
+
+    #     fig.update_layout(
+    #         xaxis_title="Time",
+    #         yaxis_title=input.column_to_plot(),
+    #         margin=dict(l=20, r=20, t=50, b=50),
+    #         height=input.curve_plot_height(),
+    #         width=input.curve_plot_width(),
+    #         showlegend=False,
+    #         yaxis_type="log" if input.log_scale() else "linear",
+    #         autosize=False,
+    #     )
+
+    #     return fig
 
     def save_on_session_end():
         save_filemap(
