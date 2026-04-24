@@ -149,15 +149,17 @@ def main_server(
 
     @reactive.Effect
     def cache_latest_for_save():
-        latest_point["value"] = current_point_index()
+        latest_point["value"] = int(current_point_index())
         latest_single_values["value"] = single_values_of_point()
         latest_single_values_df["value"] = single_values_of_points()
         latest_work_df["value"] = work_df()
 
     @reactive.Effect
     def update_point_filemap():
-        current_point_filemap.set(point_filemaps[current_point_index()])
-        single_values_of_point.set(single_values_of_points()[current_point_index()])
+        current_point_filemap.set(point_filemaps[int(current_point_index())])
+        single_values_of_point.set(
+            single_values_of_points()[int(current_point_index())]
+        )
 
     @reactive.Effect
     def update_column_to_plot():
@@ -325,7 +327,7 @@ def main_server(
         print(f"Saving filemap to {filemap_save_path} ...")
 
         # because the list of single values is only updated when the point is changed, change it here to make sure to include the latest changes
-        single_values_df[current_index] = current_single_values_df
+        single_values_df[int(current_index)] = current_single_values_df
 
         single_values_columns = single_values_df[0].columns
         single_values_columns.remove("Point")
