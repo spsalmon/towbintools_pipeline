@@ -792,7 +792,7 @@ def main_server(
 
         # markers
         qc_columns = [c for c in pf.columns if "qc" in c]
-        if len(qc_columns) == 0:
+        if len(qc_columns) == 1:
             qc_column = qc_columns[0]
         else:
             qc_column = find_best_string_match(col, qc_columns)
@@ -1033,3 +1033,4 @@ def main_server(
         )
 
     session.on_ended(save_on_session_end)
+    return save_on_session_end  # return so the SIGINT handler can call it directly
