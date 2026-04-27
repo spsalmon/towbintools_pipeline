@@ -30,10 +30,10 @@ def get_backup_path(filemap_folder, filemap_name, filemap_extension):
     else:
         iteration = int(match.group(1))
 
-    filemap_save_path = f"{filemap_name}_v{iteration}.{filemap_extension}"
+    filemap_save_path = f"{filemap_name}_v{iteration}{filemap_extension}"
     while os.path.exists(os.path.join(filemap_folder, filemap_save_path)):
         iteration += 1
-        filemap_save_path = f"{filemap_name}_v{iteration}.{filemap_extension}"
+        filemap_save_path = f"{filemap_name}_v{iteration}{filemap_extension}"
 
     filemap_save_path = os.path.join(filemap_folder, filemap_save_path)
     return filemap_save_path

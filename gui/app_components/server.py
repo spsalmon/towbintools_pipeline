@@ -173,65 +173,77 @@ def main_server(
         if file is None:
             return
 
-        (
-            _,
-            _,
-            _,
-            custom_columns_choices,
-            _,
-            _,
-        ) = populate_column_choices(filemap)
-
+        _, _, _, custom_columns_choices, _, _ = populate_column_choices(filemap)
         datapath = file[0]["datapath"]
+
         if datapath.endswith(".csv") or datapath.endswith(".parquet"):
-            print(f"Importing molts from {datapath} ...")
+            print(f"Importing annotations from {datapath} ...")
             imported_df = read_filemap(datapath)
 
-            work_df_columns = [
-                "Death",
-                "Ignore",
-                "Arrest",
-            ] + custom_columns_choices
-
-            missing_work_df_columns = [
-                col for col in work_df_columns if col not in imported_df.columns
-            ]
-
             current_work_df = work_df()
-
-            for col in missing_work_df_columns:
+            for col in ["Death", "Ignore", "Arrest"] + custom_columns_choices:
+                if col in imported_df.columns:
+                    continue
                 if col in current_work_df.columns:
                     value = current_work_df.select(pl.col(col)).to_numpy().squeeze()
-
+                elif col == "Death":
+                    value = np.nan
+                elif col in ("Ignore", "Arrest"):
+                    value = False
                 else:
-                    if col == "Death":
-                        value = np.nan
-                    elif col == "Ignore":
-                        value = False
-                    elif col == "Arrest":
-                        value = False
-                    else:
-                        value = np.nan
-
+                    value = np.nan
                 imported_df = imported_df.with_columns(pl.lit(value).alias(col))
 
-            necessary_columns = ["ExperimentTime"] + feature_columns
-            missing_columns = [
-                col for col in necessary_columns if col not in imported_df.columns
-            ]
-
-            for col in missing_columns:
-                value = filemap.select(pl.col(col)).to_numpy().squeeze()
-                imported_df = imported_df.with_columns(pl.lit(value).alias(col))
+            for col in ["ExperimentTime"] + feature_columns:
+                if col not in imported_df.columns:
+                    imported_df = imported_df.with_columns(
+                        pl.lit(filemap.select(pl.col(col)).to_numpy().squeeze()).alias(
+                            col
+                        )
+                    )
 
             imported_df = process_feature_at_molt_columns(
-                imported_df,
-                feature_columns,
-                recompute_features_at_molt=False,
+                imported_df, feature_columns, recompute_features_at_molt=False
             )
 
-            new_work_df = imported_df.select(pl.col(columns_to_get_unique))
-            work_df.set(new_work_df)
+            work_cols = list(
+                dict.fromkeys(
+                    [c for c in columns_to_get_unique if c in imported_df.columns]
+                    + [
+                        c
+                        for c in ["Death", "Ignore", "Arrest"]
+                        if c in imported_df.columns
+                    ]
+                )
+            )
+            work_cols_to_update = [c for c in work_cols if c not in ("Point", "Time")]
+            new_work_df = imported_df.select(pl.col(work_cols))
+
+            import_keys = new_work_df.select(["Point", "Time"]).with_columns(
+                pl.lit(True).alias("_in_import")
+            )
+            tagged = current_work_df.join(
+                import_keys, on=["Point", "Time"], how="left"
+            ).join(
+                new_work_df.select(["Point", "Time"] + work_cols_to_update),
+                on=["Point", "Time"],
+                how="left",
+                suffix="_new",
+            )
+            update_exprs = [
+                pl.when(pl.col("_in_import"))
+                .then(pl.col(f"{c}_new"))
+                .otherwise(pl.col(c))
+                .alias(c)
+                for c in work_cols_to_update
+                if c in current_work_df.columns
+            ]
+            drop_cols = ["_in_import"] + [
+                f"{c}_new" for c in work_cols_to_update if c in current_work_df.columns
+            ]
+            work_df.set(tagged.with_columns(update_exprs).drop(drop_cols))
+
+            import_single_values_df = build_single_values_df(imported_df)
 
         elif datapath.endswith(".mat"):
             matlab_report = sio.loadmat(datapath, chars_as_strings=False)
@@ -239,52 +251,67 @@ def main_server(
             for key, value in matlab_report.items():
                 if key.startswith("__"):
                     continue
-                try:
-                    new_key = KEY_CONVERSION_MAP.get(key)
+                new_key = KEY_CONVERSION_MAP.get(key)
+                if new_key:
                     new_matlab_report[new_key] = value
-                except Exception as e:
-                    print(f"Error converting key {key}: {e}")
 
             try:
                 ecdysis = new_matlab_report["ecdysis"]
-                ecdysis_df = pl.DataFrame(
-                    {
-                        "Point": range(len(ecdysis)),
-                        **{
-                            column: [
-                                (
-                                    float(molts[i]) - 1
-                                    if not np.isnan(molts[i])
-                                    else np.nan
-                                )
-                                for molts in ecdysis
-                            ]
-                            for i, column in enumerate(ECDYSIS_COLUMNS)
-                        },
-                    }
-                )
-
-                updated_filemap = filemap.drop(ECDYSIS_COLUMNS).join(
-                    ecdysis_df, on="Point", how="left"
-                )
             except KeyError:
                 print("No molts found in the matlab report")
                 return
 
+            ecdysis_df = pl.DataFrame(
+                {
+                    "Point": range(len(ecdysis)),
+                    **{
+                        col: [
+                            float(molts[i]) - 1 if not np.isnan(molts[i]) else np.nan
+                            for molts in ecdysis
+                        ]
+                        for i, col in enumerate(ECDYSIS_COLUMNS)
+                    },
+                }
+            )
             imported_df = process_feature_at_molt_columns(
-                updated_filemap,
+                filemap.drop(ECDYSIS_COLUMNS).join(ecdysis_df, on="Point", how="left"),
                 feature_columns,
                 recompute_features_at_molt=True,
             )
+            import_single_values_df = build_single_values_df(imported_df)
 
-        import_single_values_df = build_single_values_df(imported_df)
+        else:
+            return
 
-        print(f"imported dataframe : {import_single_values_df}")
-        import_single_values_df = import_single_values_df.partition_by(
-            "Point", maintain_order=True
+        current_combined = pl.concat(single_values_of_points(), how="vertical")
+        cols_to_update = [
+            c
+            for c in import_single_values_df.columns
+            if c != "Point" and c in current_combined.columns
+        ]
+
+        import_point_keys = import_single_values_df.select("Point").with_columns(
+            pl.lit(True).alias("_in_import")
         )
-        single_values_of_points.set(import_single_values_df)
-        single_values_of_point.set(import_single_values_df[point])
+        tagged = current_combined.join(import_point_keys, on="Point", how="left").join(
+            import_single_values_df.select(["Point"] + cols_to_update),
+            on="Point",
+            how="left",
+            suffix="_new",
+        )
+        update_exprs = [
+            pl.when(pl.col("_in_import"))
+            .then(pl.col(f"{c}_new"))
+            .otherwise(pl.col(c))
+            .alias(c)
+            for c in cols_to_update
+        ]
+        drop_cols = ["_in_import"] + [f"{c}_new" for c in cols_to_update]
+        merged = tagged.with_columns(update_exprs).drop(drop_cols)
+
+        merged_partitions = merged.partition_by("Point", maintain_order=True)
+        single_values_of_points.set(merged_partitions)
+        single_values_of_point.set(merged_partitions[point])
 
     @reactive.calc
     def get_images_of_point():
@@ -904,123 +931,6 @@ def main_server(
             yaxis_type="log" if input.log_scale() else "linear",
             shapes=shapes + arrest_shapes,
         )
-
-    # @reactive.calc
-    # def get_markers():
-    #     print("get_markers")
-    #     qc_columns = [col for col in current_point_filemap().columns if "qc" in col]
-    #     if len(qc_columns) == 0:
-    #         qc_column = qc_columns[0]
-    #     else:
-    #         qc_column = find_best_string_match(input.column_to_plot(), qc_columns)
-
-    #     data_of_point = current_point_filemap().select(
-    #         pl.col(
-    #             [
-    #                 "Time",
-    #                 input.column_to_plot(),
-    #                 qc_column,
-    #                 "HatchTime",
-    #                 "M1",
-    #                 "M2",
-    #                 "M3",
-    #                 "M4",
-    #             ]
-    #         )
-    #     )
-
-    #     times_of_point = data_of_point.select(pl.col("Time")).to_numpy().squeeze()
-    #     qcs_of_point = data_of_point.select(pl.col(qc_column)).to_numpy().squeeze()
-
-    #     custom_annotations_of_point = custom_column_values()
-    #     markers = set_marker_shape(
-    #         times_of_point,
-    #         current_time_index(),
-    #         qcs_of_point,
-    #         hatch(),
-    #         m1(),
-    #         m2(),
-    #         m3(),
-    #         m4(),
-    #         custom_annotations=custom_annotations_of_point,
-    #     )
-    #     return markers
-
-    # @reactive.calc
-    # def get_molt_scatter():
-    #     print("get_molt_scatter")
-    #     (
-    #         ecdys_list,
-    #         value_at_ecdys_list,
-    #         symbols,
-    #         colors,
-    #         sizes,
-    #         widths,
-    #     ) = get_points_for_value_at_molts(
-    #         hatch(),
-    #         m1(),
-    #         m2(),
-    #         m3(),
-    #         m4(),
-    #         value_at_hatch(),
-    #         value_at_m1(),
-    #         value_at_m2(),
-    #         value_at_m3(),
-    #         value_at_m4(),
-    #     )
-
-    #     return go.Scatter(
-    #         x=ecdys_list,
-    #         y=value_at_ecdys_list,
-    #         mode="markers",
-    #         marker=dict(
-    #             symbol=symbols,
-    #             size=sizes,
-    #             color=colors,
-    #             line=dict(width=widths, color=colors),
-    #         ),
-    #         hoverinfo="none",  # Disable hover information
-    #         hoverlabel=None,  # Disable hover label
-    #         hoveron=None,  # Disable hover interaction
-    #     )
-
-    # @output
-    # @render_widget
-    # def plot_curve():
-    #     print("plot_curve")
-    #     fig = create_figure()
-    #     markers = get_markers()
-
-    #     # if the figure only has one trace, we can add the scatter trace
-    #     molt_scatter = get_molt_scatter()
-
-    #     if len(fig.data) == 1:
-    #         fig.add_trace(molt_scatter)
-    #     else:
-    #         # check if the scatter changed
-    #         if not np.array_equal(fig.data[1].x, molt_scatter.x) or not np.array_equal(
-    #             fig.data[1].y, molt_scatter.y
-    #         ):
-    #             data = list(fig.data)
-    #             data.pop(1)  # Remove the second trace
-    #             fig.data = data
-    #             fig.add_trace(molt_scatter)
-
-    #     # Instead of modifying fig.data[0].marker in-place, use update_traces
-    #     fig.update_traces(marker=markers, selector=0)
-
-    #     fig.update_layout(
-    #         xaxis_title="Time",
-    #         yaxis_title=input.column_to_plot(),
-    #         margin=dict(l=20, r=20, t=50, b=50),
-    #         height=input.curve_plot_height(),
-    #         width=input.curve_plot_width(),
-    #         showlegend=False,
-    #         yaxis_type="log" if input.log_scale() else "linear",
-    #         autosize=False,
-    #     )
-
-    #     return fig
 
     def save_on_session_end():
         save_filemap(
