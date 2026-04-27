@@ -32,11 +32,16 @@ def main(input_pickle, output_file, block_config, config, filemap, n_jobs=-1):
 
     classifier_path = block_config["qc_model_path"]
     model_path_and_classes = load(classifier_path)
-
-    features = Parallel(n_jobs=n_jobs)(
-        delayed(compute_qc_features)(mask_path, image_path)
-        for mask_path, image_path in zip(input_masks, input_images)
-    )
+    mask_only = model_path_and_classes.get("mask_only", False)
+    if mask_only:
+        features = Parallel(n_jobs=n_jobs)(
+            delayed(compute_qc_features)(mask_path, None) for mask_path in input_masks
+        )
+    else:
+        features = Parallel(n_jobs=n_jobs)(
+            delayed(compute_qc_features)(mask_path, image_path)
+            for mask_path, image_path in zip(input_masks, input_images)
+        )
 
     valid_indices = [i for i, x in enumerate(features) if x is not None]
     features = [features[i] for i in valid_indices]
@@ -47,8 +52,13 @@ def main(input_pickle, output_file, block_config, config, filemap, n_jobs=-1):
         f"Ignored {(len(input_images) - len(valid_indices)) / len(input_images):.2%} of samples due to feature extraction failure / empty images."
     )
 
-    egg_model_path = model_path_and_classes.get("egg_model_path", None)
-    qc_model_path = model_path_and_classes["qc_model_path"]
+    egg_model_path = os.path.join(
+        os.path.dirname(classifier_path),
+        model_path_and_classes.get("egg_model_path", None),
+    )
+    qc_model_path = os.path.join(
+        os.path.dirname(classifier_path), model_path_and_classes["qc_model_path"]
+    )
     import_eggs_from = block_config.get("qc_import_eggs_from", None)
 
     qc_classifier = xgb.XGBClassifier()

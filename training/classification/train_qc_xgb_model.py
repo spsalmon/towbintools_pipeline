@@ -110,18 +110,19 @@ def train_xgb_model(
     return model
 
 
-dataset_path = (
-    "/mnt/towbin.data/shared/fdell/models/fluorescent_bacteria_qc/fluorescent_bacteria/"
-)
-output_path = "/mnt/towbin.data/shared/spsalmon/towbinlab_classification_database/models/fluorescent_bacteria_qc"
+# dataset_path = "/mnt/towbin.data/shared/fdell/models/fluorescent_bacteria_qc1/fluorescent_bacteria/"
+dataset_path = "/mnt/towbin.data/shared/spsalmon/towbinlab_classification_database/datasets/10x_pharynx_qc/pharynx/"
+output_path = "/mnt/towbin.data/shared/spsalmon/towbinlab_classification_database/models_new/10x_pharynx_qc/"
 os.makedirs(output_path, exist_ok=True)
 model_name = "qc_xgb_model.pkl"
 egg_classifier_name = "egg_xgb_model.json"
 qc_classifier_name = "qc_xgb_model.json"
 project_yaml = os.path.join(dataset_path, "project.yaml")
+
 optimize_hyperparameters = True
 mask_only = False
 train_egg_detector = False
+
 with open(project_yaml) as f:
     project_config = yaml.safe_load(f)
 
@@ -200,7 +201,7 @@ if train_egg_detector:
     # first, train the egg vs non-egg model
     labels = eggs_annotations_df["Class"].values
     egg_classes = np.unique(labels).tolist()
-    print(f"Classes for egg model: {classes}")
+    print(f"Classes for egg model: {egg_classes}")
     # convert classes to integers
     class_to_int = {cls: i for i, cls in enumerate(egg_classes)}
     labels = np.array([class_to_int[cls] for cls in labels])
@@ -224,7 +225,7 @@ if train_egg_detector:
     # now, train the qc model
     labels = qc_annotations_df["Class"].values
     qc_classes = np.unique(labels).tolist()
-    print(f"QC classes: {classes}")
+    print(f"QC classes: {qc_classes}")
     # convert classes to integers
     class_to_int = {cls: i for i, cls in enumerate(qc_classes)}
     labels = np.array([class_to_int[cls] for cls in labels])
@@ -251,10 +252,11 @@ if train_egg_detector:
 
     # save the model
     to_save = {
-        "egg_model_path": egg_model_path,
-        "qc_model_path": qc_model_path,
+        "egg_model_path": egg_classifier_name,
+        "qc_model_path": qc_classifier_name,
         "egg_classes": egg_classes,
         "qc_classes": qc_classes,
+        "mask_only": mask_only,
     }
 
     dump(to_save, os.path.join(output_path, model_name))
@@ -290,8 +292,9 @@ else:
 
     # save the model
     to_save = {
-        "qc_model_path": qc_model_path,
+        "qc_model_path": qc_classifier_name,
         "qc_classes": classes,
+        "mask_only": mask_only,
     }
 
     dump(to_save, os.path.join(output_path, model_name))
