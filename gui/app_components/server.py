@@ -176,6 +176,7 @@ def main_server(
         (
             _,
             _,
+            _,
             custom_columns_choices,
             _,
             _,

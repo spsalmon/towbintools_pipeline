@@ -46,7 +46,7 @@ dependencies:
   - cffi=2.0.0=py312he06e257_1
   - cfgv=3.5.0=pyhd8ed1ab_0
   - charset-normalizer=3.4.7=pyhd8ed1ab_0
-  - click=8.3.2=pyh6dadd2b_0
+  - click=8.3.3=pyh6dadd2b_0
   - click-default-group=1.2.4=pyhd8ed1ab_1
   - clikit=0.6.2=pyhd8ed1ab_3
   - colorama=0.4.6=pyhd8ed1ab_1
@@ -72,12 +72,12 @@ dependencies:
   - gitpython=3.1.47=pyhd8ed1ab_0
   - html5lib=1.1=pyhd8ed1ab_2
   - identify=2.6.19=pyhd8ed1ab_0
-  - idna=3.11=pyhf9edf01_1
+  - idna=3.13=pyhcf101f3_0
   - importlib-metadata=8.8.0=pyhcf101f3_0
   - importlib_resources=7.1.0=pyhd8ed1ab_0
   - iniconfig=2.3.0=pyhd8ed1ab_0
   - ipykernel=7.2.0=pyh6dadd2b_1
-  - ipython=9.12.0=pyhccfa634_0
+  - ipython=9.13.0=pyhe2676ad_0
   - ipython_pygments_lexers=1.1.1=pyhd8ed1ab_0
   - isort=8.0.1=pyhd8ed1ab_0
   - jaraco.classes=3.4.0=pyhcf101f3_3
@@ -90,7 +90,7 @@ dependencies:
   - keyring=25.7.0=pyh7428d3b_0
   - kiwisolver=1.5.0=py312h78d62e6_0
   - krb5=1.22.2=h0ea6238_0
-  - lcms2=2.18=hf2c6c5f_0
+  - lcms2=2.19=hf2c6c5f_0
   - lerc=4.1.0=hd936e49_0
   - libabseil=20260107.1=cxx17_h0eb2380_0
   - libarrow=24.0.0=h22b38e0_0_cuda
@@ -130,7 +130,7 @@ dependencies:
   - libsodium=1.0.21=h6a83c73_3
   - libsqlite=3.53.0=hf5d6505_0
   - libssh2=1.11.1=h9aa295b_0
-  - libthrift=0.22.0=h23985f6_1
+  - libthrift=0.22.0=h2e43b2f_2
   - libtiff=4.7.1=h8f73337_1
   - libutf8proc=2.11.3=hb980946_0
   - libwebp-base=1.6.0=h4d5522a_0
@@ -142,7 +142,7 @@ dependencies:
   - llvm-openmp=22.1.4=h4fa8253_0
   - lz4-c=1.10.0=h2466b09_1
   - markupsafe=3.0.3=py312h05f76fc_1
-  - matplotlib-base=3.10.8=py312h0ebf65c_0
+  - matplotlib-base=3.10.9=py312h0ebf65c_0
   - matplotlib-inline=0.2.1=pyhd8ed1ab_0
   - mccabe=0.7.0=pyhd8ed1ab_1
   - mkl=2025.3.1=hac47afa_12
@@ -161,11 +161,11 @@ dependencies:
   - openjpeg=2.5.4=h0e57b4f_0
   - openssl=3.6.2=hf411b9b_0
   - orc=2.3.0=h8fc0eb6_0
-  - packaging=26.1=pyhc364b38_0
+  - packaging=26.2=pyhc364b38_0
   - pandas=3.0.2=py312h95189c4_0
   - parso=0.8.6=pyhcf101f3_0
   - pastel=0.2.1=pyhd8ed1ab_0
-  - pathspec=1.1.0=pyhd8ed1ab_0
+  - pathspec=1.1.1=pyhd8ed1ab_0
   - patsy=1.0.2=pyhcf101f3_0
   - pillow=12.2.0=py312h31f0997_0
   - pip=26.0.1=pyh8b19718_0
@@ -199,7 +199,7 @@ dependencies:
   - python-discovery=1.2.2=pyhcf101f3_0
   - python-gil=3.12.13=hd8ed1ab_0
   - python-librt=0.9.0=py312he5662c2_0
-  - python-tzdata=2026.1=pyhd8ed1ab_0
+  - python-tzdata=2026.2=pyhd8ed1ab_0
   - python_abi=3.12=8_cp312
   - pytokens=0.4.1=py312he5662c2_1
   - pywin32=311=py312h829343e_1
@@ -208,7 +208,7 @@ dependencies:
   - pyzmq=27.1.0=py312h343a6d4_2
   - qhull=2020.2=hc790b64_5
   - re2=2025.11.05=ha104f34_1
-  - requests=2.33.1=pyhcf101f3_0
+  - requests=2.33.1=pyhcf101f3_1
   - ruamel.yaml=0.19.1=pyhcf101f3_0
   - ruamel.yaml.clib=0.2.15=py312he5662c2_1
   - scipy=1.17.1=py312h9b3c559_0
@@ -230,7 +230,7 @@ dependencies:
   - tox=4.52.1=pyhcf101f3_0
   - traitlets=5.14.3=pyhd8ed1ab_1
   - typing-extensions=4.15.0=h396c80c_0
-  - typing-inspection=0.4.2=pyhd8ed1ab_1
+  - typing-inspection=0.4.2=pyhcf101f3_2
   - typing_extensions=4.15.0=pyhcf101f3_0
   - tzdata=2025c=hc9c84f9_1
   - ucrt=10.0.26100.0=h57928b3_0
@@ -295,7 +295,7 @@ dependencies:
       - htmltools == 0.6.0 --hash=sha256:072a274ff5e2851e0acce13fc5bb2bbdbbad8268dc8b123f881c05012ce7dce0
       - httpcore == 1.0.9 --hash=sha256:2d400746a40668fc9dec9810239072b40b4484b640a8c38fd654a024c7a1bf55
       - httpx == 0.28.1 --hash=sha256:d909fcccc110f8c7faf814ca82a9a4d816bc5a6dbfea25d6591d6985b8ba59ad
-      - huggingface-hub == 1.11.0 --hash=sha256:42a6de0afbfeb5e022222d36398f029679db4eb4778801aafda32257ae9131ab
+      - huggingface-hub == 1.12.0 --hash=sha256:d74939969585ee35748bd66de09baf84099d461bda7287cd9043bfb99b0e424d
       - imagecodecs == 2026.3.6 --hash=sha256:e8fba5b9ac7be109ed35070208bc1683fa17cc381ed9535a4eae200c6d883bd8
       - imageio == 2.37.3 --hash=sha256:46f5bb8522cd421c0f5ae104d8268f569d856b29eb1a13b92829d1970f32c9f0
       - importlib-metadata == 8.7.1 --hash=sha256:5a1f80bf1daa489495071efbb095d75a634cf28a8bc299581244063b53176151
@@ -325,7 +325,7 @@ dependencies:
       - ome-types == 0.6.3 --hash=sha256:ce9753ff351bbc534ee5c5038d3cf60b1e4c13d69ad2e6b5a5b75de2a52521a5
       - opencv-contrib-python == 4.13.0.92 --hash=sha256:cb694dcf76bb2c8d7fa573fc1a99339e8b6640194d7778381e74cc3445369e45
       - opencv-python == 4.13.0.92 --hash=sha256:423d934c9fafb91aad38edf26efb46da91ffbc05f3f59c4b0c72e699720706f5
-      - opentelemetry-api == 1.41.0 --hash=sha256:0e77c806e6a89c9e4f8d372034622f3e1418a11bdbe1c80a50b3d3397ad0fa4f
+      - opentelemetry-api == 1.41.1 --hash=sha256:a22df900e75c76dc08440710e51f52f1aa6b451b429298896023e60db5b3139f
       - orjson == 3.11.8 --hash=sha256:3cf17c141617b88ced4536b2135c552490f07799f6ad565948ea07bef0dcb9a6
       - partd == 1.4.2 --hash=sha256:978e4ac767ec4ba5b86c6eaa52e5a2a3bc748a2ca839e8cc798f1cc6ce6efb0f
       - pint == 0.25.3 --hash=sha256:27eb25143bd5de9fcc4d5a4b484f16faf6b4615aa93ece6b3373a8c1a3c1b97d
@@ -333,7 +333,7 @@ dependencies:
       - protobuf == 7.34.1 --hash=sha256:e97b55646e6ce5cbb0954a8c28cd39a5869b59090dfaa7df4598a7fba869468c
       - psygnal == 0.15.1 --hash=sha256:4f0ce91b9c18e92281bf2c3fc4bb4e808d90f0b023d0a37b302d354188520338
       - pydantic-extra-types == 2.11.1 --hash=sha256:1722ea2bddae5628ace25f2aa685b69978ef533123e5638cfbddb999e0100ec1
-      - python-multipart == 0.0.26 --hash=sha256:c0b169f8c4484c13b0dcf2ef0ec3a4adb255c4b7d18d8e420477d2b1dd03f185
+      - python-multipart == 0.0.27 --hash=sha256:6fccfad17a27334bd0193681b369f476eda3409f17381a2d65aa7df3f7275645
       - pytorch-lightning == 2.6.1 --hash=sha256:1f8118567ec829e3055f16cf1aa320883a86a47c836951bfd9dcfa34ec7ffd59
       - pytorch-toolbelt == 0.8.0 --hash=sha256:ccb5b0388d32bda0e42bc270d4e14a10c96b0b810eb2b52b9885f1e5d155f37d
       - questionary == 2.1.1 --hash=sha256:a51af13f345f1cdea62347589fbb6df3b290306ab8930713bfae4d475a7d4a59
@@ -362,9 +362,9 @@ dependencies:
       - torch == 2.10.0 --hash=sha256:2c66c61f44c5f903046cc696d088e21062644cbe541c7f1c4eaae88b2ad23547
       - torchmetrics == 1.9.0 --hash=sha256:bfdcbff3dd1d96b3374bb2496eb39f23c4b28b8a845b6a18c313688e0d2d9ca1
       - torchvision == 0.25.0 --hash=sha256:f9c55ae8d673ab493325d1267cbd285bb94d56f99626c00ac4644de32a59ede3
-      - towbintools == 0.3.19 --hash=sha256:15d588ee1c8b3e24c4d2d8529801352156913a874556d777fdc7a720a4494995
+      - towbintools == 0.4.0 --hash=sha256:67af8e8f469a43ca8159b7f9d963b9ebe72906f8ddac166e49b407596efc779c
       - tqdm == 4.67.3 --hash=sha256:ee1e4c0e59148062281c49d80b25b67771a127c85fc9676d3be5f243206826bf
-      - typer == 0.24.2 --hash=sha256:b618bc3d721f9a8d30f3e05565be26416d06e9bcc29d49bc491dc26aba674fa8
+      - typer == 0.25.0 --hash=sha256:ac01b48823d3db9a83c9e164338057eadbb1c9957a2a6b4eeb486669c560b5dc
       - uc-micro-py == 2.0.0 --hash=sha256:3603a3859af53e5a39bc7677713c78ea6589ff188d70f4fee165db88e22b242c
       - ujson == 5.12.0 --hash=sha256:1b5c6ceb65fecd28a1d20d1eba9dbfa992612b86594e4b6d47bb580d2dd6bcb3
       - uvicorn == 0.46.0 --hash=sha256:bbebbcbed972d162afca128605223022bedd345b7bc7855ce66deb31487a9048

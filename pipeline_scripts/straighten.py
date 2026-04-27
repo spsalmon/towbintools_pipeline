@@ -83,44 +83,53 @@ def straighten_and_save(
 ):
     """Straighten image and save to output_path."""
 
-    if channel_to_allign is None and source_image_channels is not None:
-        channel_to_allign = source_image_channels[0]
-
-    logger = start_logger_if_necessary()
-    logger.debug(f"Accessing {mask_path}")
-    mask = image_handling.read_tiff_file(mask_path)
-    mask = mask_preprocessing(mask)
-
-    if source_image_path == mask_path:
-        preprocessed_mask = image_preprocessing(mask, keep_biggest_object)
-        if is_stack:
-            # Create dictionary structure for stack images
-            image = {"allign": preprocessed_mask, "straighten": preprocessed_mask}
-        else:
-            image = preprocessed_mask
-    else:
-        logger.debug(f"Accessing {source_image_path}")
-        image = get_image(
-            source_image_path, mask, is_stack, channel_to_allign, source_image_channels
-        )
-        image = image_preprocessing(image, keep_biggest_object)
-
     try:
-        if is_stack:
-            straightened_image = straighten_zstack_image(image, mask)
-        else:
-            straightened_image = straighten_2D_image(image, mask)
-    except Exception as e:
-        logger.exception(
-            f"Straightening failed for {source_image_path} with error: {e}"
-        )
-        if isinstance(image, dict):
-            image = image["straighten"]
+        if channel_to_allign is None and source_image_channels is not None:
+            channel_to_allign = source_image_channels[0]
 
-        straightened_image = np.zeros_like(image).astype(np.uint8)
-        # # add empty channel dimension if is_stack is True
-        if is_stack:
-            straightened_image = straightened_image[:, np.newaxis, ...]
+        logger = start_logger_if_necessary()
+        logger.debug(f"Accessing {mask_path}")
+        mask = image_handling.read_tiff_file(mask_path)
+        mask = mask_preprocessing(mask)
+
+        if source_image_path == mask_path:
+            preprocessed_mask = image_preprocessing(mask, keep_biggest_object)
+            if is_stack:
+                # Create dictionary structure for stack images
+                image = {"allign": preprocessed_mask, "straighten": preprocessed_mask}
+            else:
+                image = preprocessed_mask
+        else:
+            logger.debug(f"Accessing {source_image_path}")
+            image = get_image(
+                source_image_path,
+                mask,
+                is_stack,
+                channel_to_allign,
+                source_image_channels,
+            )
+            image = image_preprocessing(image, keep_biggest_object)
+
+        try:
+            if is_stack:
+                straightened_image = straighten_zstack_image(image, mask)
+            else:
+                straightened_image = straighten_2D_image(image, mask)
+        except Exception as e:
+            logger.exception(
+                f"Straightening failed for {source_image_path} with error: {e}"
+            )
+            if isinstance(image, dict):
+                image = image["straighten"]
+
+            straightened_image = np.zeros_like(image).astype(np.uint8)
+            # # add empty channel dimension if is_stack is True
+            if is_stack:
+                straightened_image = straightened_image[:, np.newaxis, ...]
+    except Exception as e:
+        logger.exception(f"Processing failed for {source_image_path} with error: {e}")
+        n_channels = len(source_image_channels) if source_image_channels else 1
+        straightened_image = np.zeros((n_channels, 128, 128)).astype(np.uint8).squeeze()
 
     if straightened_image.ndim == 2:
         imwrite(

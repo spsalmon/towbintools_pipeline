@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 
 # --- Configuration: edit these ---
-FILEMAP_PATH="/mnt/towbin.data/shared/spsalmon/pipeline_test_folder/analysis/report/analysis_filemap.parquet"
-OPEN_ANNOTATED=1       # 1 = open annotated if exists, 0 = always open original
+FILEMAP_PATH="/mnt/towbin.data/shared/aslesarchuk/20260421_squid5_10x_160_186_415_393_272_634/analysis/report/analysis_filemap.csv"
+OPEN_ANNOTATED=1      # 1 = open annotated if exists, 0 = always open original
 RECOMPUTE_VALUES_AT_MOLT=0            # 1 = recompute features at molt, 0 = skip if already computed
 PORT=0             # 0 = random available port
 HOST="127.0.0.1"
