@@ -1,3 +1,4 @@
+import atexit
 import os
 
 from app_components.backend import open_filemap
@@ -25,9 +26,22 @@ print("Creating the app ...")
     default_plotted_column,
 ) = initialize_ui(filemap, recompute_features_at_molt=recompute_features_at_molt)
 
+_server_save_hook = {"fn": None}
+
+
+def _save_on_exit():
+    if _server_save_hook["fn"] is not None:
+        try:
+            _server_save_hook["fn"]()
+        except Exception as e:
+            print(f"Save on exit failed: {e}")
+
+
+atexit.register(_save_on_exit)
+
 
 def server(input, output, session):
-    return main_server(
+    save_fn = main_server(
         input,
         output,
         session,
@@ -40,6 +54,7 @@ def server(input, output, session):
         times=times,
         default_plotted_column=default_plotted_column,
     )
+    _server_save_hook["fn"] = save_fn
 
 
 app = App(app_ui, server)
