@@ -78,8 +78,10 @@ def main(input_pickle, output_file, block_config, config, filemap, n_jobs=-1):
             fname for fname in extracted_feature_names if fname not in egg_feature_names
         ]
 
+        egg_features_df = features_df.copy()
+
         if len(extra_features) > 0:
-            egg_features_df = features_df.drop(columns=extra_features)
+            egg_features_df = egg_features_df.drop(columns=extra_features)
 
         egg_features_dm = xgb.DMatrix(
             egg_features_df, feature_names=egg_features_df.columns.to_list()

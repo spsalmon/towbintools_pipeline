@@ -40,3 +40,19 @@ Then, you need to update the packages. For consistency's sake, the pipeline uses
 cd ~/towbintools_pipeline
 micromamba run -n towbintools conda-lock install --name towbintools ./requirements/conda-lock.yml
 ```
+
+## Troubleshooting
+
+If for some weird reason, you end up with a broken environment, you can always delete it and create it again using the lock file. To do so, run:
+
+```bash
+micromamba env remove -n towbintools
+cd ~/towbintools_pipeline
+bash install_pipeline.sh
+```
+
+You may also want to update the towbintools package itself manually. To do so, run:
+
+```bash
+micromamba run -n towbintools pip install -U towbintools
+```
