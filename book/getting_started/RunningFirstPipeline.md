@@ -8,7 +8,9 @@ the unique identifier for the position (individual worm if each position contain
 
 The pipeline works using atomic [building blocks](https://spsalmon.github.io/towbintools_pipeline/building-blocks/buildingblock/), head to the **Building Block** section to learn more about them.
 
-After installing the pipeline you will find an example of a working configuration for measuring organ and body size over  in the 'configs/' directory. Let's break it down!
+After installing the pipeline you will find an example of a working configuration for measuring organ and body size over  in the 'configs/' directory. The default configuration in 'configs/config.yaml' will be reset to its upstream version every time you update.
+
+Let's break it down!
 
 ```yaml
 experiment_dir: "/mnt/towbin.data/shared/spsalmon/pipeline_test_folder/"
