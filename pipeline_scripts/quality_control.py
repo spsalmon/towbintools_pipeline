@@ -52,10 +52,13 @@ def main(input_pickle, output_file, block_config, config, filemap, n_jobs=-1):
         f"Ignored {(len(input_images) - len(valid_indices)) / len(input_images):.2%} of samples due to feature extraction failure / empty images."
     )
 
-    egg_model_path = os.path.join(
-        os.path.dirname(classifier_path),
-        model_path_and_classes.get("egg_model_path", None),
+    _egg_model_relative = model_path_and_classes.get("egg_model_path", None)
+    egg_model_path = (
+        os.path.join(os.path.dirname(classifier_path), _egg_model_relative)
+        if _egg_model_relative is not None
+        else None
     )
+
     qc_model_path = os.path.join(
         os.path.dirname(classifier_path), model_path_and_classes["qc_model_path"]
     )
