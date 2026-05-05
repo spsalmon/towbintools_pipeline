@@ -307,7 +307,7 @@ class BuildingBlock(ABC):
 class SegmentationBuildingBlock(BuildingBlock):
     def __init__(self, block_config):
         NON_LEARNING_METHODS = ["double_threshold", "edge_based", "threshold"]
-        LEARNING_BASED_METHODS = ["deep_learning", "conv_paint"]
+        LEARNING_BASED_METHODS = ["deep_learning", "cellpose"]
 
         if block_config["segmentation_method"] in NON_LEARNING_METHODS:
             requires_gpu = False
