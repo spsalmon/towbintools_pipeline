@@ -12,7 +12,7 @@ dependencies:
   - polars
   - pyarrow
   - bottleneck
-  - numcodecs<0.16
+  - numcodecs
   - pip
 
   # development dependencies
@@ -39,3 +39,4 @@ dependencies:
     - statannotations
     - tensorboard
     - bayesian-optimization
+    - cellpose

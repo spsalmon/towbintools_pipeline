@@ -6,15 +6,13 @@ from joblib import delayed
 from joblib import Parallel
 from tqdm import tqdm
 
-experiment_dir = (
-    "/mnt/towbin.data/shared/nschoonjans/20260312_Ziva_60X_wBT443_training-dataset"
-)
+experiment_dir = "/mnt/towbin.data/shared/nschoonjans/20260402_Ziva_60X_397-405-AID_nuclear_shape_chambers"
 image_dir = os.path.join(experiment_dir, "raw")
 
 re_template = r"Channel\s*([A-Za-z0-9_,\s]+?)\s*_Seq"
 pattern_to_output = {
-    "GFP,mCherry,DIA,DIA": "raw",
-    "DIA,DIA": "raw_stacks",
+    "WF BF,WF mCherry,WF GFP": "raw",
+    "SD mCherry": "raw_stacks",
 }
 
 # re_template = r"\.(\w+)$"
