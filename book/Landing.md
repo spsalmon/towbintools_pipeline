@@ -8,7 +8,7 @@ towbintools_pipeline is a modular pipelining tool made to streamline the analysi
 - a GUI for annotating time series (i.e. molts)
 - convenient plotting in jupyter notebooks with ready made functions
 
-Head to the **Getting Started** section to learn how to [install the pipeline](https://spsalmon.github.io/towbintools_pipeline/getting-started/installation/), how to use [building blocks](https://spsalmon.github.io/towbintools_pipeline/getting-started/buildingblocks/) and how to [run your first pipeline](https://spsalmon.github.io/towbintools_pipeline/getting-started/runningfirstpipeline/).
+Head to the **Getting Started** section to learn how to [install the pipeline](https://spsalmon.github.io/towbintools_pipeline/getting-started/installation/), [update the pipeline](https://spsalmon.github.io/towbintools_pipeline/getting-started/update/), and how to [run your first pipeline](https://spsalmon.github.io/towbintools_pipeline/getting-started/runningfirstpipeline/).
 
 Click there for information on how to [retrain models](https://spsalmon.github.io/towbintools_pipeline/training/training/) or [use the GUI](https://spsalmon.github.io/towbintools_pipeline/usage/usinggui/) or visit the **Usage** section.
 

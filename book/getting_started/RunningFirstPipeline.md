@@ -88,6 +88,8 @@ batch_size: [ 4 ]
 ```
 ## Running the pipeline
 
+An example configuration will always be available in the 'configs/' directory of your pipeline installation. You can use it as a template to build your own configuration. This configuration file will automatically be updated to the latest version when you update the pipeline. You should therefore not use it as your working configuration, but rather copy it and give it a different name. You can then modify it to fit your needs. This copied version will not be overwritten when we update the original configuration file.
+
 Once your configuration is finished, you can save it anywhere. Let's assume you saved it in ~/towbintools_pipeline/configs/my_configuration.yaml. I recommend picking a folder where you will centralize all your configuration. The configuration you run on an experiment will always be backed up in the analysis/report folder of said experiment. To run this specific configuration :
 
 ```bash

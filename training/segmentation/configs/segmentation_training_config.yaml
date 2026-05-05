@@ -13,19 +13,14 @@ test_dataframes:
 
 save_dir: '/mnt/towbin.data/shared/spsalmon/towbinlab_segmentation_database/models/paper/germline/'
 model_name: 'towbintools_medium'
-
-pretrained: True
-
-continue_training_from_checkpoint: '/mnt/towbin.data/shared/spsalmon/towbinlab_segmentation_database/models/paper/body/towbintools_medium/best_light.ckpt'
+continue_training_from_checkpoint: null
 
 n_classes: 1
 channels_to_segment: [0]
 
 architecture: 'UnetPlusPlus'
-pretrained_encoder: 'efficientnet-b5'
+encoder: 'efficientnet-b5'
 pretrained_weights: 'imagenet'
-
-deep_supervision: False
 
 learning_rate: 1.0e-4
 normalization_parameters: {'type': 'percentile', 'lo': 1, 'hi': 99, 'axis': [-2, -1]}
