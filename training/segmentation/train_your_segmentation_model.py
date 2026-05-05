@@ -12,9 +12,8 @@ import torch
 import torch.nn as nn
 import yaml
 from towbintools.deep_learning.deep_learning_tools import (
-    create_pretrained_segmentation_model,
+    create_segmentation_model,
 )
-from towbintools.deep_learning.deep_learning_tools import create_segmentation_model
 from towbintools.deep_learning.utils.augmentation import get_prediction_augmentation
 from towbintools.deep_learning.utils.augmentation import get_training_augmentation
 from towbintools.deep_learning.utils.dataset import create_segmentation_dataloaders
@@ -63,12 +62,11 @@ validation_dataframes = config.get("validation_dataframes", None)
 test_dataframes = config.get("test_dataframes", None)
 save_dir = config["save_dir"]
 model_name = config["model_name"]
-pretrained = config.get("pretrained", True)
 n_classes = config.get("n_classes", 1)
 channels_to_segment = config.get("channels_to_segment", [0])
 architecture = config.get("architecture", "UnetPlusPlus")
-pretrained_encoder = config.get("pretrained_encoder", "efficientnet-b4")
-pretrained_weights = config.get("pretrained_weights", "image-micronet")
+encoder = config.get("encoder", "efficientnet-b5")
+pretrained_weights = config.get("pretrained_weights", "imagenet")
 deep_supervision = config.get("deep_supervision", False)
 learning_rate = config.get("learning_rate", 1e-4)
 loss = config.get("loss", "FocalTversky")
@@ -222,30 +220,18 @@ elif training_dataframes is not None and validation_dataframes is not None:
         ),
     )
 
-# initialize model
-if pretrained:
-    model = create_pretrained_segmentation_model(
-        input_channels=input_channels,
-        n_classes=n_classes,
-        architecture=architecture,
-        encoder=pretrained_encoder,
-        pretrained_weights=pretrained_weights,
-        normalization=full_normalization_parameters,
-        learning_rate=learning_rate,
-        checkpoint_path=checkpoint_path,
-        criterion=criterion,
-    )
-else:
-    model = create_segmentation_model(
-        n_classes=n_classes,
-        input_channels=input_channels,
-        architecture=architecture,
-        normalization=full_normalization_parameters,
-        learning_rate=learning_rate,
-        checkpoint_path=checkpoint_path,
-        deep_supervision=deep_supervision,
-        criterion=criterion,
-    )
+
+model = create_segmentation_model(
+    input_channels=input_channels,
+    n_classes=n_classes,
+    architecture=architecture,
+    encoder=encoder,
+    pretrained_weights=pretrained_weights,
+    normalization=full_normalization_parameters,
+    learning_rate=learning_rate,
+    checkpoint_path=checkpoint_path,
+    criterion=criterion,
+)
 
 checkpoint_callback = callbacks.ModelCheckpoint(
     dirpath=model_save_dir, save_top_k=save_best_k_models, monitor="val_loss"
