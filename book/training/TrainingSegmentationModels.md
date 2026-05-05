@@ -80,3 +80,12 @@ train_test_split_ratio: 0.1
 - **save_best_k_models** : the number of best models to save during training. The best models are determined based on the validation loss. If set to 1, only the best model will be saved. If set to 3, the three best models will be saved, etc.
 - **train_val_split_ratio** : the ratio of the training set to use for validation if no separate validation dataframe is provided. For example, if set to 0.2, 20% of the training data will be used for validation and 80% will be used for training.
 - **train_test_split_ratio** : the ratio of the training set to use for testing if no separate test dataframe is provided.
+
+## Running the training
+
+Once you configuration is finished, you can run the training with the following command:
+
+```bash
+cd ~/towbintools_pipeline/training/segmentation
+bash run_training.sh -c /path/to/your/config.yaml
+```
