@@ -264,9 +264,61 @@ def get_input_and_output_files(experiment_filemap, columns, output_dir, rerun=Tr
     return input_files, output_files
 
 
-def get_experiment_time_from_filemap(experiment_filemap, config):
+def get_experiment_time_from_filemap(experiment_filemap, config, recompute=True):
     experiment_filemap = experiment_filemap.clone()
     raw_dir_name = config.get("raw_dir_name", "raw")
+
+    # When recompute=False, skip rows that already have a valid ExperimentTime.
+    # Only process reference rows (global min Time from existing data, needed to
+    # establish T0 per Point) plus the rows that are missing ExperimentTime.
+    if (
+        not recompute
+        and "ExperimentTime" in experiment_filemap.columns
+        and "Time" in experiment_filemap.columns
+    ):
+        has_exp_time = experiment_filemap["ExperimentTime"].is_not_null()
+
+        if has_exp_time.all():
+            return experiment_filemap["ExperimentTime"]
+
+        rows_existing = experiment_filemap.filter(has_exp_time)
+        rows_needing = experiment_filemap.filter(~has_exp_time)
+
+        # Include global min-Time rows from existing data so that the recursive
+        # call below can determine T0 per Point correctly.
+        global_min_time = rows_existing["Time"].min()
+        reference_rows = rows_existing.filter(pl.col("Time") == global_min_time)
+
+        sub_filemap = (
+            pl.concat([reference_rows, rows_needing])
+            .unique(["Time", "Point"])
+            .sort(["Time", "Point"])
+        )
+
+        sub_exp_time = get_experiment_time_from_filemap(
+            sub_filemap, config, recompute=True
+        )
+        sub_filemap = sub_filemap.with_columns(sub_exp_time.alias("_exp_time"))
+
+        # Keep only the newly computed values (exclude reference rows)
+        new_computed = sub_filemap.join(
+            reference_rows.select(["Time", "Point"]),
+            on=["Time", "Point"],
+            how="anti",
+        ).select(["Time", "Point", "_exp_time"])
+
+        result = (
+            experiment_filemap.join(new_computed, on=["Time", "Point"], how="left")
+            .with_columns(
+                pl.when(pl.col("ExperimentTime").is_null())
+                .then(pl.col("_exp_time"))
+                .otherwise(pl.col("ExperimentTime"))
+                .alias("ExperimentTime")
+            )
+            .drop("_exp_time")
+        )
+        return result["ExperimentTime"]
+
     raw_files = experiment_filemap.select(pl.col(raw_dir_name)).to_series().to_list()
 
     with parallel_config(backend="multiprocessing", n_jobs=-1):

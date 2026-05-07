@@ -125,15 +125,69 @@ def main(global_config, temp_dir_basename, temp_dir, subdir=None):
         experiment_filemap = read_filemap(filemap_path)
         experiment_filemap = experiment_filemap.fill_nan("").fill_null("")
 
+        # Check for new files added to the raw directory since the filemap was created
+        if (
+            "Time" in experiment_filemap.columns
+            and "Point" in experiment_filemap.columns
+        ):
+            try:
+                current_dir_filemap = get_dir_filemap(
+                    raw_subdir, time_regex, point_regex
+                )
+                if not current_dir_filemap.is_empty():
+                    current_dir_filemap = current_dir_filemap.rename(
+                        {"ImagePath": raw_dir_name}
+                    )
+                    new_rows = current_dir_filemap.join(
+                        experiment_filemap.select(["Time", "Point"]),
+                        on=["Time", "Point"],
+                        how="anti",
+                    )
+                    if not new_rows.is_empty():
+                        print(
+                            f"### Found {len(new_rows)} new file(s) in {raw_subdir}, adding to filemap ###"
+                        )
+                        for col in experiment_filemap.columns:
+                            if col not in new_rows.columns:
+                                new_rows = new_rows.with_columns(
+                                    pl.lit(None)
+                                    .cast(experiment_filemap[col].dtype)
+                                    .alias(col)
+                                )
+                        new_rows = new_rows.select(experiment_filemap.columns)
+                        experiment_filemap = pl.concat(
+                            [experiment_filemap, new_rows]
+                        ).sort(["Time", "Point"])
+                        # Fill string columns with ""; numeric nulls (ExperimentTime)
+                        # stay null and are computed below.
+                        experiment_filemap = experiment_filemap.with_columns(
+                            pl.col(c).fill_null("")
+                            for c, dt in zip(
+                                experiment_filemap.columns, experiment_filemap.dtypes
+                            )
+                            if dt in (pl.Utf8, pl.String, pl.Categorical)
+                        )
+                        write_filemap(experiment_filemap, filemap_path)
+            except Exception as e:
+                print(f"Warning: could not check for new files in raw directory: {e}")
+
     config["filemap_path"] = filemap_path
 
-    # if the ExperimentTime column is not present, create it
-    if "ExperimentTime" not in experiment_filemap.columns:
+    # Compute ExperimentTime if missing. When rows already have it (e.g. existing
+    # filemap), only compute for the new rows that lack it (recompute=False).
+    has_missing_exp_time = (
+        "ExperimentTime" in experiment_filemap.columns
+        and "Time" in experiment_filemap.columns
+        and experiment_filemap["ExperimentTime"].is_null().any()
+    )
+    if "ExperimentTime" not in experiment_filemap.columns or has_missing_exp_time:
         if extract_experiment_time:
             print("### Calculating ExperimentTime ###")
             experiment_filemap = experiment_filemap.with_columns(
                 pl.lit(
-                    get_experiment_time_from_filemap(experiment_filemap, config)
+                    get_experiment_time_from_filemap(
+                        experiment_filemap, config, recompute=not has_missing_exp_time
+                    )
                 ).alias("ExperimentTime")
             )
             write_filemap(experiment_filemap, filemap_path)
