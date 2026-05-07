@@ -167,7 +167,8 @@ def populate_column_choices(filemap):
             default_plotted_column = feature_columns[0]
         except IndexError:
             default_plotted_column = "placeholder_feature"
-            filemap = filemap.with_columns(pl.lit(np.nan).alias(default_plotted_column))
+            filemap = filemap.with_columns(pl.lit(1.0).alias(default_plotted_column))
+            feature_columns.append(default_plotted_column)
             print("No feature column found in the filemap, creating a placeholder.")
 
     segmentation_columns = [
