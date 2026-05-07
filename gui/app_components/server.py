@@ -195,7 +195,7 @@ def main_server(
                 imported_df = imported_df.with_columns(pl.lit(value).alias(col))
 
             for col in ["ExperimentTime"] + feature_columns:
-                if col not in imported_df.columns:
+                if col not in imported_df.columns and col in filemap.columns:
                     imported_df = imported_df.with_columns(
                         pl.lit(filemap.select(pl.col(col)).to_numpy().squeeze()).alias(
                             col
@@ -399,13 +399,11 @@ def main_server(
 
     @reactive.Effect
     def get_hatch_and_molts():
+        sv = single_values_of_point()
+        if not isinstance(sv, pl.DataFrame):
+            return
         # Get all molt times
-        hatch_and_molts = (
-            single_values_of_point()
-            .select(pl.col(ECDYSIS_COLUMNS))
-            .to_numpy()
-            .squeeze()
-        )
+        hatch_and_molts = sv.select(pl.col(ECDYSIS_COLUMNS)).to_numpy().squeeze()
 
         # Set molt times using unpacking
         molt_values = [hatch, m1, m2, m3, m4]
@@ -451,7 +449,7 @@ def main_server(
             else:
                 ignore_start.set("")
 
-        except ColumnNotFoundError:
+        except (ColumnNotFoundError, ValueError):
             ignore_start.set("")
 
         print(f"Ignore start: {ignore_start()}")

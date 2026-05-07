@@ -273,6 +273,10 @@ def get_time_and_ecdysis(filemap):
 def build_single_values_df(filemap):
     columns = filemap.columns
 
+    for ecdys in ECDYSIS_COLUMNS:
+        if ecdys not in columns:
+            filemap = filemap.with_columns(pl.lit(np.nan).alias(ecdys))
+
     columns_to_keep = ["Point"]
     columns_to_keep.extend([col for col in columns if "_at_" in col])
     columns_to_keep.extend(ECDYSIS_COLUMNS)
