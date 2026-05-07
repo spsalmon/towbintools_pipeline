@@ -32,9 +32,7 @@ def test_populate_column_choices_creates_qc_placeholder():
 
 def test_populate_column_choices_placeholder_feature_is_one():
     filemap = make_minimal_filemap()
-    result_filemap, _, feature_columns, _, default_plotted_column, _ = (
-        populate_column_choices(filemap)
-    )
+    result_filemap, *_ = populate_column_choices(filemap)
     assert "placeholder_feature" in result_filemap.columns
     values = (
         result_filemap.select("placeholder_feature").to_numpy().squeeze().astype(float)
@@ -56,8 +54,5 @@ def test_build_single_values_df_no_ecdysis_columns():
     filemap = make_minimal_filemap()
     result_filemap, *_ = populate_column_choices(filemap)
     # Should not raise even though HatchTime, M1, M2, M3, M4 may be absent
-    try:
-        df = build_single_values_df(result_filemap)
-    except Exception as e:
-        raise AssertionError(f"build_single_values_df raised with minimal filemap: {e}")
+    df = build_single_values_df(result_filemap)
     assert "Point" in df.columns
