@@ -24,6 +24,7 @@ print("Creating the app ...")
     points,
     times,
     default_plotted_column,
+    n_channels,
 ) = initialize_ui(filemap, recompute_features_at_molt=recompute_features_at_molt)
 
 _server_save_hook = {"fn": None}
@@ -53,6 +54,7 @@ def server(input, output, session):
         points=points,
         times=times,
         default_plotted_column=default_plotted_column,
+        n_channels=n_channels,
     )
     _server_save_hook["fn"] = save_fn
 

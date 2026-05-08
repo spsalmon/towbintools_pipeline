@@ -90,7 +90,8 @@ def create_timepoint_selector(
 ):
     return ui.column(
         5,
-        ui.output_plot("plot_image", height="60vh"),
+        ui.output_ui("preload_progress"),
+        ui.output_ui("plot_image"),
         time_point_navigator("time", name="time", choices=times),
         time_point_navigator("point", name="point", choices=points),
         ui.row(
@@ -188,4 +189,5 @@ def initialize_ui(filemap, recompute_features_at_molt=False):
         points,
         times,
         default_plotted_column,
+        n_channels,
     )
