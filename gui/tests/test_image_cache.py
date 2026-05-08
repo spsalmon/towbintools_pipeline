@@ -61,6 +61,9 @@ class TestPointImageCache:
             t.join()
         assert not errors
         assert len(cache) == 50
+        for i in range(50):
+            result = cache.get(time_index=i, channel_idx=0)
+            assert result is not None and result[0, 0] == i
 
 
 class TestProgressTracker:
