@@ -1,4 +1,5 @@
 import polars as pl
+from pathlib import Path
 from app_components.backend import ECDYSIS_COLUMNS
 from app_components.backend import infer_n_channels
 from app_components.backend import populate_column_choices
@@ -95,10 +96,11 @@ def create_timepoint_selector(
     return ui.column(
         5,
         ui.output_ui("preload_progress"),
-        ui.output_ui("plot_image"),
+        ui.div({"class": "image-container"}, ui.output_ui("plot_image")),
         time_point_navigator("time", name="time", choices=times),
         time_point_navigator("point", name="point", choices=points),
-        ui.row(
+        ui.div(
+            {"class": "channel-selectors"},
             ui.input_selectize(
                 "channel",
                 "Select channel",
@@ -126,7 +128,11 @@ def create_timepoint_selector(
                 choices=feature_columns,
             )
         ),
-        ui.row(ui.input_action_button("save", "Save")),
+        ui.div(
+            {"class": "save-row"},
+            ui.input_action_button("save", "Save"),
+            ui.input_dark_mode(mode="dark"),
+        ),
     )
 
 
@@ -182,7 +188,11 @@ def initialize_ui(filemap, recompute_features_at_molt=False):
         overlay_segmentation_choices,
         default_plotted_column,
     )
-    app_ui = ui.page_fluid(ui.row(molt_annotator, timepoint_selector))
+    _css_path = Path(__file__).parent.parent / "static" / "custom.css"
+    app_ui = ui.page_fluid(
+        ui.include_css(_css_path, method="link_files"),
+        ui.row(molt_annotator, timepoint_selector),
+    )
 
     return (
         app_ui,
