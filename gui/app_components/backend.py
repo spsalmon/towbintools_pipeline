@@ -550,6 +550,7 @@ def set_marker_shape(
     m3,
     m4,
     custom_annotations: list = [],
+    dark_mode: bool = False,
 ):
     symbols = []
     for qc in qcs:
@@ -563,9 +564,9 @@ def set_marker_shape(
             symbol = ""
         symbols.append(symbol)
 
-    # create a list full of "blue"
     sizes = [4] * len(symbols)
-    colors = ["black"] * len(symbols)
+    default_color = "#e0e0e0" if dark_mode else "black"
+    colors = [default_color] * len(symbols)
 
     for custom_annotation in custom_annotations:
         if np.isfinite(custom_annotation):
