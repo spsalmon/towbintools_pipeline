@@ -1,5 +1,6 @@
-import polars as pl
 from pathlib import Path
+
+import polars as pl
 from app_components.backend import ECDYSIS_COLUMNS
 from app_components.backend import infer_n_channels
 from app_components.backend import populate_column_choices
