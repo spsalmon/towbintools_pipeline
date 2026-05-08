@@ -221,6 +221,7 @@ class BackgroundLoader:
             try:
                 channel_img = extract_channel(img, ch)
                 cache.put(point, time_index, ch, prepare_channel(channel_img))
-            except (ValueError, IndexError, Exception):
+            except Exception as e:
+                print(f"BackgroundLoader: failed ch={ch} t={time_index}: {e!r}")
                 continue
         progress_tracker.increment()
