@@ -1,7 +1,6 @@
 import asyncio
 import traceback
 
-import matplotlib.pyplot as plt
 import numpy as np
 import plotly.graph_objs as go
 import polars as pl
@@ -14,6 +13,14 @@ from app_components.backend import KEY_CONVERSION_MAP
 from app_components.backend import populate_column_choices
 from app_components.backend import process_feature_at_molt_columns
 from app_components.backend import set_marker_shape
+from app_components.image_cache import array_to_data_url
+from app_components.image_cache import BackgroundLoader
+from app_components.image_cache import compose_display_image
+from app_components.image_cache import downsample
+from app_components.image_cache import extract_channel
+from app_components.image_cache import PointImageCache
+from app_components.image_cache import prepare_channel
+from app_components.image_cache import ProgressTracker
 from app_components.ui_components import molt_annotation_buttons_server
 from app_components.ui_components import time_point_navigator_server
 from polars.exceptions import ColumnNotFoundError
@@ -43,6 +50,28 @@ def main_server(
 ):
     use_experiment_time = check_use_experiment_time(filemap)
     point_filemaps = filemap.partition_by("Point", maintain_order=True)
+
+    _image_cache = PointImageCache()
+    _progress_tracker = ProgressTracker()
+    _current_loader: list = [None]
+
+    def _start_loading(point_index: int) -> None:
+        if _current_loader[0] is not None:
+            _current_loader[0].cancel()
+        paths = point_filemaps[point_index].select(raw_column).to_numpy().squeeze()
+        if paths.ndim == 0:
+            paths = [str(paths)]
+        else:
+            paths = paths.tolist()
+        _image_cache.reset(point=point_index)
+        _progress_tracker.reset(total=len(paths))
+        _current_loader[0] = BackgroundLoader(
+            point=point_index,
+            image_paths=paths,
+            n_channels=n_channels,
+            cache=_image_cache,
+            progress_tracker=_progress_tracker,
+        )
 
     work_df_columns = [
         "Time",
@@ -157,9 +186,40 @@ def main_server(
 
     @reactive.Effect
     def update_point_filemap():
-        current_point_filemap.set(point_filemaps[int(current_point_index())])
-        single_values_of_point.set(
-            single_values_of_points()[int(current_point_index())]
+        point_index = int(current_point_index())
+        current_point_filemap.set(point_filemaps[point_index])
+        single_values_of_point.set(single_values_of_points()[point_index])
+        _start_loading(point_index)
+
+    @reactive.poll(lambda: _progress_tracker.get(), interval_secs=0.5)
+    def _current_progress():
+        return _progress_tracker.get()
+
+    @output
+    @render.ui
+    def preload_progress():
+        completed, total = _current_progress()
+        if total == 0 or completed >= total:
+            return ui.div()
+        pct = (completed / total) * 100
+        return ui.div(
+            ui.p(
+                f"Pre-loading: {completed} / {total} frames",
+                class_="small text-muted mb-1",
+                style="margin: 0;",
+            ),
+            ui.div(
+                ui.div(
+                    class_="progress-bar bg-info",
+                    style=f"width: {pct:.0f}%",
+                    role="progressbar",
+                    aria_valuenow=str(int(pct)),
+                    aria_valuemin="0",
+                    aria_valuemax="100",
+                ),
+                class_="progress mb-2",
+                style="height: 8px;",
+            ),
         )
 
     @reactive.Effect
@@ -736,7 +796,7 @@ def main_server(
                 print(f"Exception in reset_custom_annotation: {e}")
 
     @output
-    @render.plot
+    @render.ui
     def plot_image():
         idx = current_time_index()
         channel_str = input.channel()
@@ -745,46 +805,41 @@ def main_server(
         images_of_point = get_images_of_point()
         segmentation_of_point = get_segmentation_of_point()
 
-        img = images_of_point[idx]
-        img = image_handling.read_tiff_file(img)
-
-        # Select the correct channel/slice
-        if img.ndim == 3:
-            img_to_plot = img[channel]
-        elif img.ndim == 4:
-            img_to_plot = img[img.shape[0] // 2, channel, ...]
-        elif img.ndim == 2:
-            img_to_plot = img
-        else:
-            raise ValueError("Unexpected image dimensions")
-
         channel_overlay_str = input.channel_overlay()
-        plot_overlay = channel_overlay_str != "None"
-        if plot_overlay:
-            channel_overlay = int(channel_overlay_str.split(" ")[-1]) - 1
-            overlay = img[channel_overlay]
-            overlay = image_handling.normalize_image(overlay, dest_dtype=np.float64)
-        else:
-            overlay = None  # Only create if needed
+        need_overlay = channel_overlay_str != "None"
+        channel_overlay_idx = (
+            int(channel_overlay_str.split(" ")[-1]) - 1 if need_overlay else None
+        )
 
-        img_to_plot = image_handling.normalize_image(img_to_plot, dest_dtype=np.float64)
+        main_arr = _image_cache.get(idx, channel)
+        overlay_arr = (
+            _image_cache.get(idx, channel_overlay_idx) if need_overlay else None
+        )
 
-        fig, ax = plt.subplots()
-        ax.imshow(img_to_plot, cmap="viridis")
-        if plot_overlay:
-            ax.imshow(overlay, cmap="magma", alpha=0.5)
+        if main_arr is None or (need_overlay and overlay_arr is None):
+            raw_img = image_handling.read_tiff_file(images_of_point[idx])
+            if main_arr is None:
+                main_arr = prepare_channel(extract_channel(raw_img, channel))
+            if need_overlay and overlay_arr is None:
+                overlay_arr = prepare_channel(
+                    extract_channel(raw_img, channel_overlay_idx)
+                )
 
+        seg_arr = None
         if len(segmentation_of_point) > 0:
-            segmentation_path = segmentation_of_point[idx]
-            segmentation = image_handling.read_tiff_file(segmentation_path)
-            segmentation = segmentation.squeeze()
-            masked = np.ma.masked_array(segmentation, mask=(segmentation == 0))
-            ax.imshow(masked, alpha=0.5, cmap="autumn", interpolation="none")
+            seg = image_handling.read_tiff_file(segmentation_of_point[idx])
+            seg_arr = downsample(seg.squeeze())
 
-        # disable axis
-        ax.axis("off")
-
-        return fig
+        rgb = compose_display_image(
+            main_arr=main_arr,
+            overlay_arr=overlay_arr,
+            seg_arr=seg_arr,
+        )
+        data_url = array_to_data_url(rgb)
+        return ui.img(
+            src=data_url,
+            style="max-height: 60vh; max-width: 100%; object-fit: contain;",
+        )
 
     @output
     @render_widget
@@ -941,5 +996,10 @@ def main_server(
             work_df=latest_work_df["value"],
         )
 
-    session.on_ended(save_on_session_end)
+    def _on_session_end():
+        if _current_loader[0] is not None:
+            _current_loader[0].cancel()
+        save_on_session_end()
+
+    session.on_ended(_on_session_end)
     return save_on_session_end  # return so the SIGINT handler can call it directly
