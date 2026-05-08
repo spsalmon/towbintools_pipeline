@@ -113,3 +113,144 @@ class TestProgressTracker:
             t.join()
         completed, _ = tracker.get()
         assert completed == 100
+
+
+import pytest
+
+from app_components.image_cache import (
+    downsample,
+    apply_lut,
+    alpha_composite,
+    composite_mask,
+    extract_channel,
+    prepare_channel,
+)
+
+
+class TestDownsample:
+    def test_large_image_reduced(self):
+        img = np.zeros((2048, 2048), dtype=np.float32)
+        result = downsample(img)
+        assert max(result.shape) <= 768
+
+    def test_small_image_unchanged(self):
+        img = np.zeros((512, 512), dtype=np.float32)
+        result = downsample(img)
+        assert result.shape == (512, 512)
+
+    def test_3d_input(self):
+        img = np.zeros((4, 2048, 2048), dtype=np.float32)
+        result = downsample(img)
+        assert max(result.shape[-2:]) <= 768
+        assert result.shape[0] == 4
+
+    def test_exact_boundary(self):
+        img = np.zeros((768, 768), dtype=np.float32)
+        result = downsample(img)
+        assert result.shape == (768, 768)
+
+
+class TestApplyLut:
+    def test_output_shape(self):
+        img = np.random.rand(100, 100).astype(np.float32)
+        rgb = apply_lut(img, "viridis")
+        assert rgb.shape == (100, 100, 3)
+        assert rgb.dtype == np.uint8
+
+    def test_clamps_below_zero(self):
+        img = np.full((10, 10), -1.0, dtype=np.float32)
+        rgb = apply_lut(img, "viridis")
+        assert rgb.dtype == np.uint8
+
+    def test_clamps_above_one(self):
+        img = np.full((10, 10), 2.0, dtype=np.float32)
+        rgb = apply_lut(img, "viridis")
+        assert rgb.dtype == np.uint8
+
+    def test_known_colormaps(self):
+        img = np.zeros((4, 4), dtype=np.float32)
+        for name in ("viridis", "magma", "autumn"):
+            rgb = apply_lut(img, name)
+            assert rgb.shape == (4, 4, 3)
+
+
+class TestAlphaComposite:
+    def test_output_shape_and_dtype(self):
+        base = np.zeros((100, 100, 3), dtype=np.uint8)
+        overlay = np.full((100, 100, 3), 200, dtype=np.uint8)
+        result = alpha_composite(base, overlay, alpha=0.5)
+        assert result.shape == (100, 100, 3)
+        assert result.dtype == np.uint8
+
+    def test_midpoint_blend(self):
+        base = np.zeros((4, 4, 3), dtype=np.uint8)
+        overlay = np.full((4, 4, 3), 200, dtype=np.uint8)
+        result = alpha_composite(base, overlay, alpha=0.5)
+        assert np.allclose(result, 100, atol=2)
+
+    def test_alpha_zero_returns_base(self):
+        base = np.full((4, 4, 3), 50, dtype=np.uint8)
+        overlay = np.full((4, 4, 3), 200, dtype=np.uint8)
+        result = alpha_composite(base, overlay, alpha=0.0)
+        np.testing.assert_array_equal(result, base)
+
+
+class TestCompositeMask:
+    def test_zero_mask_unchanged(self):
+        base = np.full((10, 10, 3), 100, dtype=np.uint8)
+        mask = np.zeros((10, 10), dtype=np.uint16)
+        result = composite_mask(base, mask, alpha=0.5)
+        np.testing.assert_array_equal(result, base)
+
+    def test_nonzero_mask_changes_pixels(self):
+        base = np.zeros((10, 10, 3), dtype=np.uint8)
+        mask = np.ones((10, 10), dtype=np.uint16)
+        result = composite_mask(base, mask, alpha=1.0)
+        assert not np.all(result == 0)
+
+    def test_output_shape(self):
+        base = np.zeros((20, 20, 3), dtype=np.uint8)
+        mask = np.ones((20, 20), dtype=np.uint16)
+        result = composite_mask(base, mask)
+        assert result.shape == (20, 20, 3)
+
+
+class TestExtractChannel:
+    def test_2d(self):
+        img = np.ones((64, 64), dtype=np.uint16)
+        result = extract_channel(img, channel=0)
+        assert result.shape == (64, 64)
+
+    def test_3d(self):
+        img = np.zeros((4, 64, 64), dtype=np.uint16)
+        img[2] = 1
+        result = extract_channel(img, channel=2)
+        assert result.shape == (64, 64)
+        assert result[0, 0] == 1
+
+    def test_4d_takes_middle_z(self):
+        img = np.zeros((6, 4, 64, 64), dtype=np.uint16)
+        z_mid = 3
+        img[z_mid, 1] = 99
+        result = extract_channel(img, channel=1)
+        assert result.shape == (64, 64)
+        assert result[0, 0] == 99
+
+    def test_invalid_ndim_raises(self):
+        img = np.zeros((2, 3, 4, 5, 6), dtype=np.uint16)
+        with pytest.raises(ValueError):
+            extract_channel(img, channel=0)
+
+
+class TestPrepareChannel:
+    def test_output_dtype_and_range(self):
+        channel_img = np.array([[0, 100], [200, 65535]], dtype=np.uint16)
+        result = prepare_channel(channel_img)
+        assert result.dtype == np.float32
+        assert result.min() >= 0.0
+        assert result.max() <= 1.0
+
+    def test_large_image_downsampled(self):
+        channel_img = np.random.randint(0, 65535, (2048, 2048), dtype=np.uint16)
+        result = prepare_channel(channel_img)
+        assert max(result.shape) <= 768
