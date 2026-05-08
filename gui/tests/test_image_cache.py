@@ -317,7 +317,40 @@ class TestBackgroundLoader:
             loader.cancel()
             loader.wait()
 
-        assert len(cache) < n_frames * 2
+        assert len(cache) < (n_frames * 2) // 2  # far fewer than all frames
+
+    def test_failed_reads_skipped(self):
+        cache = PointImageCache()
+        tracker = ProgressTracker()
+        n_frames = 5
+        fake_img = self._make_fake_tiff(1)
+        cache.reset(point=0)
+        tracker.reset(total=n_frames)
+        paths = [f"/fake/{i}.tif" for i in range(n_frames)]
+
+        call_count = {"n": 0}
+
+        def sometimes_fail(path):
+            call_count["n"] += 1
+            if call_count["n"] % 2 == 0:
+                raise OSError("simulated read failure")
+            return fake_img
+
+        with patch(
+            "app_components.image_cache.image_handling.read_tiff_file",
+            side_effect=sometimes_fail,
+        ):
+            loader = BackgroundLoader(
+                point=0,
+                image_paths=paths,
+                n_channels=1,
+                cache=cache,
+                progress_tracker=tracker,
+            )
+            loader.wait()
+
+        # Frames 0, 2, 4 succeed (3 out of 5); frames 1, 3 fail silently
+        assert len(cache) == 3
 
     def test_stale_writes_discarded_after_cancel_and_reset(self):
         cache = PointImageCache()
