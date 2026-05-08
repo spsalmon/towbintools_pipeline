@@ -7,7 +7,9 @@ import numpy as np
 import pytest
 from app_components.image_cache import alpha_composite
 from app_components.image_cache import apply_lut
+from app_components.image_cache import array_to_data_url
 from app_components.image_cache import BackgroundLoader
+from app_components.image_cache import compose_display_image
 from app_components.image_cache import composite_mask
 from app_components.image_cache import downsample
 from app_components.image_cache import extract_channel
@@ -405,3 +407,50 @@ class TestBackgroundLoader:
         completed, total = tracker.get()
         assert completed == n_frames
         assert total == n_frames
+
+
+class TestComposeDisplayImage:
+    def _channel(self, h=64, w=64):
+        return np.random.rand(h, w).astype(np.float32)
+
+    def test_main_only(self):
+        rgb = compose_display_image(main_arr=self._channel())
+        assert rgb.shape == (64, 64, 3)
+        assert rgb.dtype == np.uint8
+
+    def test_with_overlay(self):
+        rgb = compose_display_image(
+            main_arr=self._channel(),
+            overlay_arr=self._channel(),
+        )
+        assert rgb.shape == (64, 64, 3)
+
+    def test_with_seg(self):
+        seg = np.zeros((64, 64), dtype=np.uint16)
+        seg[10:20, 10:20] = 1
+        rgb = compose_display_image(
+            main_arr=self._channel(),
+            seg_arr=seg,
+        )
+        assert rgb.shape == (64, 64, 3)
+
+    def test_all_layers(self):
+        seg = np.ones((64, 64), dtype=np.uint16)
+        rgb = compose_display_image(
+            main_arr=self._channel(),
+            overlay_arr=self._channel(),
+            seg_arr=seg,
+        )
+        assert rgb.shape == (64, 64, 3)
+
+
+class TestArrayToDataUrl:
+    def test_returns_data_url_prefix(self):
+        rgb = np.zeros((64, 64, 3), dtype=np.uint8)
+        url = array_to_data_url(rgb)
+        assert url.startswith("data:image/jpeg;base64,")
+
+    def test_non_empty(self):
+        rgb = np.random.randint(0, 255, (64, 64, 3), dtype=np.uint8)
+        url = array_to_data_url(rgb)
+        assert len(url) > 100
