@@ -1,6 +1,8 @@
 # gui/app_components/image_cache.py
 import math
 import threading
+from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import wait as futures_wait
 
 import matplotlib
 import numpy as np
@@ -130,3 +132,66 @@ def prepare_channel(channel_img: np.ndarray) -> np.ndarray:
     """Normalize a single channel to float32 [0, 1] and downsample for display."""
     normalized = image_handling.normalize_image(channel_img, dest_dtype=np.float32)
     return downsample(normalized)
+
+
+class BackgroundLoader:
+    """Reads all TIFFs for a point in background threads and populates a PointImageCache."""
+
+    def __init__(
+        self,
+        point: int,
+        image_paths: list[str],
+        n_channels: int,
+        cache: PointImageCache,
+        progress_tracker: ProgressTracker,
+        n_workers: int = 4,
+    ):
+        self._cancel = threading.Event()
+        self._executor = ThreadPoolExecutor(max_workers=n_workers)
+        self._futures = [
+            self._executor.submit(
+                self._process,
+                point,
+                time_index,
+                path,
+                n_channels,
+                cache,
+                progress_tracker,
+            )
+            for time_index, path in enumerate(image_paths)
+        ]
+        self._executor.shutdown(wait=False)
+
+    def cancel(self) -> None:
+        self._cancel.set()
+
+    def wait(self) -> None:
+        """Block until all submitted futures are done. Used in tests."""
+        futures_wait(self._futures)
+
+    def _process(
+        self,
+        point: int,
+        time_index: int,
+        path: str,
+        n_channels: int,
+        cache: PointImageCache,
+        progress_tracker: ProgressTracker,
+    ) -> None:
+        if self._cancel.is_set():
+            return
+        try:
+            img = image_handling.read_tiff_file(path)
+        except Exception:
+            return
+        if self._cancel.is_set():
+            return
+        for ch in range(n_channels):
+            if self._cancel.is_set():
+                return
+            try:
+                channel_img = extract_channel(img, ch)
+            except (ValueError, IndexError):
+                continue
+            cache.put(point, time_index, ch, prepare_channel(channel_img))
+        progress_tracker.increment()

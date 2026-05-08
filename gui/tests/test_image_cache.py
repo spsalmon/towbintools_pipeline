@@ -1,10 +1,13 @@
 # gui/tests/test_image_cache.py
 import threading
+import time
+from unittest.mock import patch
 
 import numpy as np
 import pytest
 from app_components.image_cache import alpha_composite
 from app_components.image_cache import apply_lut
+from app_components.image_cache import BackgroundLoader
 from app_components.image_cache import composite_mask
 from app_components.image_cache import downsample
 from app_components.image_cache import extract_channel
@@ -249,3 +252,123 @@ class TestPrepareChannel:
         channel_img = np.random.randint(0, 65535, (2048, 2048), dtype=np.uint16)
         result = prepare_channel(channel_img)
         assert max(result.shape) <= 768
+
+
+class TestBackgroundLoader:
+    def _make_fake_tiff(self, n_channels=2, h=64, w=64):
+        return np.random.randint(0, 65535, (n_channels, h, w), dtype=np.uint16)
+
+    def test_populates_cache(self):
+        cache = PointImageCache()
+        tracker = ProgressTracker()
+        n_frames = 3
+        n_channels = 2
+        fake_img = self._make_fake_tiff(n_channels)
+        cache.reset(point=0)
+        tracker.reset(total=n_frames)
+        paths = [f"/fake/path/{i}.tif" for i in range(n_frames)]
+
+        with patch(
+            "app_components.image_cache.image_handling.read_tiff_file",
+            return_value=fake_img,
+        ):
+            loader = BackgroundLoader(
+                point=0,
+                image_paths=paths,
+                n_channels=n_channels,
+                cache=cache,
+                progress_tracker=tracker,
+            )
+            loader.wait()
+
+        assert len(cache) == n_frames * n_channels
+        for t in range(n_frames):
+            for ch in range(n_channels):
+                arr = cache.get(t, ch)
+                assert arr is not None
+                assert arr.dtype == np.float32
+                assert max(arr.shape) <= 768
+
+    def test_cancel_stops_workers(self):
+        cache = PointImageCache()
+        tracker = ProgressTracker()
+        n_frames = 100
+
+        def slow_read(path):
+            time.sleep(0.05)
+            return np.zeros((2, 64, 64), dtype=np.uint16)
+
+        cache.reset(point=0)
+        tracker.reset(total=n_frames)
+        paths = [f"/fake/{i}.tif" for i in range(n_frames)]
+
+        with patch(
+            "app_components.image_cache.image_handling.read_tiff_file",
+            side_effect=slow_read,
+        ):
+            loader = BackgroundLoader(
+                point=0,
+                image_paths=paths,
+                n_channels=2,
+                cache=cache,
+                progress_tracker=tracker,
+            )
+            time.sleep(0.1)
+            loader.cancel()
+            loader.wait()
+
+        assert len(cache) < n_frames * 2
+
+    def test_stale_writes_discarded_after_cancel_and_reset(self):
+        cache = PointImageCache()
+        tracker = ProgressTracker()
+        fake_img = self._make_fake_tiff(1)
+
+        cache.reset(point=0)
+        tracker.reset(total=5)
+        paths = [f"/fake/{i}.tif" for i in range(5)]
+
+        with patch(
+            "app_components.image_cache.image_handling.read_tiff_file",
+            return_value=fake_img,
+        ):
+            loader = BackgroundLoader(
+                point=0,
+                image_paths=paths,
+                n_channels=1,
+                cache=cache,
+                progress_tracker=tracker,
+            )
+            loader.cancel()
+            cache.reset(point=1)
+            loader.wait()
+
+        for t in range(5):
+            assert cache.get(t, 0) is None
+
+    def test_progress_tracker_incremented(self):
+        cache = PointImageCache()
+        tracker = ProgressTracker()
+        n_frames = 4
+        fake_img = self._make_fake_tiff(1)
+
+        cache.reset(point=0)
+        tracker.reset(total=n_frames)
+        paths = [f"/fake/{i}.tif" for i in range(n_frames)]
+
+        with patch(
+            "app_components.image_cache.image_handling.read_tiff_file",
+            return_value=fake_img,
+        ):
+            loader = BackgroundLoader(
+                point=0,
+                image_paths=paths,
+                n_channels=1,
+                cache=cache,
+                progress_tracker=tracker,
+            )
+            loader.wait()
+
+        completed, total = tracker.get()
+        assert completed == n_frames
+        assert total == n_frames
