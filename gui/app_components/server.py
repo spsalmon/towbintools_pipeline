@@ -60,9 +60,9 @@ def main_server(
             _current_loader[0].cancel()
         paths = point_filemaps[point_index].select(raw_column).to_numpy().squeeze()
         if paths.ndim == 0:
-            paths = [str(paths)]
+            paths = [str(paths)] if paths else []
         else:
-            paths = paths.tolist()
+            paths = [p for p in paths.tolist() if p is not None]
         _image_cache.reset(point=point_index)
         _progress_tracker.reset(total=len(paths))
         _current_loader[0] = BackgroundLoader(
@@ -800,6 +800,8 @@ def main_server(
     def plot_image():
         idx = current_time_index()
         channel_str = input.channel()
+        if channel_str == "None" or channel_str is None:
+            return ui.div()
         channel = int(channel_str.split(" ")[-1]) - 1
 
         images_of_point = get_images_of_point()
@@ -828,7 +830,12 @@ def main_server(
         seg_arr = None
         if len(segmentation_of_point) > 0:
             seg = image_handling.read_tiff_file(segmentation_of_point[idx])
-            seg_arr = downsample(seg.squeeze())
+            if seg.ndim == 2:
+                seg_arr = downsample(seg)
+            elif seg.ndim == 3:
+                seg_arr = downsample(seg[seg.shape[0] // 2])
+            else:
+                seg_arr = downsample(seg.squeeze())
 
         rgb = compose_display_image(
             main_arr=main_arr,
@@ -987,6 +994,9 @@ def main_server(
         )
 
     def save_on_session_end():
+        if latest_point["value"] is None:
+            print("Session ended before state was captured; skipping save.")
+            return
         save_filemap(
             filemap=filemap,
             current_index=latest_point["value"],
