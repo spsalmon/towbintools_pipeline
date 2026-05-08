@@ -39,6 +39,7 @@ def main_server(
     feature_columns=None,
     custom_columns_choices=None,
     default_plotted_column=None,
+    n_channels=None,
 ):
     use_experiment_time = check_use_experiment_time(filemap)
     point_filemaps = filemap.partition_by("Point", maintain_order=True)
