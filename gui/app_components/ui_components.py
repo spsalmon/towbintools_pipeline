@@ -108,12 +108,14 @@ def molt_annotation_buttons_server(
 # time and point navigator
 @module.ui
 def time_point_navigator(name="", choices=[]):
-    return ui.row(
-        ui.column(
-            4, ui.input_action_button("previous", f"previous {name}", height="15vh")
+    return ui.div(
+        {"class": "navigator-row"},
+        ui.input_action_button("previous", f"previous {name}", class_="nav-btn"),
+        ui.div(
+            {"class": "nav-selector"},
+            ui.input_selectize("current", f"Select {name}", choices=choices),
         ),
-        ui.column(4, ui.input_selectize("current", f"Select {name}", choices=choices)),
-        ui.column(4, ui.input_action_button("next", f"next {name}", height="15vh")),
+        ui.input_action_button("next", f"next {name}", class_="nav-btn"),
     )
 
 
