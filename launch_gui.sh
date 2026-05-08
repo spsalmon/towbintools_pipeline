@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 # --- Configuration: edit these ---
-FILEMAP_PATH="/mnt/towbin.data/shared/aslesarchuk/20260421_squid5_10x_160_186_415_393_272_634/analysis/report/analysis_filemap.csv"
+FILEMAP_PATH="/mnt/towbin.data/shared/nschoonjans/20260402_Ziva_60X_397-405-AID_nuclear_shape_chambers/analysis/report/analysis_filemap.csv"
 OPEN_ANNOTATED=1      # 1 = open annotated if exists, 0 = always open original
 RECOMPUTE_VALUES_AT_MOLT=0            # 1 = recompute features at molt, 0 = skip if already computed
 PORT=0             # 0 = random available port

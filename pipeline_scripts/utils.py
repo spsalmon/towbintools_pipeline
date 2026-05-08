@@ -264,7 +264,7 @@ def get_input_and_output_files(experiment_filemap, columns, output_dir, rerun=Tr
     return input_files, output_files
 
 
-def get_experiment_time_from_filemap(experiment_filemap, config, recompute=True):
+def get_experiment_time_from_filemap(experiment_filemap, config, recompute=False):
     experiment_filemap = experiment_filemap.clone()
     raw_dir_name = config.get("raw_dir_name", "raw")
 
