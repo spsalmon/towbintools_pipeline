@@ -1,0 +1,48 @@
+/* Navigator: flexbox row so prev/selector/next stay at equal height */
+.navigator-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 4px 0;
+}
+
+.navigator-row .nav-btn {
+    flex: 1;
+}
+
+.navigator-row .nav-selector {
+    flex: 2;
+}
+
+/* Image viewer: breathing room around the image output */
+.image-container {
+    padding: 12px;
+}
+
+/* Channel selectors: centered flex row */
+.channel-selectors {
+    display: flex;
+    gap: 8px;
+    justify-content: center;
+    flex-wrap: wrap;
+}
+
+.channel-selectors > div {
+    flex: 1;
+    min-width: 120px;
+}
+
+/* Molt annotation buttons: padding and rounded container */
+.annotation-buttons-container {
+    padding: 12px;
+    border-radius: 8px;
+    margin-bottom: 8px;
+}
+
+/* Save row: save button left, dark mode toggle right */
+.save-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 8px 0;
+}
