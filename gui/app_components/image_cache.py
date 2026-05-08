@@ -1,4 +1,6 @@
 # gui/app_components/image_cache.py
+import base64
+import io
 import math
 import threading
 from concurrent.futures import ThreadPoolExecutor
@@ -6,6 +8,7 @@ from concurrent.futures import wait as futures_wait
 
 import matplotlib
 import numpy as np
+from PIL import Image as PILImage
 from towbintools.foundation import image_handling
 
 
@@ -132,6 +135,32 @@ def prepare_channel(channel_img: np.ndarray) -> np.ndarray:
     """Normalize a single channel to float32 [0, 1] and downsample for display."""
     normalized = image_handling.normalize_image(channel_img, dest_dtype=np.float32)
     return downsample(normalized)
+
+
+def compose_display_image(
+    main_arr: np.ndarray,
+    main_cmap: str = "viridis",
+    overlay_arr: np.ndarray | None = None,
+    overlay_cmap: str = "magma",
+    overlay_alpha: float = 0.5,
+    seg_arr: np.ndarray | None = None,
+    seg_alpha: float = 0.5,
+) -> np.ndarray:
+    """Compose main channel + optional overlay channel + optional segmentation mask into RGB uint8."""
+    rgb = apply_lut(main_arr, main_cmap)
+    if overlay_arr is not None:
+        rgb = alpha_composite(rgb, apply_lut(overlay_arr, overlay_cmap), overlay_alpha)
+    if seg_arr is not None:
+        rgb = composite_mask(rgb, seg_arr, seg_alpha, "autumn")
+    return rgb
+
+
+def array_to_data_url(rgb: np.ndarray, quality: int = 85) -> str:
+    """Encode an RGB uint8 array as a base64 JPEG data URL."""
+    buf = io.BytesIO()
+    PILImage.fromarray(rgb).save(buf, format="JPEG", quality=quality)
+    b64 = base64.b64encode(buf.getvalue()).decode("ascii")
+    return f"data:image/jpeg;base64,{b64}"
 
 
 class BackgroundLoader:
