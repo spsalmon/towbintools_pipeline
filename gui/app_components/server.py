@@ -60,7 +60,8 @@ def main_server(
             _current_loader[0].cancel()
         paths = point_filemaps[point_index].select(raw_column).to_numpy().squeeze()
         if paths.ndim == 0:
-            paths = [str(paths)] if paths else []
+            value = paths.item()
+            paths = [value] if value is not None else []
         else:
             paths = [p for p in paths.tolist() if p is not None]
         _image_cache.reset(point=point_index)
@@ -807,8 +808,11 @@ def main_server(
         images_of_point = get_images_of_point()
         segmentation_of_point = get_segmentation_of_point()
 
+        if not images_of_point or idx >= len(images_of_point):
+            return ui.div()
+
         channel_overlay_str = input.channel_overlay()
-        need_overlay = channel_overlay_str != "None"
+        need_overlay = channel_overlay_str not in ("None", None)
         channel_overlay_idx = (
             int(channel_overlay_str.split(" ")[-1]) - 1 if need_overlay else None
         )
@@ -829,13 +833,16 @@ def main_server(
 
         seg_arr = None
         if len(segmentation_of_point) > 0:
-            seg = image_handling.read_tiff_file(segmentation_of_point[idx])
-            if seg.ndim == 2:
-                seg_arr = downsample(seg)
-            elif seg.ndim == 3:
-                seg_arr = downsample(seg[seg.shape[0] // 2])
-            else:
-                seg_arr = downsample(seg.squeeze())
+            try:
+                seg = image_handling.read_tiff_file(segmentation_of_point[idx])
+                if seg.ndim == 2:
+                    seg_arr = downsample(seg)
+                elif seg.ndim == 3:
+                    seg_arr = downsample(seg[seg.shape[0] // 2])
+                else:
+                    seg_arr = downsample(seg.squeeze())
+            except Exception:
+                seg_arr = None
 
         rgb = compose_display_image(
             main_arr=main_arr,
