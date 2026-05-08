@@ -870,6 +870,15 @@ def main_server(
             session.send_custom_message("resize_plot", {"height": h, "width": w})
         )
 
+    @reactive.Effect
+    def _update_plot_theme():
+        mode = input.color_mode()
+        if mode is None:
+            return
+        template = "plotly_dark" if mode == "dark" else "plotly"
+        with _fig.batch_update():
+            _fig.update_layout(template=template)
+
     def _is_finite_number(val):
         try:
             return np.isfinite(float(val))
@@ -881,6 +890,7 @@ def main_server(
         # --- data trace ---
         col = input.column_to_plot()
         pf = current_point_filemap()
+        dark_mode = input.color_mode() == "dark"
 
         times_of_point = pf.select(pl.col("Time")).to_numpy().squeeze()
         values_of_point = pf.select(pl.col(col)).to_numpy().squeeze()
@@ -903,6 +913,7 @@ def main_server(
             m3(),
             m4(),
             custom_annotations=custom_column_values(),
+            dark_mode=dark_mode,
         )
 
         # molt scatter
@@ -954,7 +965,7 @@ def main_server(
                     y0=0,
                     x1=float(death()),
                     y1=1,
-                    line=dict(color="black", width=2),
+                    line=dict(color="#e0e0e0" if dark_mode else "black", width=2),
                 )
             )
 

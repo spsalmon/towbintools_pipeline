@@ -1,7 +1,10 @@
-/* Navigator: flexbox row so prev/selector/next stay at equal height */
+/* ================================================================
+   Navigator: flex-end alignment so buttons sit at same level as
+   the selectize input (not its label above it)
+   ================================================================ */
 .navigator-row {
     display: flex;
-    align-items: center;
+    align-items: flex-end;
     gap: 8px;
     padding: 4px 0;
 }
@@ -11,20 +14,34 @@
 }
 
 .navigator-row .nav-selector {
-    flex: 2;
+    flex: 3;
 }
 
-/* Image viewer: breathing room around the image output */
+/* Remove default bottom margin on the selectize wrapper */
+.navigator-row .shiny-input-container {
+    margin-bottom: 0;
+    width: 100%;
+}
+
+/* ================================================================
+   Image container: centered content with breathing room
+   ================================================================ */
 .image-container {
+    display: flex;
+    justify-content: center;
+    align-items: center;
     padding: 12px;
 }
 
-/* Channel selectors: centered flex row */
+/* ================================================================
+   Channel selectors: evenly spaced, centered flex row
+   ================================================================ */
 .channel-selectors {
     display: flex;
     gap: 8px;
     justify-content: center;
     flex-wrap: wrap;
+    padding: 4px 0;
 }
 
 .channel-selectors > div {
@@ -32,14 +49,44 @@
     min-width: 120px;
 }
 
-/* Molt annotation buttons: padding and rounded container */
+/* Center channel selector labels */
+.channel-selectors label {
+    display: block;
+    text-align: center;
+}
+
+/* ================================================================
+   Molt annotation buttons container
+   ================================================================ */
 .annotation-buttons-container {
     padding: 12px;
     border-radius: 8px;
     margin-bottom: 8px;
 }
 
-/* Save row: save button left, dark mode toggle right */
+/* Remove Bootstrap row's negative gutter margins and add explicit gap */
+.annotation-buttons-container > .row {
+    margin-left: 0;
+    margin-right: 0;
+    gap: 8px;
+}
+
+/* Center the molt time text label (e.g. "M1 : 5.0") */
+.annotation-buttons-container .shiny-text-output {
+    display: block;
+    text-align: center;
+    padding: 2px 0;
+}
+
+/* Full-width buttons within annotation columns */
+.annotation-buttons-container .action-button {
+    width: 100%;
+    margin-bottom: 4px;
+}
+
+/* ================================================================
+   Save row: save button left, dark mode toggle right
+   ================================================================ */
 .save-row {
     display: flex;
     justify-content: space-between;

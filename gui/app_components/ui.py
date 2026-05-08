@@ -29,7 +29,7 @@ def create_molt_annotator(ecdysis_list_id, custom_columns_choices):
             ui.row(
                 [molt_annotation_buttons(molt, molt=molt) for molt in ecdysis_list_id],
                 ui.column(
-                    2,
+                    1,
                     ui.row(ui.input_action_button("set_arrest", "Arrest")),
                     ui.row(ui.input_action_button("set_death", "Dead")),
                     ui.row(ui.input_action_button("set_ignore_after", "Ignore After")),
@@ -132,7 +132,7 @@ def create_timepoint_selector(
         ui.div(
             {"class": "save-row"},
             ui.input_action_button("save", "Save"),
-            ui.input_dark_mode(mode="dark"),
+            ui.input_dark_mode(id="color_mode", mode=None),
         ),
     )
 
