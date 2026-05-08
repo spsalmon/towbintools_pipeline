@@ -2,7 +2,14 @@
 import threading
 
 import numpy as np
+import pytest
+from app_components.image_cache import alpha_composite
+from app_components.image_cache import apply_lut
+from app_components.image_cache import composite_mask
+from app_components.image_cache import downsample
+from app_components.image_cache import extract_channel
 from app_components.image_cache import PointImageCache
+from app_components.image_cache import prepare_channel
 from app_components.image_cache import ProgressTracker
 
 
@@ -113,18 +120,6 @@ class TestProgressTracker:
             t.join()
         completed, _ = tracker.get()
         assert completed == 100
-
-
-import pytest
-
-from app_components.image_cache import (
-    downsample,
-    apply_lut,
-    alpha_composite,
-    composite_mask,
-    extract_channel,
-    prepare_channel,
-)
 
 
 class TestDownsample:

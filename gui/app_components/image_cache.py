@@ -2,9 +2,8 @@
 import math
 import threading
 
-import matplotlib.cm
+import matplotlib
 import numpy as np
-
 from towbintools.foundation import image_handling
 
 
@@ -63,9 +62,9 @@ class ProgressTracker:
 MAX_DISPLAY_PX = 768
 
 COLORMAPS: dict[str, np.ndarray] = {
-    name: (matplotlib.colormaps.get_cmap(name)(np.linspace(0, 1, 256))[:, :3] * 255).astype(
-        np.uint8
-    )
+    name: (
+        matplotlib.colormaps.get_cmap(name)(np.linspace(0, 1, 256))[:, :3] * 255
+    ).astype(np.uint8)
     for name in ("viridis", "magma", "autumn")
 }
 
@@ -88,8 +87,7 @@ def alpha_composite(
 ) -> np.ndarray:
     """Blend two RGB uint8 arrays: result = base*(1-alpha) + overlay*alpha."""
     return np.clip(
-        base.astype(np.float32) * (1.0 - alpha)
-        + overlay.astype(np.float32) * alpha,
+        base.astype(np.float32) * (1.0 - alpha) + overlay.astype(np.float32) * alpha,
         0,
         255,
     ).astype(np.uint8)
