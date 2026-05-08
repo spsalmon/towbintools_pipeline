@@ -21,7 +21,7 @@ class PointImageCache:
         self, point: int, time_index: int, channel_idx: int, array: np.ndarray
     ) -> None:
         with self._lock:
-            if point != self._point:
+            if self._point is None or point != self._point:
                 return
             self._data[(time_index, channel_idx)] = array
 
