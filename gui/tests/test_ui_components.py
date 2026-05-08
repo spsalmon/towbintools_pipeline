@@ -1,7 +1,5 @@
-import sys
-import os
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
-
+from app_components.backend import ECDYSIS_COLUMNS
+from app_components.ui import create_molt_annotator
 from app_components.ui_components import time_point_navigator
 
 
@@ -17,3 +15,10 @@ def test_navigator_uses_flexbox_class():
     tag = time_point_navigator("test_nav", name="time", choices=[0, 1, 2])
     html = str(tag)
     assert "navigator-row" in html
+
+
+def test_annotation_buttons_have_padding_container():
+    """Annotation buttons must be wrapped in annotation-buttons-container."""
+    tag = create_molt_annotator(ECDYSIS_COLUMNS, custom_columns_choices=[])
+    html = str(tag)
+    assert "annotation-buttons-container" in html

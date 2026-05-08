@@ -22,59 +22,63 @@ def create_molt_annotator(ecdysis_list_id, custom_columns_choices):
         });
         """),
         ui.row(output_widget("plot_curve")),
-        ui.row(
-            [molt_annotation_buttons(molt, molt=molt) for molt in ecdysis_list_id],
-            ui.column(
-                2,
-                ui.row(ui.input_action_button("set_arrest", "Arrest")),
-                ui.row(ui.input_action_button("set_death", "Dead")),
-                ui.row(ui.input_action_button("set_ignore_after", "Ignore After")),
-                ui.row(ui.input_action_button("set_ignore_point", "Ignore Point")),
-            ),
+        ui.div(
+            {"class": "annotation-buttons-container"},
             ui.row(
-                ui.column(
-                    4,
-                    ui.input_selectize(
-                        "custom_column",
-                        "Select custom column",
-                        choices=custom_columns_choices,
-                    ),
-                ),
-                ui.column(
-                    4, ui.input_text("new_custom_column", "Insert new custom column")
-                ),
+                [molt_annotation_buttons(molt, molt=molt) for molt in ecdysis_list_id],
                 ui.column(
                     2,
-                    ui.input_action_button("custom_annotation", "Annotate"),
-                    ui.input_action_button("reset_custom_annotation", "Reset"),
+                    ui.row(ui.input_action_button("set_arrest", "Arrest")),
+                    ui.row(ui.input_action_button("set_death", "Dead")),
+                    ui.row(ui.input_action_button("set_ignore_after", "Ignore After")),
+                    ui.row(ui.input_action_button("set_ignore_point", "Ignore Point")),
                 ),
+                ui.row(
+                    ui.column(
+                        4,
+                        ui.input_selectize(
+                            "custom_column",
+                            "Select custom column",
+                            choices=custom_columns_choices,
+                        ),
+                    ),
+                    ui.column(
+                        4,
+                        ui.input_text("new_custom_column", "Insert new custom column"),
+                    ),
+                    ui.column(
+                        2,
+                        ui.input_action_button("custom_annotation", "Annotate"),
+                        ui.input_action_button("reset_custom_annotation", "Reset"),
+                    ),
+                ),
+                ui.row(
+                    ui.input_slider(
+                        "curve_plot_height",
+                        "Plot height",
+                        min=300,
+                        max=1000,
+                        step=10,
+                        value=700,
+                    ),
+                    ui.input_slider(
+                        "curve_plot_width",
+                        "Plot width",
+                        min=300,
+                        max=2000,
+                        step=10,
+                        value=1300,
+                    ),
+                    ui.input_checkbox("log_scale", "Log scale", value=True),
+                    ui.input_file(
+                        "import_file",
+                        "Import Annotations",
+                        accept=[".csv", ".mat", ".parquet"],
+                        multiple=False,
+                    ),
+                ),
+                align="center",
             ),
-            ui.row(
-                ui.input_slider(
-                    "curve_plot_height",
-                    "Plot height",
-                    min=300,
-                    max=1000,
-                    step=10,
-                    value=700,
-                ),
-                ui.input_slider(
-                    "curve_plot_width",
-                    "Plot width",
-                    min=300,
-                    max=2000,
-                    step=10,
-                    value=1300,
-                ),
-                ui.input_checkbox("log_scale", "Log scale", value=True),
-                ui.input_file(
-                    "import_file",
-                    "Import Annotations",
-                    accept=[".csv", ".mat", ".parquet"],
-                    multiple=False,
-                ),
-            ),
-            align="center",
         ),
         align="center",
     )
