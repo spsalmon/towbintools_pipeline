@@ -66,8 +66,16 @@ output_dir = os.path.join(database_path, output_dir)
 os.makedirs(img_dir, exist_ok=True)
 os.makedirs(mask_dir, exist_ok=True)
 
-mask_files = [os.path.join(mask_dir, f) for f in os.listdir(mask_dir)]
-img_files = [os.path.join(img_dir, f) for f in os.listdir(img_dir)]
+mask_files = [
+    os.path.join(mask_dir, f)
+    for f in os.listdir(mask_dir)
+    if f.endswith(".tif") or f.endswith(".tiff")
+]
+img_files = [
+    os.path.join(img_dir, f)
+    for f in os.listdir(img_dir)
+    if (f.endswith(".tif" or f.endswith(".tiff")))
+]
 
 mask_files = sorted(mask_files)
 img_files = sorted(img_files)

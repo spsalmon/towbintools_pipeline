@@ -9,7 +9,7 @@
 #SBATCH --gres=gpu:rtx6000:1
 
 # Default configuration file
-DEFAULT_CONFIG_FILE="./segmentation_training_config.yaml"
+DEFAULT_CONFIG_FILE="./configs/segmentation_training_config.yaml"
 CONFIG_FILE="$DEFAULT_CONFIG_FILE"
 
 # Function to show usage
