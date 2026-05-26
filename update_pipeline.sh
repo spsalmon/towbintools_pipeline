@@ -24,4 +24,7 @@ if [[ "$PIPELINE_ONLY" == false ]]; then
 
     # Add the environment to the jupyter notebook kernel
     ~/.local/bin/micromamba run -n towbintools python -m ipykernel install --user --name=towbintools
+
+    # for some reason, towbintools does not get updated
+    ~/.local/bin/micromamba run -n towbintools pip install -U towbintools
 fi
