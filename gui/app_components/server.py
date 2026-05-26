@@ -852,7 +852,7 @@ def main_server(
         data_url = array_to_data_url(rgb)
         return ui.img(
             src=data_url,
-            style="max-height: 60vh; max-width: 100%; object-fit: contain;",
+            style=f"height: {input.curve_plot_height()}px; max-width: 100%; object-fit: contain;",
         )
 
     @output
