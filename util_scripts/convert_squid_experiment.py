@@ -72,98 +72,101 @@ def process_point(
     channels_metadata = []
     channels_names = []
 
-    for image_path in point_list:
-        # check if the image is a fluorescence image
-        match = fluorescence_pattern.match(image_path)
-        if match:
-            point, wavelength = match.groups()
-            channel_name = f"Fluorescence_{wavelength}"
-        else:
-            match = brightfield_pattern.match(image_path)
+    try:
+        for image_path in point_list:
+            # check if the image is a fluorescence image
+            match = fluorescence_pattern.match(image_path)
             if match:
-                point = match.group(1)
-                channel_name = "BF"
+                point, wavelength = match.groups()
+                channel_name = f"Fluorescence_{wavelength}"
             else:
-                continue
+                match = brightfield_pattern.match(image_path)
+                if match:
+                    point = match.group(1)
+                    channel_name = "BF"
+                else:
+                    continue
 
-        # check if the point has already been processed
-        new_filename = f"Time{int(time):05d}_Point{int(point):04d}.tiff"
-        output_path = os.path.join(output_dir, new_filename)
-        if os.path.exists(output_path) and not overwrite:
-            return
+            # check if the point has already been processed
+            new_filename = f"Time{int(time):05d}_Point{int(point):04d}.tiff"
+            output_path = os.path.join(output_dir, new_filename)
+            if os.path.exists(output_path) and not overwrite:
+                return
 
-        # load the images
-        image = tifffile.imread(os.path.join(dir_path, image_path))
-        metadata = ome_types.from_tiff(os.path.join(dir_path, image_path))
+            # load the images
+            image = tifffile.imread(os.path.join(dir_path, image_path))
+            metadata = ome_types.from_tiff(os.path.join(dir_path, image_path))
 
-        channels_data.append(image)
-        channels_metadata.append(metadata)
-        channels_names.append(channel_name)
+            channels_data.append(image)
+            channels_metadata.append(metadata)
+            channels_names.append(channel_name)
 
-    # sort the channels
-    sorted_channels = sorted(
-        zip(channels_data, channels_metadata, channels_names), key=lambda x: x[2]
-    )
-    # put the first element to the end if it is a brightfield image
-    if sorted_channels[0][2] == "BF":
-        sorted_channels.append(sorted_channels.pop(0))
-
-    # merge the images
-    combined_channels_data = [channel[0] for channel in sorted_channels]
-    combined_channels_data = np.stack(combined_channels_data, axis=0)
-
-    # merge metadata
-    all_metadata = [channel[1].images[0] for channel in sorted_channels]
-
-    size_x = all_metadata[0].pixels.size_x
-    size_y = all_metadata[0].pixels.size_y
-    size_c = len(all_metadata)
-    size_t = 1
-    size_z = all_metadata[0].pixels.size_z
-
-    physical_size_x = all_metadata[0].pixels.physical_size_x
-    physical_size_y = all_metadata[0].pixels.physical_size_y
-
-    dtype = all_metadata[0].pixels.type
-    dimension_order = "XYCZT"
-
-    id = all_metadata[0].pixels.id
-
-    ordered_channel_names = [channel[2] for channel in sorted_channels]
-
-    combined_channels_metadata = []
-
-    for i, meta in enumerate(all_metadata):
-        channel = Channel(
-            name=ordered_channel_names[i], id=f"Channel:{i}", samples_per_pixel=1
+        # sort the channels
+        sorted_channels = sorted(
+            zip(channels_data, channels_metadata, channels_names), key=lambda x: x[2]
         )
-        combined_channels_metadata.append(channel)
+        # put the first element to the end if it is a brightfield image
+        if sorted_channels[0][2] == "BF":
+            sorted_channels.append(sorted_channels.pop(0))
 
-    merged_pixels = Pixels(
-        size_x=size_x,
-        size_y=size_y,
-        size_c=size_c,
-        size_t=size_t,
-        size_z=size_z,
-        dimension_order=dimension_order,
-        type=dtype,
-        physical_size_x=physical_size_x,
-        physical_size_y=physical_size_y,
-        id=id,
-        channels=combined_channels_metadata,
-        tiff_data_blocks=[{}],
-    )
-    merged_metadata = Image(pixels=merged_pixels)
-    merged_metadata.id = all_metadata[0].id
+        # merge the images
+        combined_channels_data = [channel[0] for channel in sorted_channels]
+        combined_channels_data = np.stack(combined_channels_data, axis=0)
 
-    merged_metadata.acquisition_date = all_metadata[0].acquisition_date
+        # merge metadata
+        all_metadata = [channel[1].images[0] for channel in sorted_channels]
 
-    merged_OME = ome_types.OME(images=[merged_metadata])
-    # Save the image with compression and metadata
+        size_x = all_metadata[0].pixels.size_x
+        size_y = all_metadata[0].pixels.size_y
+        size_c = len(all_metadata)
+        size_t = 1
+        size_z = all_metadata[0].pixels.size_z
 
-    combined_channels_data = np.expand_dims(combined_channels_data, axis=(0, 1))
+        physical_size_x = all_metadata[0].pixels.physical_size_x
+        physical_size_y = all_metadata[0].pixels.physical_size_y
 
-    OmeTiffWriter.save(combined_channels_data, output_path, ome_xml=merged_OME)
+        dtype = all_metadata[0].pixels.type
+        dimension_order = "XYCZT"
+
+        id = all_metadata[0].pixels.id
+
+        ordered_channel_names = [channel[2] for channel in sorted_channels]
+
+        combined_channels_metadata = []
+
+        for i, meta in enumerate(all_metadata):
+            channel = Channel(
+                name=ordered_channel_names[i], id=f"Channel:{i}", samples_per_pixel=1
+            )
+            combined_channels_metadata.append(channel)
+
+        merged_pixels = Pixels(
+            size_x=size_x,
+            size_y=size_y,
+            size_c=size_c,
+            size_t=size_t,
+            size_z=size_z,
+            dimension_order=dimension_order,
+            type=dtype,
+            physical_size_x=physical_size_x,
+            physical_size_y=physical_size_y,
+            id=id,
+            channels=combined_channels_metadata,
+            tiff_data_blocks=[{}],
+        )
+        merged_metadata = Image(pixels=merged_pixels)
+        merged_metadata.id = all_metadata[0].id
+
+        merged_metadata.acquisition_date = all_metadata[0].acquisition_date
+
+        merged_OME = ome_types.OME(images=[merged_metadata])
+        # Save the image with compression and metadata
+
+        combined_channels_data = np.expand_dims(combined_channels_data, axis=(0, 1))
+
+        OmeTiffWriter.save(combined_channels_data, output_path, ome_xml=merged_OME)
+    except Exception as e:
+        print(f"Error processing point {point_list}: {e}")
 
 
 def process_directory(dir_path, output_dir, time, overwrite=False):
