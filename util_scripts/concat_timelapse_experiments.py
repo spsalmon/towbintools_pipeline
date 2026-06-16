@@ -8,17 +8,16 @@ from joblib import Parallel
 from towbintools.foundation.file_handling import get_dir_filemap
 from tqdm import tqdm
 
-experiment_dir = "/mnt/towbin.data/shared/nschoonjans/20260402_Ziva_60X_397-405-AID_nuclear_shape_chambers"
+experiment_dir = "/mnt/towbin.data/shared/spsalmon/20240524_161257_273_LIPSI_40x_397_405_no_crash/analysis/nuclei_types"
 dir_list = [
-    "part1",
-    "part2",
-    "part3",
+    "pad1",
+    "pad2",
 ]
 time_regex = r"Time(\d+)"
 point_regex = r"Point(\d+)"
 
 dir_list = [os.path.join(experiment_dir, d) for d in dir_list]
-output_dir = os.path.join(experiment_dir, "raw_nd2")
+output_dir = os.path.join(experiment_dir, "")
 backup_dir = os.path.join(experiment_dir, "backup")
 os.makedirs(backup_dir, exist_ok=True)
 os.makedirs(output_dir, exist_ok=True)
