@@ -204,6 +204,6 @@ if __name__ == "__main__":
     input_dir = args.input_dir
     output_dir = args.output_dir
 
-    overwrite = True
+    overwrite = False
 
     merge_and_rename_images(input_dir, output_dir, overwrite)
