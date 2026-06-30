@@ -554,6 +554,10 @@ def set_marker_shape(
     m4,
     custom_annotations: list = [],
     dark_mode: bool = False,
+    m1_entry=np.nan,
+    m2_entry=np.nan,
+    m3_entry=np.nan,
+    m4_entry=np.nan,
 ):
     symbols = []
     for qc in qcs:
@@ -622,6 +626,22 @@ def set_marker_shape(
         except IndexError:
             print(f"M4 {m4} not in list of times")
 
+    entry_specs = [
+        (m1_entry, "orange"),
+        (m2_entry, "yellow"),
+        (m3_entry, "green"),
+        (m4_entry, "blue"),
+    ]
+    for entry_time, color in entry_specs:
+        if np.isfinite(entry_time) and entry_time in times_of_point:
+            try:
+                entry_index = np.where(times_of_point == entry_time)[0][0]
+                symbols[entry_index] = "diamond"
+                sizes[entry_index] = 8
+                colors[entry_index] = color
+            except IndexError:
+                print(f"Molt entry {entry_time} not in list of times")
+
     widths = [1] * len(symbols)
     widths[int(selected_time_index)] = 4
 
@@ -649,19 +669,41 @@ def get_points_for_value_at_molts(
     value_at_m2,
     value_at_m3,
     value_at_m4,
+    m1_entry=np.nan,
+    m2_entry=np.nan,
+    m3_entry=np.nan,
+    m4_entry=np.nan,
+    value_at_m1_entry=np.nan,
+    value_at_m2_entry=np.nan,
+    value_at_m3_entry=np.nan,
+    value_at_m4_entry=np.nan,
 ):
-    ecdys_list = [hatch, m1, m2, m3, m4]
+    ecdys_list = [hatch, m1, m2, m3, m4, m1_entry, m2_entry, m3_entry, m4_entry]
     value_at_ecdys_list = [
         value_at_hatch,
         value_at_m1,
         value_at_m2,
         value_at_m3,
         value_at_m4,
+        value_at_m1_entry,
+        value_at_m2_entry,
+        value_at_m3_entry,
+        value_at_m4_entry,
     ]
-    symbols = ["cross", "cross", "cross", "cross", "cross"]
-    colors = ["red", "orange", "yellow", "green", "blue"]
-    sizes = [8, 8, 8, 8, 8]
-    widths = [4, 4, 4, 4, 4]
+    symbols = ["cross"] * 5 + ["x"] * 4
+    colors = [
+        "red",
+        "orange",
+        "yellow",
+        "green",
+        "blue",
+        "orange",
+        "yellow",
+        "green",
+        "blue",
+    ]
+    sizes = [8] * 9
+    widths = [4] * 9
 
     # Use numpy to handle NaN values efficiently
     ecdys_array = np.array(ecdys_list)
@@ -684,3 +726,37 @@ def get_points_for_value_at_molts(
         sizes_filtered,
         widths_filtered,
     )
+
+
+def get_molt_interval_bands(entry_times, exit_times, colors, opacity=0.15):
+    """Build Plotly rect shapes spanning each molt's entry->exit interval.
+
+    A band is produced only for molts where both endpoints are finite numbers.
+    """
+
+    def _finite(val):
+        try:
+            return np.isfinite(float(val))
+        except (TypeError, ValueError):
+            return False
+
+    bands = []
+    for entry, exit_time, color in zip(entry_times, exit_times, colors):
+        if _finite(entry) and _finite(exit_time):
+            x0, x1 = sorted([float(entry), float(exit_time)])
+            bands.append(
+                dict(
+                    type="rect",
+                    xref="x",
+                    yref="paper",
+                    x0=x0,
+                    x1=x1,
+                    y0=0,
+                    y1=1,
+                    fillcolor=color,
+                    opacity=opacity,
+                    layer="below",
+                    line_width=0,
+                )
+            )
+    return bands
