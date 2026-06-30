@@ -1,6 +1,7 @@
 import numpy as np
 import polars as pl
 from app_components.backend import build_single_values_df
+from app_components.backend import MOLT_ENTRY_COLUMNS
 from app_components.backend import populate_column_choices
 from app_components.backend import process_feature_at_molt_columns
 
@@ -129,3 +130,32 @@ def test_full_startup_pipeline_does_not_crash():
     assert default_plotted_column == "placeholder_feature"
     assert overlay_seg == ["None"]
     assert "Point" in single_values_df.columns
+
+
+def test_build_single_values_df_adds_entry_columns_as_nan():
+    filemap = make_minimal_filemap()
+    result_filemap, *_ = populate_column_choices(filemap)
+    df = build_single_values_df(result_filemap)
+    for col in MOLT_ENTRY_COLUMNS:
+        assert col in df.columns
+        values = df.select(col).to_numpy().squeeze().astype(float)
+        assert np.all(np.isnan(values)), f"{col} should be all NaN, got {values}"
+
+
+def test_process_feature_at_molt_columns_adds_feature_at_entry_columns():
+    filemap = make_minimal_filemap()
+    filemap, _, feature_columns, *_ = populate_column_choices(filemap)
+    result = process_feature_at_molt_columns(filemap, feature_columns)
+    for entry in MOLT_ENTRY_COLUMNS:
+        col = f"placeholder_feature_at_{entry}"
+        assert col in result.columns
+
+
+def test_existing_ecdysis_columns_still_present():
+    """Canonical developmental-event columns must remain untouched."""
+    filemap = make_minimal_filemap()
+    filemap, _, feature_columns, *_ = populate_column_choices(filemap)
+    result = process_feature_at_molt_columns(filemap, feature_columns)
+    for col in ["HatchTime", "M1", "M2", "M3", "M4"]:
+        assert col in result.columns
+        assert f"placeholder_feature_at_{col}" in result.columns
