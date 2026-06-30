@@ -1,9 +1,11 @@
 import numpy as np
 import polars as pl
 from app_components.backend import build_single_values_df
+from app_components.backend import get_molt_interval_bands
 from app_components.backend import MOLT_ENTRY_COLUMNS
 from app_components.backend import populate_column_choices
 from app_components.backend import process_feature_at_molt_columns
+from app_components.backend import set_marker_shape
 
 
 def make_minimal_filemap():
@@ -159,3 +161,53 @@ def test_existing_ecdysis_columns_still_present():
     for col in ["HatchTime", "M1", "M2", "M3", "M4"]:
         assert col in result.columns
         assert f"placeholder_feature_at_{col}" in result.columns
+
+
+# --- get_molt_interval_bands ---
+
+
+def test_get_molt_interval_bands_only_when_both_endpoints_finite():
+    # M1: entry=1, exit=3 -> band; M2: entry=5, exit=nan -> no band;
+    # M3: entry=nan, exit=9 -> no band; M4: entry=nan, exit=nan -> no band
+    bands = get_molt_interval_bands(
+        [1.0, 5.0, np.nan, np.nan],
+        [3.0, np.nan, 9.0, np.nan],
+        ["orange", "yellow", "green", "blue"],
+    )
+    assert len(bands) == 1
+    band = bands[0]
+    assert band["type"] == "rect"
+    assert band["x0"] == 1.0 and band["x1"] == 3.0
+    assert band["fillcolor"] == "orange"
+    assert band["layer"] == "below"
+
+
+def test_get_molt_interval_bands_orders_endpoints():
+    bands = get_molt_interval_bands([7.0], [2.0], ["orange"])
+    assert bands[0]["x0"] == 2.0 and bands[0]["x1"] == 7.0
+
+
+def test_get_molt_interval_bands_tolerates_empty_string():
+    bands = get_molt_interval_bands(["", 4.0], ["", 6.0], ["orange", "yellow"])
+    assert len(bands) == 1
+    assert bands[0]["fillcolor"] == "yellow"
+
+
+# --- set_marker_shape ---
+
+
+def test_set_marker_shape_marks_entry_as_diamond():
+    times = np.array([0, 1, 2, 3, 4])
+    qcs = np.array(["worm"] * 5)
+    markers = set_marker_shape(
+        times,
+        selected_time_index=0,
+        qcs=qcs,
+        hatch_time=np.nan,
+        m1=np.nan,
+        m2=np.nan,
+        m3=np.nan,
+        m4=np.nan,
+        m1_entry=2.0,
+    )
+    assert "diamond" in markers["symbol"]
