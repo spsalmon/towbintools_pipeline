@@ -1,6 +1,28 @@
 #!/bin/bash
+set -euo pipefail
 
-rm *lock.yml
+# Regenerate the lock files from environment.yml.
+#
+# Two files are produced and BOTH are committed:
+#   - conda-lock.yml        canonical conda-lock solve (render input, source of truth)
+#   - conda-linux-64.lock   explicit render -> the file install/update actually consume
+#
+# install_pipeline.sh and update_pipeline.sh both read conda-linux-64.lock in two
+# phases: micromamba installs the conda packages from it, and pip installs the pip
+# packages from its `# pip <name> @ <url>#sha256=...` comment lines. Keeping conda
+# and pip separate avoids combined-transaction failures when files are held open by
+# running jobs or a Jupyter kernel.
+#
+# We deliberately do NOT render the `env` kind (conda-linux-64.lock.yml): it used to
+# be depended on, then stopped being generated, which silently broke env updates.
 
+cd "$(dirname "$0")"
+
+# Drop stale artifacts so the directory only holds the current lock files.
+rm -f conda-lock.yml conda-linux-64.lock conda-linux-64.lock.yml
+
+# 1. Solve the environment -> conda-lock.yml
 ~/.local/bin/micromamba run -n towbintools conda-lock lock -f environment.yml -p linux-64 --micromamba
-~/.local/bin/micromamba run -n towbintools conda-lock render
+
+# 2. Render the explicit single-platform lock -> conda-linux-64.lock
+~/.local/bin/micromamba run -n towbintools conda-lock render -k explicit
