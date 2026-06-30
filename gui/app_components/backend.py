@@ -13,6 +13,10 @@ from towbintools.foundation.worm_features import get_features_to_compute_at_molt
 # constant definitions
 FEATURES_TO_COMPUTE_AT_MOLT = get_features_to_compute_at_molt()
 ECDYSIS_COLUMNS = ["HatchTime", "M1", "M2", "M3", "M4"]
+MOLT_ENTRY_COLUMNS = ["M1Entry", "M2Entry", "M3Entry", "M4Entry"]
+# Events that get a feature-value-at-event column in the GUI. ECDYSIS_COLUMNS
+# stays the canonical developmental-events constant for downstream consumers.
+VALUE_AT_COLUMNS = ECDYSIS_COLUMNS + MOLT_ENTRY_COLUMNS
 
 KEY_CONVERSION_MAP = {
     "vol": "volume",
@@ -220,12 +224,12 @@ def separate_column_by_point(filemap, column):
 
 
 def get_time_and_ecdysis(filemap):
-    ecdysis_df = filemap.select(pl.col(ECDYSIS_COLUMNS + ["Point"]))
+    ecdysis_df = filemap.select(pl.col(VALUE_AT_COLUMNS + ["Point"]))
     ecdysis_time = (
         (
             ecdysis_df.group_by("Point", maintain_order=True)
-            .agg(pl.col(ECDYSIS_COLUMNS).first())
-            .select(pl.col(ECDYSIS_COLUMNS))
+            .agg(pl.col(VALUE_AT_COLUMNS).first())
+            .select(pl.col(VALUE_AT_COLUMNS))
         )
         .to_numpy()
         .squeeze()
@@ -273,13 +277,13 @@ def get_time_and_ecdysis(filemap):
 def build_single_values_df(filemap):
     columns = filemap.columns
 
-    for ecdys in ECDYSIS_COLUMNS:
+    for ecdys in VALUE_AT_COLUMNS:
         if ecdys not in columns:
             filemap = filemap.with_columns(pl.lit(np.nan).alias(ecdys))
 
     columns_to_keep = ["Point"]
     columns_to_keep.extend([col for col in columns if "_at_" in col])
-    columns_to_keep.extend(ECDYSIS_COLUMNS)
+    columns_to_keep.extend(VALUE_AT_COLUMNS)
 
     single_values_df = filemap.select(pl.col(columns_to_keep))
 
@@ -302,7 +306,7 @@ def process_feature_at_molt_columns(
 ):
     columns = filemap.columns
 
-    for ecdys in ECDYSIS_COLUMNS:
+    for ecdys in VALUE_AT_COLUMNS:
         if ecdys not in filemap.columns:
             filemap = filemap.with_columns(pl.lit(np.nan).alias(ecdys))
 
@@ -332,7 +336,7 @@ def process_feature_at_molt_columns(
 
         series = separate_column_by_point(filemap, feature_column)
         feature_at_ecdysis_columns = [
-            f"{feature_column}_at_{ecdys}" for ecdys in ECDYSIS_COLUMNS
+            f"{feature_column}_at_{ecdys}" for ecdys in VALUE_AT_COLUMNS
         ]
         for column in feature_at_ecdysis_columns:
             if column not in columns:
@@ -378,8 +382,7 @@ def process_feature_at_molt_columns(
 
 
 def _get_values_at_molt(filemap, column):
-    ecdysis = ["HatchTime", "M1", "M2", "M3", "M4"]
-    columns_at_ecdysis = [f"{column}_at_{e}" for e in ecdysis]
+    columns_at_ecdysis = [f"{column}_at_{e}" for e in VALUE_AT_COLUMNS]
 
     column_list = ["Point"] + columns_at_ecdysis
     filemap = filemap.select(pl.col(column_list))
