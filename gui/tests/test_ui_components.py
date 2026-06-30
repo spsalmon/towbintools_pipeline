@@ -1,4 +1,5 @@
 from app_components.backend import ECDYSIS_COLUMNS
+from app_components.backend import MOLT_ENTRY_COLUMNS
 from app_components.ui import create_molt_annotator
 from app_components.ui import create_timepoint_selector
 from app_components.ui_components import time_point_navigator
@@ -20,7 +21,9 @@ def test_navigator_uses_flexbox_class():
 
 def test_annotation_buttons_have_padding_container():
     """Annotation buttons must be wrapped in annotation-buttons-container."""
-    tag = create_molt_annotator(ECDYSIS_COLUMNS, custom_columns_choices=[])
+    tag = create_molt_annotator(
+        ECDYSIS_COLUMNS, MOLT_ENTRY_COLUMNS, custom_columns_choices=[]
+    )
     html = str(tag)
     assert "annotation-buttons-container" in html
 

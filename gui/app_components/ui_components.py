@@ -10,9 +10,8 @@ from shiny import ui
 
 # annotation buttons
 @module.ui
-def molt_annotation_buttons(molt, width=2):
-    return ui.column(
-        width,
+def molt_annotation_buttons(molt):
+    return ui.TagList(
         ui.row(ui.output_text("text")),
         ui.row(ui.input_action_button("set_molt", f"{molt}")),
         ui.row(ui.input_action_button("reset_molt", f"Reset {molt}")),
