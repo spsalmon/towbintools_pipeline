@@ -43,6 +43,51 @@ def get_backup_path(filemap_folder, filemap_name, filemap_extension):
     return filemap_save_path
 
 
+def _drop_join_artifact_columns(filemap):
+    """Drop polars join-artifact columns left over from an earlier bug.
+
+    A `<base>_right` column paired with an existing `<base>` column is the
+    signature of an accidental self-join collision (the default `_right`
+    suffix). These carry no meaningful data and must never be persisted; older
+    annotated filemaps may already contain them, so we heal them on open.
+    """
+    columns = set(filemap.columns)
+    artifacts = [
+        col
+        for col in filemap.columns
+        if col.endswith("_right") and col[: -len("_right")] in columns
+    ]
+    if artifacts:
+        filemap = filemap.drop(artifacts)
+    return filemap
+
+
+def _coerce_event_columns_to_float(filemap):
+    """Coerce developmental-event columns and their feature-at-event columns to
+    Float64, turning empty strings and other unparseable values into null.
+
+    Older pipeline versions persisted newly-introduced event columns (e.g. the
+    molt-entry columns) as empty strings when no value existed yet. Reading such a
+    filemap back yields String columns that break the strict Float64 casts used
+    throughout the value-at-molt computations. These columns are always numeric,
+    so an unparseable value simply means "missing" (null / NaN).
+    """
+    event_columns = [
+        col
+        for col in filemap.columns
+        if col in VALUE_AT_COLUMNS
+        or any(col.endswith(f"_at_{event}") for event in VALUE_AT_COLUMNS)
+    ]
+    string_event_columns = [
+        col for col in event_columns if filemap.schema[col] == pl.String
+    ]
+    if string_event_columns:
+        filemap = filemap.with_columns(
+            [pl.col(col).cast(pl.Float64, strict=False) for col in string_event_columns]
+        )
+    return filemap
+
+
 def open_filemap(filemap_path, open_annotated=True, lazy_loading=False):
     filemap_folder = os.path.dirname(filemap_path)
     filemap_name, filemap_extension = os.path.splitext(os.path.basename(filemap_path))
@@ -70,6 +115,10 @@ def open_filemap(filemap_path, open_annotated=True, lazy_loading=False):
     for col in filemap.columns:
         if "worm_type" in col:
             filemap = filemap.rename({col: col.replace("worm_type", "qc")})
+    # Heal join-artifact `_right` columns leaked by an earlier save-collision bug.
+    filemap = _drop_join_artifact_columns(filemap)
+    # Older filemaps may store event columns (e.g. molt-entry) as empty strings.
+    filemap = _coerce_event_columns_to_float(filemap)
     # Backup the filemap
     backup_path = get_backup_path(filemap_folder, filemap_name, filemap_extension)
     write_filemap(filemap, backup_path)
@@ -110,20 +159,21 @@ def infer_n_channels(filemap, raw_column="raw"):
 
 
 def populate_column_choices(filemap):
-    usual_columns = [
-        "Time",
-        "ExperimentTime",
-        "Point",
-        "HatchTime",
-        "M1",
-        "M2",
-        "M3",
-        "M4",
-        "Arrest",
-        "Ignore",
-        "Death",
-        "Dead",
-    ]
+    usual_columns = (
+        [
+            "Time",
+            "ExperimentTime",
+            "Point",
+        ]
+        + ECDYSIS_COLUMNS
+        + MOLT_ENTRY_COLUMNS
+        + [
+            "Arrest",
+            "Ignore",
+            "Death",
+            "Dead",
+        ]
+    )
 
     raw_columns = [column for column in filemap.columns if "raw" in column]
     usual_columns.extend(raw_columns)
@@ -275,6 +325,7 @@ def get_time_and_ecdysis(filemap):
 
 
 def build_single_values_df(filemap):
+    filemap = _coerce_event_columns_to_float(filemap)
     columns = filemap.columns
 
     for ecdys in VALUE_AT_COLUMNS:
@@ -304,6 +355,7 @@ def build_single_values_df(filemap):
 def process_feature_at_molt_columns(
     filemap, feature_columns, recompute_features_at_molt=False
 ):
+    filemap = _coerce_event_columns_to_float(filemap)
     columns = filemap.columns
 
     for ecdys in VALUE_AT_COLUMNS:
