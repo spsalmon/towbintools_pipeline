@@ -467,7 +467,7 @@ def main_server(
         work_df_columns.remove("Point")
         work_df_columns.remove("Time")
 
-        columns_to_drop = [c for c in work_df_columns if c in filemap.columns]
+        columns_to_drop = [c for c in work_df_columns if c in filemap_to_save.columns]
         if len(columns_to_drop) > 0:
             filemap_to_save = filemap_to_save.drop(columns_to_drop)
 

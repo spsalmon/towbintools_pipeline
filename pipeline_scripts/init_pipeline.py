@@ -88,6 +88,7 @@ def main(global_config, temp_dir_basename, temp_dir, subdir=None):
     extract_experiment_time = config.get("get_experiment_time", True)
     overwrite_annotated = config.get("overwrite_annotated_filemap", False)
 
+    # if the filemap does not exist, create it from the raw directory
     if not os.path.exists(
         os.path.join(report_subdir, f"analysis_filemap.{report_format}")
     ):
@@ -110,66 +111,59 @@ def main(global_config, temp_dir_basename, temp_dir, subdir=None):
         experiment_filemap = experiment_filemap.fill_nan("").fill_null("")
         write_filemap(experiment_filemap, filemap_path)
 
+    # select the right filemap
+    if overwrite_annotated and os.path.exists(
+        os.path.join(report_subdir, f"analysis_filemap_annotated.{report_format}")
+    ):
+        filemap_path = os.path.join(
+            report_subdir, f"analysis_filemap_annotated.{report_format}"
+        )
     else:
-        if overwrite_annotated and os.path.exists(
-            os.path.join(report_subdir, f"analysis_filemap_annotated.{report_format}")
-        ):
-            filemap_path = os.path.join(
-                report_subdir, f"analysis_filemap_annotated.{report_format}"
-            )
-        else:
-            filemap_path = os.path.join(
-                report_subdir, f"analysis_filemap.{report_format}"
-            )
+        filemap_path = os.path.join(report_subdir, f"analysis_filemap.{report_format}")
 
-        experiment_filemap = read_filemap(filemap_path)
-        experiment_filemap = experiment_filemap.fill_nan("").fill_null("")
+    experiment_filemap = read_filemap(filemap_path)
+    experiment_filemap = experiment_filemap.fill_nan("").fill_null("")
 
-        # Check for new files added to the raw directory since the filemap was created
-        if (
-            "Time" in experiment_filemap.columns
-            and "Point" in experiment_filemap.columns
-        ):
-            try:
-                current_dir_filemap = get_dir_filemap(
-                    raw_subdir, time_regex, point_regex
+    # Check for new files added to the raw directory since the filemap was created
+    if "Time" in experiment_filemap.columns and "Point" in experiment_filemap.columns:
+        try:
+            current_dir_filemap = get_dir_filemap(raw_subdir, time_regex, point_regex)
+            if not current_dir_filemap.is_empty():
+                current_dir_filemap = current_dir_filemap.rename(
+                    {"ImagePath": raw_dir_name}
                 )
-                if not current_dir_filemap.is_empty():
-                    current_dir_filemap = current_dir_filemap.rename(
-                        {"ImagePath": raw_dir_name}
+                new_rows = current_dir_filemap.join(
+                    experiment_filemap.select(["Time", "Point"]),
+                    on=["Time", "Point"],
+                    how="anti",
+                )
+                if not new_rows.is_empty():
+                    print(
+                        f"### Found {len(new_rows)} new file(s) in {raw_subdir}, adding to filemap ###"
                     )
-                    new_rows = current_dir_filemap.join(
-                        experiment_filemap.select(["Time", "Point"]),
-                        on=["Time", "Point"],
-                        how="anti",
-                    )
-                    if not new_rows.is_empty():
-                        print(
-                            f"### Found {len(new_rows)} new file(s) in {raw_subdir}, adding to filemap ###"
-                        )
-                        for col in experiment_filemap.columns:
-                            if col not in new_rows.columns:
-                                new_rows = new_rows.with_columns(
-                                    pl.lit(None)
-                                    .cast(experiment_filemap[col].dtype)
-                                    .alias(col)
-                                )
-                        new_rows = new_rows.select(experiment_filemap.columns)
-                        experiment_filemap = pl.concat(
-                            [experiment_filemap, new_rows]
-                        ).sort(["Time", "Point"])
-                        # Fill string columns with ""; numeric nulls (ExperimentTime)
-                        # stay null and are computed below.
-                        experiment_filemap = experiment_filemap.with_columns(
-                            pl.col(c).fill_null("")
-                            for c, dt in zip(
-                                experiment_filemap.columns, experiment_filemap.dtypes
+                    for col in experiment_filemap.columns:
+                        if col not in new_rows.columns:
+                            new_rows = new_rows.with_columns(
+                                pl.lit(None)
+                                .cast(experiment_filemap[col].dtype)
+                                .alias(col)
                             )
-                            if dt in (pl.Utf8, pl.String, pl.Categorical)
+                    new_rows = new_rows.select(experiment_filemap.columns)
+                    experiment_filemap = pl.concat([experiment_filemap, new_rows]).sort(
+                        ["Time", "Point"]
+                    )
+                    # Fill string columns with ""; numeric nulls (ExperimentTime)
+                    # stay null and are computed below.
+                    experiment_filemap = experiment_filemap.with_columns(
+                        pl.col(c).fill_null("")
+                        for c, dt in zip(
+                            experiment_filemap.columns, experiment_filemap.dtypes
                         )
-                        write_filemap(experiment_filemap, filemap_path)
-            except Exception as e:
-                print(f"Warning: could not check for new files in raw directory: {e}")
+                        if dt in (pl.Utf8, pl.String, pl.Categorical)
+                    )
+                    write_filemap(experiment_filemap, filemap_path)
+        except Exception as e:
+            print(f"Warning: could not check for new files in raw directory: {e}")
 
     config["filemap_path"] = filemap_path
 
