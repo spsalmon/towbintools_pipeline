@@ -20,9 +20,9 @@ def create_molt_annotator(ecdysis_list_id, entry_list_id, custom_columns_choices
             molt_columns.append(
                 ui.column(
                     2,
-                    molt_annotation_buttons(entry, molt=entry),
-                    ui.hr(),
                     molt_annotation_buttons(molt, molt=molt),
+                    ui.hr(),
+                    molt_annotation_buttons(entry, molt=entry),
                 )
             )
         else:
