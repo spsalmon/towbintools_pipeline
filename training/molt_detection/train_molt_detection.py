@@ -62,7 +62,7 @@ if __name__ == "__main__":
 
     model_save_dir = "./model_checkpoints"
     save_best_k_models = 1
-    max_epochs = 100
+    max_epochs = 50
     accumulate_grad_batches = 1
 
     device = "gpu" if torch.cuda.is_available() else "cpu"
