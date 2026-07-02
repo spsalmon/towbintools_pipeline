@@ -2,208 +2,118 @@ import os
 import pickle
 
 import numpy as np
-import pandas as pd
-from scipy.stats import norm
+import polars as pl
+from towbintools.data_analysis.growth_rate import (
+    compute_instantaneous_growth_rate_classified,
+)
 from towbintools.data_analysis.time_series import correct_series_with_classification
+from towbintools.foundation.file_handling import read_filemap
 from tqdm import tqdm
 
 
-def get_landmarks(annotation, landmark_names):
-    landmarks = []
-    for landmark_name in landmark_names:
-        try:
-            landmark_x = annotation[annotation["Name"] == landmark_name]["X"].values[0]
-        except IndexError:
-            landmark_x = np.nan
-        landmarks.append(landmark_x)
+def landmarks_to_gaussian_keymap(landmarks, length, sigma_frames=3.0):
+    landmarks = np.asarray(landmarks, dtype=float)
+    nan_mask = np.isnan(landmarks)
+    centers = np.where(nan_mask, 0.0, landmarks)[:, None]
+    x = np.arange(length, dtype=float)[None, :]
 
-    landmarks = np.array(landmarks)
-
-    return landmarks
-
-
-def landmarks_to_gaussian_keymap(
-    landmarks, sigma=1.5, rescale_length=200, multi_output=False
-):
-    landmarks_gaussian_keymap = []
-
-    for i in range(len(landmarks)):
-        if np.isnan(landmarks[i]):
-            landmarks_gaussian_keymap.append(np.zeros(rescale_length))
-        else:
-            X = norm(landmarks[i] * 100, sigma)
-            pdf = X.pdf(np.linspace(0, 100, rescale_length))
-            normalized_pdf = pdf / np.max(pdf)
-            landmarks_gaussian_keymap.append(normalized_pdf)
-
-    if multi_output:
-        return np.array(landmarks_gaussian_keymap)
-    gaussian_keymap = np.sum(landmarks_gaussian_keymap, axis=0)
-    return gaussian_keymap
-
-
-def build_gaussian_keymaps(
-    filemap, landmark_names, sigma=1.5, rescale_length=200, multi_output=False
-):
-    keymaps = []
-    for i, row in filemap.iterrows():
-        annotation_path = row["annotation"]
-        annotation = pd.read_csv(annotation_path)
-        # get the landmarks
-        landmarks = get_landmarks(annotation, landmark_names)
-        # create the keymap
-        keymap = landmarks_to_gaussian_keymap(
-            landmarks,
-            sigma=sigma,
-            rescale_length=rescale_length,
-            multi_output=multi_output,
-        )
-        keymaps.append(keymap)
-    return np.array(keymaps)
-    return np.array(keymaps)
+    keymap = np.exp(-0.5 * ((x - centers) / sigma_frames) ** 2)
+    keymap[nan_mask] = 0.0
+    return keymap
 
 
 def get_analysis_filemap(experiment_path):
-    directories = [
+    analysis_dirs = [
         os.path.join(experiment_path, d)
         for d in os.listdir(experiment_path)
         if os.path.isdir(os.path.join(experiment_path, d))
+        and "analysis" in d
+        and "matlab" not in d
+    ]
+    report_dirs = [
+        report
+        for d in analysis_dirs
+        if os.path.isdir(report := os.path.join(d, "report"))
     ]
 
-    analysis_directories = [
-        d for d in directories if "analysis" in d and "matlab" not in d
-    ]
-    report_directories = [os.path.join(d, "report") for d in analysis_directories]
-
-    report_directories = [d for d in report_directories if os.path.isdir(d)]
-
-    for report_dir in report_directories:
-        files = [os.path.join(report_dir, f) for f in os.listdir(report_dir)]
-        filemap_files = [f for f in files if "analysis_filemap_annotated" in f]
-
-        # return the filemap that was modified most recently
-        if filemap_files:
-            filemap_files.sort(key=os.path.getmtime)
-            return os.path.join(report_dir, filemap_files[-1])
-        # check for converted experiments
+    for report_dir in report_dirs:
+        filemaps = [
+            os.path.join(report_dir, f)
+            for f in os.listdir(report_dir)
+            if "analysis_filemap_annotated" in f
+        ]
+        if filemaps:
+            return max(filemaps, key=os.path.getmtime)
     return None
-
-
-storage_cluster_path = "/mnt/towbin.data/shared"
-valid_experimentalists = ["kstojanovski", "plenart", "igheor", "spsalmon"]
-valid_scopes = ["ti2", "orca", "lipsi", "crest"]
-valid_scopes_variations = []
-for scope in valid_scopes:
-    valid_scopes_variations.append(scope)
-    valid_scopes_variations.append(scope.upper())
-    valid_scopes_variations.append(scope.capitalize())
-
-valid_experimentalists_dir = [
-    os.path.join(storage_cluster_path, exp) for exp in valid_experimentalists
-]
-
-filemaps = []
-for exp_dir in valid_experimentalists_dir:
-    experiment_directories = [
-        os.path.join(exp_dir, d)
-        for d in os.listdir(exp_dir)
-        if os.path.isdir(os.path.join(exp_dir, d))
-    ]
-
-    for exp in experiment_directories:
-        experiment_name = os.path.basename(os.path.normpath(exp))
-
-        try:
-            year = int(experiment_name[:4])
-            if year < 2024:
-                continue
-        except ValueError:
-            continue
-
-        if "10x" not in experiment_name and "10X" not in experiment_name:
-            continue
-
-        if not any(scope in experiment_name for scope in valid_scopes_variations):
-            continue
-
-        filemap = get_analysis_filemap(exp)
-
-        if filemap:
-            f = pd.read_csv(filemap, nrows=1)
-            if "ch2_seg_str_volume" not in f.columns:
-                continue
-            filemaps.append(filemap)
-
-print(f"Found {len(filemaps)} valid experiments")
 
 
 def get_features_and_ground_truth_molts(
     filemap,
     worm_type_column="ch2_seg_str_worm_type",
     volume_column="ch2_seg_str_volume",
-    slope=8,
-    sigma=1.5,
-    multi_output=True,
+    sigma_frames=3.0,
 ):
     X = []
     y = []
     keypoints_all = []
-    for point in filemap["Point"].unique():
-        point_data = filemap[filemap["Point"] == point]
-        data_of_point = point_data.sort_values(by=["Time"])
-        volume_data = point_data[volume_column].values
 
-        worm_type_data = point_data[worm_type_column].values
+    if worm_type_column not in filemap.columns:
+        worm_type_column = "ch2_seg_str_qc"
+
+    for point_data in filemap.partition_by("Point", maintain_order=True):
+        point_data = point_data.sort("Time")
+        point = point_data["Point"][0]
+
+        worm_type_data = point_data[worm_type_column].to_numpy()
         if np.all(worm_type_data == worm_type_data[0]):
-            print(
-                f"Skipping point {point} because all worm types are the same: {worm_type_data[0]}"
-            )
+            print(f"Skipping point {point}: all worm types are {worm_type_data[0]}")
             continue
 
-        volume_data = np.log(
+        keypoints = point_data.select(
+            pl.col(["HatchTime", "M1", "M2", "M3", "M4"]).cast(pl.Float64, strict=False)
+        ).to_numpy()[0]
+        if np.all(np.isnan(keypoints)):
+            print(f"Skipping point {point}: all keypoints are NaN")
+            continue
+        keypoints = keypoints[1:]
+
+        volume_data = point_data[volume_column].to_numpy()
+        series_length = volume_data.shape[-1]
+        if not 200 <= series_length <= 1000:
+            print(f"Skipping point {point}: length {series_length} outside [200, 1000]")
+            continue
+
+        log_volume_data = np.log(
             correct_series_with_classification(volume_data, worm_type_data)
         )
 
-        # get the molt times
-        keypoints = data_of_point[["HatchTime", "M1", "M2", "M3", "M4"]].values[0]
-        if np.all(np.isnan(keypoints)):
-            print(f"Skipping point {point} because all keypoints are NaN")
-            continue
-
-        keypoints = keypoints[1:]
-
-        normalized_keypoints = keypoints / volume_data.shape[0]
-
-        rescale_length = volume_data.shape[-1]
-
-        if rescale_length < 200 or rescale_length > 1000:
-            print(
-                f"Skipping point {point} because length is not in the [200, 1000] range: {rescale_length}"
-            )
-            continue
-
-        gaussian_keymaps = landmarks_to_gaussian_keymap(
-            normalized_keypoints,
-            sigma=sigma,
-            rescale_length=rescale_length,
-            multi_output=multi_output,
+        log_volume_growth_rate = compute_instantaneous_growth_rate_classified(
+            log_volume_data,
+            time=np.linspace(0, series_length - 1, series_length),
+            qc=worm_type_data,
+            lmbda=0.005,
+            order=2,
+            medfilt_window=5,
         )
-        y.append(gaussian_keymaps)
 
-        X.append(volume_data)
+        features = np.stack([log_volume_data, log_volume_growth_rate], axis=0)
+
+        X.append(features)
+        y.append(
+            landmarks_to_gaussian_keymap(
+                keypoints, length=series_length, sigma_frames=sigma_frames
+            )
+        )
         keypoints_all.append(keypoints)
 
-    return np.array(X), np.array(y), keypoints_all
+    return X, y, keypoints_all
 
 
 def get_all_features_and_ground_truth_molts(
     filemaps,
-    keymap_type="gaussian",
     worm_type_column="ch2_seg_str_worm_type",
     volume_column="ch2_seg_str_volume",
-    slope=8,
-    sigma=1.5,
-    multi_output=True,
+    sigma_frames=3.0,
 ):
     X = []
     y = []
@@ -211,47 +121,79 @@ def get_all_features_and_ground_truth_molts(
 
     for filemap_path in tqdm(filemaps):
         print(f"Processing filemap: {filemap_path}")
-        filemap = pd.read_csv(filemap_path, low_memory=False)
         try:
             X_i, y_i, keypoints_i = get_features_and_ground_truth_molts(
-                filemap,
-                keymap_type=keymap_type,
+                read_filemap(filemap_path),
                 worm_type_column=worm_type_column,
                 volume_column=volume_column,
-                slope=slope,
-                sigma=sigma,
-                multi_output=multi_output,
+                sigma_frames=sigma_frames,
             )
-            if X_i is not None and X_i.size > 0:
-                X.extend(X_i)
-                y.extend(y_i)
-                keypoints_all.extend(keypoints_i)
+            X.extend(X_i)
+            y.extend(y_i)
+            keypoints_all.extend(keypoints_i)
         except Exception as e:
             print(f"Error processing filemap {filemap_path}: {e}")
-            continue
 
-    # y = np.array(y)
-    keypoints_all = np.array(keypoints_all)
-
-    return X, y, keypoints_all
+    return X, y, np.array(keypoints_all)
 
 
-keymap_type = "gaussian"
-sigma = 0.5
-segment_names = ["M1", "M2", "M3", "M4"]
-multi_output = True
-slope = 5
-
-X, y, keypoints_all = get_all_features_and_ground_truth_molts(
-    filemaps,
-    keymap_type=keymap_type,
-    worm_type_column="ch2_seg_str_worm_type",
+def find_valid_filemaps(
+    storage_cluster_path="/mnt/towbin.data/shared",
+    experimentalists=("kstojanovski", "plenart", "igheor", "spsalmon"),
+    scopes=("ti2", "orca", "lipsi", "crest"),
     volume_column="ch2_seg_str_volume",
-    slope=slope,
-    sigma=sigma,
-    multi_output=multi_output,
-)
+):
+    scope_variations = {
+        variation
+        for scope in scopes
+        for variation in (scope, scope.upper(), scope.capitalize())
+    }
 
-pickle.dump(X, open("X_molt_detection.pickle", "wb"))
-pickle.dump(y, open(f"y_{keymap_type}_molt_detection.pickle", "wb"))
-pickle.dump(keypoints_all, open("keypoints_molt_detection.pickle", "wb"))
+    filemaps = []
+    for experimentalist in experimentalists:
+        exp_dir = os.path.join(storage_cluster_path, experimentalist)
+        for name in os.listdir(exp_dir):
+            experiment = os.path.join(exp_dir, name)
+            if not os.path.isdir(experiment):
+                continue
+
+            try:
+                if int(name[:4]) < 2024:
+                    continue
+            except ValueError:
+                continue
+
+            if "10x" not in name and "10X" not in name:
+                continue
+            if not any(scope in name for scope in scope_variations):
+                continue
+
+            filemap_path = get_analysis_filemap(experiment)
+            if filemap_path is None:
+                continue
+
+            f = read_filemap(filemap_path)
+            if volume_column not in f.columns:
+                continue
+            filemaps.append(filemap_path)
+
+    return filemaps
+
+
+if __name__ == "__main__":
+    keymap_type = "gaussian"
+    sigma_frames = 2.0
+
+    filemaps = find_valid_filemaps()
+    print(f"Found {len(filemaps)} valid experiments")
+
+    X, y, keypoints_all = get_all_features_and_ground_truth_molts(
+        filemaps,
+        worm_type_column="ch2_seg_str_worm_type",
+        volume_column="ch2_seg_str_volume",
+        sigma_frames=sigma_frames,
+    )
+
+    pickle.dump(X, open("X_molt_detection.pickle", "wb"))
+    pickle.dump(y, open(f"y_{keymap_type}_molt_detection.pickle", "wb"))
+    pickle.dump(keypoints_all, open("keypoints_molt_detection.pickle", "wb"))

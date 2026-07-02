@@ -6,7 +6,6 @@ from sklearn.model_selection import train_test_split
 from torch.utils.data import DataLoader
 from towbintools.deep_learning.architectures import KeypointDetection1DModel
 from towbintools.deep_learning.utils.dataset import KeypointDetection1DTrainingDataset
-from towbintools.deep_learning.utils.loss import PeakWeightedMSELoss
 
 if __name__ == "__main__":
     X = pickle.load(open("X_molt_detection.pickle", "rb"))
@@ -21,24 +20,24 @@ if __name__ == "__main__":
     batch_size = 64
 
     model = KeypointDetection1DModel(
-        input_channels=1,
+        input_channels=2,
         n_classes=4,
         learning_rate=1e-4,
-        criterion=PeakWeightedMSELoss(peak_weight=3.0),
-        architecture="UnetPlusPlus",
-        activation="none",
+        activation="sigmoid",
     )
 
     train_dataset = KeypointDetection1DTrainingDataset(
         inputs=X_raw_train,
-        targets=y_train,
+        heatmap_targets=y_train,
+        index_targets=keypoints_train,
         enforce_divisibility_by=32,
         resize_method="pad",
     )
 
     val_dataset = KeypointDetection1DTrainingDataset(
         inputs=X_raw_test,
-        targets=y_test,
+        heatmap_targets=y_test,
+        index_targets=keypoints_test,
         enforce_divisibility_by=32,
         resize_method="pad",
     )
