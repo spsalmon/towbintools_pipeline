@@ -140,7 +140,7 @@ def get_all_features_and_ground_truth_molts(
 def find_valid_filemaps(
     storage_cluster_path="/mnt/towbin.data/shared",
     experimentalists=("kstojanovski", "plenart", "igheor", "spsalmon"),
-    scopes=("ti2", "orca", "lipsi", "crest"),
+    scopes=("ti2", "orca", "lipsi", "crest", "squid"),
     volume_column="ch2_seg_str_volume",
 ):
     scope_variations = {

@@ -10,6 +10,7 @@ from joblib import delayed
 from joblib import Parallel
 from joblib import parallel_config
 from torch.utils.data import DataLoader
+from towbintools.data_analysis import compute_instantaneous_growth_rate_classified
 from towbintools.data_analysis import compute_series_at_time_classified
 from towbintools.data_analysis import correct_series_with_classification
 from towbintools.deep_learning.deep_learning_tools import (
@@ -130,28 +131,32 @@ def run_detect_molts_deep_learning(
         hatch_indices.append(hatch_time)
     hatch_indices = np.array(hatch_indices)
 
-    molt_detection_data = []
+    features = []
     for column in molt_detection_columns:
         if column not in analysis_filemap.columns:
             raise ValueError(f"Column {column} not found in analysis filemap.")
         column_data = separate_column_by_point(analysis_filemap, column)
 
-        print(f"Column data shape for {column}: {column_data.shape}")
-
-        corrected_column_data = []
         for i, series_i in enumerate(column_data):
             worm_type_i = worm_type_data[i]
-            corrected_column_data.append(
-                np.log(
-                    correct_series_with_classification(
-                        series_i,
-                        worm_type_i,
-                    )
-                )
-            )
-        molt_detection_data.append(np.array(corrected_column_data))
+            series_length = series_i.shape[-1]
 
-    molt_detection_data = np.array(molt_detection_data).squeeze()
+            log_volume_data = np.log(
+                correct_series_with_classification(series_i, worm_type_i)
+            )
+
+            log_volume_growth_rate = compute_instantaneous_growth_rate_classified(
+                log_volume_data,
+                time=np.linspace(0, series_length - 1, series_length),
+                qc=worm_type_i,
+                lmbda=0.005,
+                order=2,
+                medfilt_window=5,
+            )
+
+            features.append(np.stack([log_volume_data, log_volume_growth_rate], axis=0))
+
+    molt_detection_data = np.stack(features, axis=0)
     if molt_detection_data.ndim == 1:
         molt_detection_data = molt_detection_data[np.newaxis, ...]
 
@@ -178,18 +183,26 @@ def run_detect_molts_deep_learning(
     molts_indices = []
     with torch.no_grad():
         for batch in tqdm(dataloader):
-            x, invalid_series_index, original_shapes = batch
+            x, valid_mask, invalid_series_index, original_shapes = batch
             x = x.to(device)
-            heatmaps = model(x)
+            valid_mask = valid_mask.to(device)
+            heatmaps, presences = model(x, mask=valid_mask)
             heatmaps = heatmaps.cpu().numpy()
+            presences = presences.cpu().numpy()
 
-            for j, heatmap in enumerate(heatmaps):
+            print(
+                f"heatmaps shape: {heatmaps.shape}, presences shape: {presences.shape}"
+            )
+            print(f"heatmaps: {heatmaps}")
+            print(f"presences: {presences}")
+
+            for j, (heatmap, presence) in enumerate(zip(heatmaps, presences)):
                 if j in invalid_series_index:
                     molts_indices.append(
                         [np.nan] * 4
                     )  # series was invalid so no molts could be detected
                 else:
-                    m = heatmap_to_keypoints_1D(heatmap, height_threshold=0.5)
+                    m = heatmap_to_keypoints_1D(heatmap, presence)
                     print(f"Molts detected : {m}")
                     molts_indices.append(m)
 
