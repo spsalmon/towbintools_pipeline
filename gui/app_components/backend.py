@@ -289,7 +289,15 @@ def get_time_and_ecdysis(filemap):
 
     if "ExperimentTime" not in filemap.columns:
         filemap = filemap.with_columns(pl.lit(np.nan).alias("ExperimentTime"))
-    # TODO : this is a quick fix, because missing values are now sometimes stored as '', which cannot be converted to float
+    filemap = filemap.with_columns(
+        pl.col("ExperimentTime")
+        .cast(pl.Utf8)
+        .str.strip_chars()
+        .replace("", None)
+        .cast(pl.Float64, strict=False)
+        .alias("ExperimentTime")
+    )
+
     if filemap.select(pl.col("ExperimentTime")).drop_nulls().is_empty():
         filemap = filemap.with_columns(pl.lit(np.nan).alias("ExperimentTime"))
 
