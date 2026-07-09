@@ -394,13 +394,17 @@ def process_feature_at_molt_columns(
     for feature_column in feature_columns:
         # convert the feature column to float
         filemap = filemap.with_columns(pl.col(feature_column).cast(pl.Float64))
-        if len(qc_columns) == 1:
+
+        series = separate_column_by_point(filemap, feature_column)
+        if len(qc_columns) == 0:
+            # No qc column at all: treat every timepoint as a valid worm, matching
+            # the placeholder_qc default in populate_column_choices.
+            qcs = np.full(series.shape, "worm", dtype=object)
+        elif len(qc_columns) == 1:
             qcs = separate_column_by_point(filemap, qc_columns[0])
         else:
             qc_column = find_best_string_match(feature_column, qc_columns)
             qcs = separate_column_by_point(filemap, qc_column)
-
-        series = separate_column_by_point(filemap, feature_column)
         feature_at_ecdysis_columns = [
             f"{feature_column}_at_{ecdys}" for ecdys in VALUE_AT_COLUMNS
         ]

@@ -300,6 +300,17 @@ def main_server(
                         )
                     )
 
+            # Always classify frames using the qc of the filemap currently open in
+            # the GUI, never the qc the imported file happens to carry. Drop any
+            # imported qc so values-at-molt are computed against the GUI's qc only.
+            imported_df = imported_df.drop(
+                [col for col in imported_df.columns if "qc" in col]
+            )
+            for col in [col for col in filemap.columns if "qc" in col]:
+                imported_df = imported_df.with_columns(
+                    pl.lit(filemap.select(pl.col(col)).to_numpy().squeeze()).alias(col)
+                )
+
             imported_df = process_feature_at_molt_columns(
                 imported_df, feature_columns, recompute_features_at_molt=False
             )

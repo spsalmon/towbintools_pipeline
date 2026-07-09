@@ -147,6 +147,22 @@ def test_process_feature_at_molt_columns_adds_feature_at_molt_columns():
         assert col in result.columns
 
 
+def test_process_feature_at_molt_columns_without_qc_column():
+    """The annotation-import flow builds a fresh dataframe from the imported file
+    and calls this function directly, without the placeholder_qc that
+    populate_column_choices would otherwise inject. A filemap that carries a
+    feature column but no qc column at all must not crash (regression: an empty
+    qc_columns list produced a None column name)."""
+    filemap = make_minimal_filemap().with_columns(
+        pl.Series("ch2_seg_str_volume", [1.0, 2.0, 3.0, 1.5, 2.5, 3.5]),
+        pl.Series("ExperimentTime", [0.0, 3600.0, 7200.0, 0.0, 3600.0, 7200.0]),
+    )
+    assert not [c for c in filemap.columns if "qc" in c]
+    result = process_feature_at_molt_columns(filemap, ["ch2_seg_str_volume"])
+    for ecdys in ["HatchTime", "M1", "M2", "M3", "M4"]:
+        assert f"ch2_seg_str_volume_at_{ecdys}" in result.columns
+
+
 def test_full_startup_pipeline_does_not_crash():
     """Simulate the full initialize_ui backend flow (minus infer_n_channels)."""
     filemap = make_minimal_filemap()
