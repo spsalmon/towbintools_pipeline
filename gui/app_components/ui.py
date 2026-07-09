@@ -2,6 +2,7 @@ from pathlib import Path
 
 import polars as pl
 from app_components.backend import ECDYSIS_COLUMNS
+from app_components.backend import fix_experiment_time
 from app_components.backend import infer_n_channels
 from app_components.backend import MOLT_ENTRY_COLUMNS
 from app_components.backend import populate_column_choices
@@ -155,6 +156,8 @@ def create_timepoint_selector(
 
 def initialize_ui(filemap, recompute_features_at_molt=False):
     print("Initializing the UI ...")
+
+    filemap = fix_experiment_time(filemap)
 
     times = (
         filemap.select(pl.col("Time"))

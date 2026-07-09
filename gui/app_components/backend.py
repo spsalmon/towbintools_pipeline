@@ -26,6 +26,23 @@ KEY_CONVERSION_MAP = {
 }
 
 
+def fix_experiment_time(filemap):
+    if "ExperimentTime" not in filemap.columns:
+        filemap = filemap.with_columns(pl.lit(np.nan).alias("ExperimentTime"))
+    filemap = filemap.with_columns(
+        pl.col("ExperimentTime")
+        .cast(pl.Utf8)
+        .str.strip_chars()
+        .replace("", None)
+        .cast(pl.Float64, strict=False)
+        .alias("ExperimentTime")
+    )
+
+    if filemap.select(pl.col("ExperimentTime")).drop_nulls().is_empty():
+        filemap = filemap.with_columns(pl.lit(np.nan).alias("ExperimentTime"))
+    return filemap
+
+
 def get_backup_path(filemap_folder, filemap_name, filemap_extension):
     # check if the filemap is already annotated
     match = re.search(r"annotated_v(/d+)", filemap_name)
@@ -286,20 +303,6 @@ def get_time_and_ecdysis(filemap):
     )
 
     time = separate_column_by_point(filemap, "Time").astype(float)
-
-    if "ExperimentTime" not in filemap.columns:
-        filemap = filemap.with_columns(pl.lit(np.nan).alias("ExperimentTime"))
-    filemap = filemap.with_columns(
-        pl.col("ExperimentTime")
-        .cast(pl.Utf8)
-        .str.strip_chars()
-        .replace("", None)
-        .cast(pl.Float64, strict=False)
-        .alias("ExperimentTime")
-    )
-
-    if filemap.select(pl.col("ExperimentTime")).drop_nulls().is_empty():
-        filemap = filemap.with_columns(pl.lit(np.nan).alias("ExperimentTime"))
 
     experiment_time = separate_column_by_point(filemap, "ExperimentTime").astype(float)
 
