@@ -8,6 +8,7 @@ from towbintools.foundation.file_handling import add_dir_to_experiment_filemap
 from pipeline_scripts.utils import create_linker_command
 from pipeline_scripts.utils import get_input_and_output_files
 from pipeline_scripts.utils import get_output_name
+from pipeline_scripts.utils import get_python_command
 from pipeline_scripts.utils import pickle_objects
 from pipeline_scripts.utils import run_command
 
@@ -151,7 +152,7 @@ class BuildingBlock(ABC):
 
     def create_command(
         self,
-        micromamba_path,
+        python_command,
         input_pickle_path,
         output_pickle_path,
         pickled_block_config,
@@ -164,7 +165,7 @@ class BuildingBlock(ABC):
         if script_path.endswith(".sh"):
             command = f"bash {script_path} --input {input_pickle_path} -output {output_pickle_path} --block_config {pickled_block_config} --config {pickled_config}"
         elif script_path.endswith(".py"):
-            command = f"{micromamba_path} run -n towbintools python3 {script_path} --input {input_pickle_path} --output {output_pickle_path} --block_config {pickled_block_config} --config {pickled_config} --n_jobs {config['sbatch_cpus']}"
+            command = f"{python_command} {script_path} --input {input_pickle_path} --output {output_pickle_path} --block_config {pickled_block_config} --config {pickled_config} --n_jobs {config['sbatch_cpus']}"
         else:
             raise ValueError(
                 f"Script type of {script_path} is not supported. The pipeline only supports bash or python scripts."
@@ -176,7 +177,7 @@ class BuildingBlock(ABC):
 
     def run(self, experiment_filemap, config, subdir=None):
         block_config = self.block_config
-        micromamba_path = config.get("micromamba_path", "~/.local/bin/micromamba")
+        python_command = get_python_command(config)
         temp_dir = config["temp_dir"]
 
         if self.requires_filemap:
@@ -208,7 +209,7 @@ class BuildingBlock(ABC):
                 )
 
                 command = self.create_command(
-                    micromamba_path,
+                    python_command,
                     input_pickle_path,
                     output_pickle_path,
                     pickled_block_config,
@@ -218,7 +219,7 @@ class BuildingBlock(ABC):
                 )
 
                 linker_command = create_linker_command(
-                    micromamba_path, temp_dir, subdir
+                    python_command, temp_dir, subdir
                 )
 
                 run_command(
@@ -232,7 +233,7 @@ class BuildingBlock(ABC):
 
             else:
                 linker_command = create_linker_command(
-                    micromamba_path, temp_dir, subdir
+                    python_command, temp_dir, subdir
                 )
                 run_command(
                     "# No input files found, skipping this building block.",
@@ -266,7 +267,7 @@ class BuildingBlock(ABC):
                 )
 
                 command = self.create_command(
-                    micromamba_path,
+                    python_command,
                     input_pickle_path,
                     output_file,
                     pickled_block_config,
@@ -276,7 +277,7 @@ class BuildingBlock(ABC):
                 )
 
                 linker_command = create_linker_command(
-                    micromamba_path, temp_dir, output_file
+                    python_command, temp_dir, output_file
                 )
 
                 run_command(
@@ -290,7 +291,7 @@ class BuildingBlock(ABC):
 
             else:
                 linker_command = create_linker_command(
-                    micromamba_path, temp_dir, output_file
+                    python_command, temp_dir, output_file
                 )
                 run_command(
                     "# No input files found, skipping this building block.",
