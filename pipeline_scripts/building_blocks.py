@@ -12,6 +12,11 @@ from pipeline_scripts.utils import get_python_command
 from pipeline_scripts.utils import pickle_objects
 from pipeline_scripts.utils import run_command
 
+# Resolve bundled scripts/models relative to this package, so the pipeline
+# works regardless of the current working directory.
+_PIPELINE_DIR = os.path.dirname(os.path.abspath(__file__))
+_REPO_DIR = os.path.dirname(_PIPELINE_DIR)
+
 OPTIONS_MAP = {
     "segmentation": [
         "rerun_segmentation",
@@ -103,7 +108,9 @@ DEFAULT_OPTIONS = {
     "molt_detection": {
         "rerun_molt_detection": [False],
         "molt_detection_method": ["deep_learning"],
-        "molt_detection_model_path": ["./models/molt_detection_model.ckpt"],
+        "molt_detection_model_path": [
+            os.path.join(_REPO_DIR, "models", "molt_detection_model.ckpt")
+        ],
         "molt_detection_batch_size": [1],
         "molt_detection_volume": [
             None
@@ -161,6 +168,10 @@ class BuildingBlock(ABC):
         pickled_filemap_path=None,
     ):
         script_path = self.script_path
+        # Resolve bundled (relative) worker scripts against the repo root so the
+        # command works regardless of the current working directory.
+        if not os.path.isabs(script_path):
+            script_path = os.path.normpath(os.path.join(_REPO_DIR, script_path))
 
         if script_path.endswith(".sh"):
             command = f"bash {script_path} --input {input_pickle_path} -output {output_pickle_path} --block_config {pickled_block_config} --config {pickled_config}"
