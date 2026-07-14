@@ -1,0 +1,21 @@
+# Cross-platform, micromamba-free environment for running the pipeline core
+# locally (Windows/Linux/macOS). Create it with plain conda or mamba:
+#
+#   conda env create -f requirements/environment_local.yml
+#   conda activate towbintools_local
+#
+# The cluster/micromamba install (install_pipeline.sh + conda-lock) is
+# unchanged; this file is the lightweight local alternative.
+name: towbintools_local
+channels:
+  - conda-forge
+dependencies:
+  - python=3.12
+  - pip
+  - pip:
+      - towbintools   # pulls numpy, polars, torch (CPU on Windows), etc.
+      - tifffile
+      - pyyaml
+      - joblib
+      - lxml          # avoids OME-TIFF metadata warnings when reading images
+      - pytest        # for the test suite
