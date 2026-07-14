@@ -10,8 +10,21 @@ docs piecemeal in the meantime.
 - `lxml` is needed to read OME-TIFF metadata cleanly (otherwise a warning).
 - Keep the existing cluster path documented too (micromamba + conda-lock +
   `install_pipeline.sh`) — it is unchanged.
-- (Once packaged) `pip install .` / `pip install -e .` via pyproject.toml, and
-  how that relates to the conda/lock install.
+- `pip install -e ".[dev]"` (via pyproject.toml) installs the pipeline as a
+  package so it runs from anywhere (no repo-root / PYTHONPATH). Local install is
+  two steps from the repo root: `conda env create -f
+  requirements/environment_local.yml`, then `pip install -e ".[dev]"`. (conda
+  resolves a pip `-e .` relative to the yml's dir, so we don't put it in the yml.)
+- Explain the dependency layering:
+  1. pyproject.toml = what the pipeline needs (abstract deps, single source).
+  2. environment*.yml = how to build an env (conda-vs-pip delivery choice).
+  3. conda-lock.yml / conda-linux-64.lock = exact pinned solve (cluster).
+
+## Deferred cleanup (engineering, not just docs)
+- Consolidate the CLUSTER `environment.yml` to source deps from pyproject
+  (pip section `- .`), so the dep list is not duplicated; then regenerate the
+  lock. Needs deliberate testing on the cluster — do it in the packaging
+  milestone, not before.
 
 ## Running the pipeline
 - New `backend` config option: `slurm` (default, submits jobs) vs `local` (runs
