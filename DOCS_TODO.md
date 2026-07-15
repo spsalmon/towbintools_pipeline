@@ -4,12 +4,23 @@ Running notes of things to include when the docs (README + book) are rewritten
 at the end of the refactor. Add to this as we change things; don't edit the
 docs piecemeal in the meantime.
 
+## Repo structure
+- `towbintools_pipeline/` = core pipeline package (`python -m
+  towbintools_pipeline...`). `defaults/` = bundled `config/` + `models/`
+  (fallbacks/examples). `scripts/` = automation bash. `tools/` = one-off
+  data-conversion helpers (auxiliary). `examples/custom_scripts/` = user
+  extension-point templates. `training/` and `gui/` are separate auxiliary
+  trees. Add a repo map to the README.
+- Run/install now via scripts/: `bash scripts/run_pipeline.sh`,
+  `bash scripts/install_pipeline.sh`.
+
 ## Installation / environment
 - Local install without micromamba, any OS: `conda env create -f
   requirements/environment_local.yml`, then `conda activate towbintools_local`.
 - `lxml` is needed to read OME-TIFF metadata cleanly (otherwise a warning).
 - Keep the existing cluster path documented too (micromamba + conda-lock +
-  `install_pipeline.sh`) — it is unchanged.
+  `scripts/install_pipeline.sh`) — install logic unchanged, only moved to
+  scripts/.
 - `pip install -e ".[dev]"` (via pyproject.toml) installs the pipeline as a
   package so it runs from anywhere (no repo-root / PYTHONPATH). Local install is
   two steps from the repo root: `conda env create -f
