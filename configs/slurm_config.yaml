@@ -1,0 +1,8 @@
+# SLURM resource requests for the per-block worker jobs. Merged into the main
+# config at startup when backend is "slurm" (see init_pipeline). Keeping the
+# cluster knobs here means a new cluster is adjusted in one place. Any sbatch_*
+# key set directly in the main config takes precedence over this file.
+sbatch_memory: 64G
+sbatch_time: 0-48:00:00
+sbatch_cpus: 32
+sbatch_gpus: "rtx6000:1"

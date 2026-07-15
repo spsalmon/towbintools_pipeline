@@ -9,11 +9,12 @@ get_experiment_time: True
 time_regex: 'Time(\d+)'
 point_regex: 'Point(\d+)'
 
-# SLURM parameters
-sbatch_memory: 64G
-sbatch_time: 0-48:00:00
-sbatch_cpus: 32
-sbatch_gpus: "rtx6000:1"
+# Compute parallelism for the workers (all backends): joblib --n_jobs.
+n_jobs: 32
+
+# SLURM resources for the cluster backend are kept in a separate file, merged
+# in at startup (only when backend is slurm). Path is relative to this file.
+slurm_config: "slurm_config.yaml"
 
 #########################################################################################################
 ################################# IMAGE ANALYSIS PIPELINE CONFIGURATION #################################

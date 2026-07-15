@@ -7,6 +7,7 @@ import sys
 
 import numpy as np
 import polars as pl
+import yaml
 from joblib import delayed
 from joblib import Parallel
 from joblib import parallel_config
@@ -432,6 +433,39 @@ def cleanup_files(*filepaths):
 
 
 # ----BOILERPLATE CODE FOR SLURM----
+
+_REPO_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
+
+def merge_slurm_config(global_config, config_file):
+    # SLURM resource requests live in a separate file for the cluster backend,
+    # so the cluster knobs sit in one place. Merge them into the config at
+    # startup; inline sbatch_* keys take precedence, so single-file configs keep
+    # working. No-op for the local backend.
+    if global_config.get("backend", "slurm") != "slurm":
+        return global_config
+
+    slurm_config_path = global_config.get("slurm_config")
+    if slurm_config_path is None:
+        # Bundled default, shipped alongside the example config.
+        slurm_config_path = os.path.join(_REPO_DIR, "configs", "slurm_config.yaml")
+    elif not os.path.isabs(slurm_config_path):
+        # A relative path is resolved against the main config file's directory.
+        slurm_config_path = os.path.join(
+            os.path.dirname(os.path.abspath(config_file)), slurm_config_path
+        )
+
+    if not os.path.exists(slurm_config_path):
+        print(f"SLURM config file not found, skipping: {slurm_config_path}")
+        return global_config
+
+    with open(slurm_config_path) as f:
+        slurm_config = yaml.load(f, Loader=yaml.FullLoader) or {}
+
+    # Inline keys win over the file.
+    for key, value in slurm_config.items():
+        global_config.setdefault(key, value)
+    return global_config
 
 
 def get_python_command(config):
