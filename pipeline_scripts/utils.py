@@ -511,30 +511,26 @@ def run_command(
         )
         return
 
+    # GPU directive only for blocks that need it and when a gpu is configured.
     gpus = config.get("sbatch_gpus", None)
-    if requires_gpu and gpus is not None:
-        script_path = create_sbatch_file(
-            script_name,
-            config["temp_dir"],
-            config["sbatch_cpus"],
-            config["sbatch_time"],
-            config["sbatch_memory"],
-            command,
-            gpus=gpus,
-            run_linker=run_linker,
-            linker_command=linker_command,
-        )
-    else:
-        script_path = create_sbatch_file(
-            script_name,
-            config["temp_dir"],
-            config["sbatch_cpus"],
-            config["sbatch_time"],
-            config["sbatch_memory"],
-            command,
-            run_linker=run_linker,
-            linker_command=linker_command,
-        )
+    if not requires_gpu:
+        gpus = None
+
+    # Cores requested follow n_jobs when sbatch_cpus is unset (and vice versa).
+    cores = config.get("sbatch_cpus", config.get("n_jobs"))
+
+    script_path = create_sbatch_file(
+        script_name,
+        config["temp_dir"],
+        cores,
+        config.get("sbatch_time"),
+        config.get("sbatch_memory"),
+        command,
+        gpus=gpus,
+        extra_options=config.get("sbatch_extra_options"),
+        run_linker=run_linker,
+        linker_command=linker_command,
+    )
     subprocess.run(["sbatch", script_path])
 
 
@@ -546,6 +542,7 @@ def create_sbatch_file(
     memory,
     command,
     gpus=None,
+    extra_options=None,
     run_linker=True,
     linker_command=None,
 ):
@@ -553,23 +550,34 @@ def create_sbatch_file(
     batch_dir = os.path.join(temp_dir, "batch")
     os.makedirs(batch_dir, exist_ok=True)
 
-    # Build SLURM header
-    content = f"""#!/bin/bash
-#SBATCH -J {job_name}
-#SBATCH -o {os.path.join(temp_dir, 'sbatch_output', job_name)}-%j.out
-#SBATCH -e {os.path.join(temp_dir, 'sbatch_output', job_name)}-%j.err
-#SBATCH -c {cores}
-#SBATCH -t {time_limit}
-#SBATCH --mem={memory}
+    # Build SLURM header. Standard directives are emitted only when set, so a
+    # cluster can drop one (e.g. omit --mem in favour of a --mem-per-cpu entry
+    # in extra_options). extra_options are raw sbatch option strings, each
+    # rendered verbatim as a `#SBATCH <option>` line (e.g. "--account=gratis").
+    directives = [
+        f"-J {job_name}",
+        f"-o {os.path.join(temp_dir, 'sbatch_output', job_name)}-%j.out",
+        f"-e {os.path.join(temp_dir, 'sbatch_output', job_name)}-%j.err",
+    ]
+    if cores is not None:
+        directives.append(f"-c {cores}")
+    if time_limit is not None:
+        directives.append(f"-t {time_limit}")
+    if memory is not None:
+        directives.append(f"--mem={memory}")
+    if gpus is not None:
+        directives.append(f"--gres=gpu:{gpus}")
+    for option in extra_options or []:
+        directives.append(str(option))
 
+    header = "#!/bin/bash\n" + "".join(f"#SBATCH {d}\n" for d in directives)
+
+    content = f"""{header}
 ## this is a test for removing issues with lock files
 # export TMPDIR={os.path.join(temp_dir, 'tmp', "$SLURM_JOB_ID")}
 # mkdir -p $TMPDIR
 # export XDG_CACHE_HOME={os.path.join(temp_dir, 'cache')}
 """
-
-    if gpus is not None:
-        content += f"#SBATCH --gres=gpu:{gpus}\n"
 
     # set environment variables for single threaded execution (doesn't solve our problem, so I commented it out)
     #     content += """

@@ -6,3 +6,12 @@ sbatch_memory: 64G
 sbatch_time: 0-48:00:00
 sbatch_cpus: 32
 sbatch_gpus: "rtx6000:1"
+
+# Extra raw sbatch options for cluster-specific needs. Each entry is rendered
+# verbatim as a `#SBATCH <entry>` line, so any directive works. A standard key
+# above can be omitted to replace it (e.g. drop sbatch_memory and request
+# memory per cpu here instead).
+# sbatch_extra_options:
+#   - "--account=gratis"
+#   - "--mem-per-cpu=4G"
+#   - "--partition=gpu"
