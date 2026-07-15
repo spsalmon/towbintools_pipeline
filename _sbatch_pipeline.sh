@@ -8,7 +8,7 @@
 #SBATCH --gres=pipelinecapacity:1
 OMP_NUM_THREADS=1
 # Default configuration file
-DEFAULT_CONFIG_FILE="./configs/config.yaml"
+DEFAULT_CONFIG_FILE="./defaults/config/config.yaml"
 CONFIG_FILE="$DEFAULT_CONFIG_FILE"
 TEMP_DIR="./temp_files"
 # Function to show usage

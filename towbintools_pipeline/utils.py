@@ -448,7 +448,7 @@ def merge_slurm_config(global_config, config_file):
     slurm_config_path = global_config.get("slurm_config")
     if slurm_config_path is None:
         # Bundled default, shipped alongside the example config.
-        slurm_config_path = os.path.join(_REPO_DIR, "configs", "slurm_config.yaml")
+        slurm_config_path = os.path.join(_REPO_DIR, "defaults", "config", "slurm_config.yaml")
     elif not os.path.isabs(slurm_config_path):
         # A relative path is resolved against the main config file's directory.
         slurm_config_path = os.path.join(
