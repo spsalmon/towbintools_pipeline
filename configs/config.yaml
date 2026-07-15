@@ -1,5 +1,11 @@
+# Can be overridden with the --experiment_dir CLI flag.
 experiment_dir: "/mnt/towbin.data/shared/spsalmon/pipeline_test_folder/"
 analysis_dir_name: "analysis"
+
+# Temp files default to <experiment_dir>/temp_files. Override with the
+# --temp_dir CLI flag or an explicit temp_dir key here.
+# temp_dir: "/path/to/temp_files"
+
 raw_dir_name: "raw"
 report_format: "parquet"
 pixelsize: [ 0.65 ]
