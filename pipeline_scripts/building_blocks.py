@@ -173,10 +173,15 @@ class BuildingBlock(ABC):
         if not os.path.isabs(script_path):
             script_path = os.path.normpath(os.path.join(_REPO_DIR, script_path))
 
+        # Worker compute parallelism (joblib --n_jobs), needed by every backend.
+        # Falls back to the SLURM cpu request so configs that only set
+        # sbatch_cpus keep working.
+        n_jobs = config.get("n_jobs", config.get("sbatch_cpus", 1))
+
         if script_path.endswith(".sh"):
             command = f"bash {script_path} --input {input_pickle_path} -output {output_pickle_path} --block_config {pickled_block_config} --config {pickled_config}"
         elif script_path.endswith(".py"):
-            command = f"{python_command} {script_path} --input {input_pickle_path} --output {output_pickle_path} --block_config {pickled_block_config} --config {pickled_config} --n_jobs {config['sbatch_cpus']}"
+            command = f"{python_command} {script_path} --input {input_pickle_path} --output {output_pickle_path} --block_config {pickled_block_config} --config {pickled_config} --n_jobs {n_jobs}"
         else:
             raise ValueError(
                 f"Script type of {script_path} is not supported. The pipeline only supports bash or python scripts."
