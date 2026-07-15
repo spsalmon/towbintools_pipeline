@@ -1,5 +1,8 @@
 #!/usr/bin/env bash
 
+# Run from the repo root so ./gui/run.py resolves.
+cd "$(dirname "$0")/.."
+
 # --- Configuration: edit these ---
 FILEMAP_PATH="/mnt/towbin.data/shared/kstojanovski/20240202_Orca_10x_yap-1del_col-10-tir_wBT160-186-310-337-380-393_25C_20240202_171239_051/analysis_sacha/report/demo/analysis_filemap_annotated.csv"
 OPEN_ANNOTATED=1      # 1 = open annotated if exists, 0 = always open original
