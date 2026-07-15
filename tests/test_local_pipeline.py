@@ -27,14 +27,16 @@ def _write_image(path, blob_width):
     tifffile.imwrite(str(path), image, photometric="minisblack")
 
 
-def test_local_pipeline_segmentation_and_morphology(tmp_path):
+def _build_experiment(tmp_path, config_experiment_dir=None):
+    # Tiny 2-image raw experiment + a local-backend config; returns config_path.
+    # config_experiment_dir overrides what the config records as experiment_dir.
     raw_dir = tmp_path / "exp" / "raw"
     raw_dir.mkdir(parents=True)
     _write_image(raw_dir / "Time000000_Point000000_synthetic.tiff", 50)
     _write_image(raw_dir / "Time000001_Point000000_synthetic.tiff", 55)
 
     config = {
-        "experiment_dir": str(tmp_path / "exp"),
+        "experiment_dir": config_experiment_dir or str(tmp_path / "exp"),
         "analysis_dir_name": "analysis",
         "raw_dir_name": "raw",
         "report_format": "csv",
@@ -53,27 +55,34 @@ def test_local_pipeline_segmentation_and_morphology(tmp_path):
     config_path = tmp_path / "config.yaml"
     with open(config_path, "w") as f:
         yaml.safe_dump(config, f)
+    return config_path
 
-    temp_dir = tmp_path / "pipeline_temp"
 
+def _run_pipeline(config_path, extra_args=()):
     # Run from the repo root so `-m pipeline_scripts...` resolves; the local
     # backend launches the workers with this same interpreter (sys.executable).
     env = dict(os.environ, PYTHONPATH=REPO_ROOT)
-    result = subprocess.run(
+    return subprocess.run(
         [
             sys.executable,
             "-m",
             "pipeline_scripts.init_pipeline",
             "-c",
             str(config_path),
-            "--temp_dir",
-            str(temp_dir),
+            *extra_args,
         ],
         cwd=REPO_ROOT,
         env=env,
         capture_output=True,
         text=True,
     )
+
+
+def test_local_pipeline_segmentation_and_morphology(tmp_path):
+    config_path = _build_experiment(tmp_path)
+    temp_dir = tmp_path / "pipeline_temp"
+
+    result = _run_pipeline(config_path, ["--temp_dir", str(temp_dir)])
     assert (
         result.returncode == 0
     ), f"pipeline failed:\n{result.stdout}\n{result.stderr}"
@@ -90,3 +99,44 @@ def test_local_pipeline_segmentation_and_morphology(tmp_path):
         rows = list(csv.DictReader(f))
     assert len(rows) == 2
     assert all(float(r["ch1_seg_area"]) > 0 for r in rows)
+
+
+def test_local_pipeline_default_temp_dir_next_to_experiment(tmp_path):
+    # Without --temp_dir (and no temp_dir config key), temp files default next
+    # to the experiment data, not the repo/cwd.
+    config_path = _build_experiment(tmp_path)
+
+    result = _run_pipeline(config_path)
+    assert (
+        result.returncode == 0
+    ), f"pipeline failed:\n{result.stdout}\n{result.stderr}"
+
+    default_temp = tmp_path / "exp" / "temp_files"
+    assert (default_temp / "pickles").is_dir()
+    # the run still produced its outputs under the experiment dir
+    morph_csv = tmp_path / "exp" / "analysis" / "report" / "ch1_seg_morphology.csv"
+    assert morph_csv.exists()
+
+
+def test_experiment_dir_cli_overrides_config(tmp_path):
+    # The config records a wrong experiment_dir; --experiment_dir points at the
+    # real data and must win, so the run finds the images and produces outputs.
+    config_path = _build_experiment(
+        tmp_path, config_experiment_dir=str(tmp_path / "wrong")
+    )
+
+    result = _run_pipeline(
+        config_path,
+        [
+            "--experiment_dir",
+            str(tmp_path / "exp"),
+            "--temp_dir",
+            str(tmp_path / "pipeline_temp"),
+        ],
+    )
+    assert (
+        result.returncode == 0
+    ), f"pipeline failed:\n{result.stdout}\n{result.stderr}"
+
+    morph_csv = tmp_path / "exp" / "analysis" / "report" / "ch1_seg_morphology.csv"
+    assert morph_csv.exists()
