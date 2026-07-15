@@ -33,6 +33,12 @@ docs piecemeal in the meantime.
   `python -m pipeline_scripts.init_pipeline -c <config> --temp_dir <dir>`.
 - For now the pipeline must be launched from the repo root (module invocation);
   this goes away once it is a proper installed package with an entry point.
+- `experiment_dir` can be given with `--experiment_dir` (overrides the config).
+- Temp/output location precedence: `--temp_dir` flag > `temp_dir` config key >
+  default `<experiment_dir>/temp_files`. Nothing is written inside the repo by
+  default (outputs already live under `experiment_dir`). Note the outer launch
+  script still makes a repo-root `sbatch_output/` — part of the
+  `_sbatch_pipeline.sh` follow-up below.
 
 ## Testing
 - `python -m pytest tests/ -v` runs the local-backend smoke test (synthetic
