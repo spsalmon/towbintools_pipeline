@@ -30,7 +30,7 @@ docs piecemeal in the meantime.
 - New `backend` config option: `slurm` (default, submits jobs) vs `local` (runs
   in-process, no slurm/micromamba).
 - Local run, from the repo root:
-  `python -m pipeline_scripts.init_pipeline -c <config> --temp_dir <dir>`.
+  `python -m towbintools_pipeline.init_pipeline -c <config> --temp_dir <dir>`.
 - For now the pipeline must be launched from the repo root (module invocation);
   this goes away once it is a proper installed package with an entry point.
 - `experiment_dir` can be given with `--experiment_dir` (overrides the config).
@@ -57,7 +57,7 @@ docs piecemeal in the meantime.
   `--mem-per-cpu` instead). `sbatch_extra_options` is a list of raw sbatch
   option strings rendered verbatim as `#SBATCH <option>` lines — cluster-specific
   directives (`--account`, `--mem-per-cpu`, `--partition`, custom gres) are now
-  config-only, no edits to `pipeline_scripts/utils.py`.
+  config-only, no edits to `towbintools_pipeline/utils.py`.
 - Per-block SLURM resources are still future work (currently one resource set
   for all worker jobs).
 

@@ -6,11 +6,11 @@ from towbintools.foundation.file_handling import add_dir_to_experiment_filemap
 from towbintools.foundation.file_handling import read_filemap
 from towbintools.foundation.file_handling import write_filemap
 
-from pipeline_scripts.utils import cleanup_files
-from pipeline_scripts.utils import load_pickles
-from pipeline_scripts.utils import merge_and_save_records
-from pipeline_scripts.utils import pickle_objects
-from pipeline_scripts.utils import sync_backup_folder
+from towbintools_pipeline.utils import cleanup_files
+from towbintools_pipeline.utils import load_pickles
+from towbintools_pipeline.utils import merge_and_save_records
+from towbintools_pipeline.utils import pickle_objects
+from towbintools_pipeline.utils import sync_backup_folder
 
 
 def get_args():

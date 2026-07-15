@@ -482,7 +482,7 @@ def create_linker_command(
     temp_dir,
     result,
 ):
-    linker_command = f"{python_command} -m pipeline_scripts.block_linker --temp_dir {temp_dir} --result {result}"
+    linker_command = f"{python_command} -m towbintools_pipeline.block_linker --temp_dir {temp_dir} --result {result}"
     return linker_command
 
 

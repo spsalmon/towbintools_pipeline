@@ -59,14 +59,14 @@ def _build_experiment(tmp_path, config_experiment_dir=None):
 
 
 def _run_pipeline(config_path, extra_args=()):
-    # Run from the repo root so `-m pipeline_scripts...` resolves; the local
+    # Run from the repo root so `-m towbintools_pipeline...` resolves; the local
     # backend launches the workers with this same interpreter (sys.executable).
     env = dict(os.environ, PYTHONPATH=REPO_ROOT)
     return subprocess.run(
         [
             sys.executable,
             "-m",
-            "pipeline_scripts.init_pipeline",
+            "towbintools_pipeline.init_pipeline",
             "-c",
             str(config_path),
             *extra_args,

@@ -8,14 +8,14 @@ from towbintools.foundation.file_handling import get_dir_filemap
 from towbintools.foundation.file_handling import read_filemap
 from towbintools.foundation.file_handling import write_filemap
 
-from pipeline_scripts.building_blocks import parse_and_create_building_blocks
-from pipeline_scripts.utils import create_temp_folders
-from pipeline_scripts.utils import get_and_create_folders
-from pipeline_scripts.utils import get_experiment_subdirs
-from pipeline_scripts.utils import get_experiment_time_from_filemap
-from pipeline_scripts.utils import merge_slurm_config
-from pipeline_scripts.utils import pickle_objects
-from pipeline_scripts.utils import sync_backup_folder
+from towbintools_pipeline.building_blocks import parse_and_create_building_blocks
+from towbintools_pipeline.utils import create_temp_folders
+from towbintools_pipeline.utils import get_and_create_folders
+from towbintools_pipeline.utils import get_experiment_subdirs
+from towbintools_pipeline.utils import get_experiment_time_from_filemap
+from towbintools_pipeline.utils import merge_slurm_config
+from towbintools_pipeline.utils import pickle_objects
+from towbintools_pipeline.utils import sync_backup_folder
 
 
 def get_args():

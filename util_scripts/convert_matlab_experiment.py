@@ -8,7 +8,7 @@ import scipy.io as sio
 from towbintools.foundation.file_handling import add_dir_to_experiment_filemap
 
 sys.path.append(str(Path(__file__).parent.parent))
-from pipeline_scripts.utils import (  # noqa: E402
+from towbintools_pipeline.utils import (  # noqa: E402
     get_experiment_time_from_filemap_parallel,
 )
 
