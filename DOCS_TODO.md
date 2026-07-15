@@ -39,11 +39,31 @@ docs piecemeal in the meantime.
   images, no bundled data). Document how to add more tests.
 
 ## Config
-- Document `backend`, and (once split out) where SLURM resources live and how to
-  set them per block.
+- Document `backend` (`slurm` vs `local`).
+- `n_jobs` (main config, all backends) = worker compute parallelism (joblib
+  `--n_jobs`). Falls back to `sbatch_cpus` and vice versa, so setting one is
+  enough.
+- SLURM resources live in a separate file `configs/slurm_config.yaml`, pointed
+  to by `slurm_config:` in the main config (relative to it) and merged in at
+  startup for the slurm backend only. Inline `sbatch_*` keys override the file.
+- Each standard sbatch directive (`-c`, `-t`, `--mem`, gpu gres) is emitted only
+  when set, so one can be dropped (e.g. omit `sbatch_memory`, use
+  `--mem-per-cpu` instead). `sbatch_extra_options` is a list of raw sbatch
+  option strings rendered verbatim as `#SBATCH <option>` lines — cluster-specific
+  directives (`--account`, `--mem-per-cpu`, `--partition`, custom gres) are now
+  config-only, no edits to `pipeline_scripts/utils.py`.
+- Per-block SLURM resources are still future work (currently one resource set
+  for all worker jobs).
 
 ## Known cleanups to mention / finish before docs
 - `CustomBuildingBlock.create_command` was broken (missing `config` param) — fix
   and document custom blocks.
 - Workers use a bare `import utils` (rely on script dir on sys.path) — revisit
   when packaging.
+- The outer orchestrator job `_sbatch_pipeline.sh` still has its own hardcoded
+  `#SBATCH` header (`-c 8 -t 12:00:00 --mem=8GB --gres=pipelinecapacity:1`) and a
+  hardcoded `micromamba run -n towbintools`. The per-block worker headers are now
+  config-driven, but this launch script is not — sbatch reads its `#SBATCH`
+  lines before any YAML is loaded, so config-driving it needs a different
+  mechanism (generate the script, or pass `sbatch` CLI flags). Separate
+  follow-up.
