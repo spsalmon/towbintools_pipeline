@@ -178,9 +178,10 @@ def get_output_name(
     analysis_subdir = config["analysis_subdir"]
     report_subdir = config["report_subdir"]
     raw_dir_name = config.get("raw_dir_name", "raw")
+    analysis_dir_name = config.get("analysis_dir_name", "analysis")
 
     split = input_name.split("/")
-    if len(split) > 1 and "analysis" in split[0]:
+    if len(split) > 1 and analysis_dir_name in split[0]:
         input_name = split[1:]
         input_name = os.path.join(*input_name)
 
