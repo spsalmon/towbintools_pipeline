@@ -1,7 +1,11 @@
-# SLURM resource requests for the per-block worker jobs. Merged into the main
-# config at startup when backend is "slurm" (see init_pipeline). Keeping the
-# cluster knobs here means a new cluster is adjusted in one place. Any sbatch_*
-# key set directly in the main config takes precedence over this file.
+# SLURM resource requests. Merged into the main config at startup when backend
+# is "slurm" (see init_pipeline). Keeping the cluster knobs here means a new
+# cluster is adjusted in one place. Any sbatch_* key set directly in the main
+# config takes precedence over this file.
+#
+# The top-level sbatch_* keys below are the shared DEFAULT applied to every
+# worker block. Optionally override per block type under sbatch_overrides, and
+# set the outer/orchestrator job's resources under sbatch_init.
 sbatch_memory: 64G
 sbatch_time: 0-48:00:00
 sbatch_cpus: 32
@@ -15,3 +19,20 @@ sbatch_gpus: "rtx6000:1"
 #   - "--account=gratis"
 #   - "--mem-per-cpu=4G"
 #   - "--partition=gpu"
+
+# Per-block-type overrides, merged over the defaults above (only list what
+# differs). Keyed by block name (segmentation, straightening, ...).
+# sbatch_overrides:
+#   segmentation:
+#     sbatch_gpus: "rtx6000:1"
+#     sbatch_memory: 32G
+#   morphology_computation:
+#     sbatch_gpus: null
+#     sbatch_cpus: 8
+
+# The outer/orchestrator job (runs init_pipeline, submits the first block),
+# merged over the defaults above.
+# sbatch_init:
+#   sbatch_cpus: 4
+#   sbatch_memory: 8G
+#   sbatch_time: 0-12:00:00
