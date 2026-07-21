@@ -475,6 +475,36 @@ def merge_slurm_config(global_config, config_file):
     return global_config
 
 
+_SBATCH_KEYS = (
+    "sbatch_cpus",
+    "sbatch_time",
+    "sbatch_memory",
+    "sbatch_gpus",
+    "sbatch_extra_options",
+)
+
+
+def _slurm_defaults(config):
+    # The shared resource default: the top-level sbatch_* keys.
+    return {key: config[key] for key in _SBATCH_KEYS if key in config}
+
+
+def resolve_block_slurm(config, block_name):
+    # Effective SLURM resources for a worker block: the shared defaults overlaid
+    # with any per-type entry under sbatch_overrides.
+    resolved = _slurm_defaults(config)
+    resolved.update(config.get("sbatch_overrides", {}).get(block_name, {}))
+    return resolved
+
+
+def resolve_init_slurm(config):
+    # Effective SLURM resources for the outer/orchestrator job: the shared
+    # defaults overlaid with sbatch_init.
+    resolved = _slurm_defaults(config)
+    resolved.update(config.get("sbatch_init", {}))
+    return resolved
+
+
 def backup_run_config(global_config, config_file, temp_dir):
     # Snapshot the config file(s) actually used into the run's temp dir (synced
     # into the pipeline backup) as a write-only record of the run. Copies the
