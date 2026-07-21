@@ -116,18 +116,14 @@ docs piecemeal in the meantime.
   rewriting every reference). Aim to support: (a) absolute path, (b) name-only
   (resolved under the experiment folder), (c) maybe relative. One place holds
   the dir name.
-- Default config uses mixed single/double quotes for strings — make consistent
-  (or drop unnecessary quotes).
 
 ## Known cleanups to mention / finish before docs
-- `CustomBuildingBlock.create_command` was broken (missing `config` param) — fix
-  and document custom blocks.
+- Document custom blocks. The `CustomBuildingBlock.create_command` bug (missing
+  `config` param, plus a doubled `run -n towbintools python3` launcher) is fixed;
+  custom blocks now work on both backends.
 - Workers use a bare `import utils` (rely on script dir on sys.path) — revisit
   when packaging.
-- The outer orchestrator job `_sbatch_pipeline.sh` still has its own hardcoded
-  `#SBATCH` header (`-c 8 -t 12:00:00 --mem=8GB --gres=pipelinecapacity:1`) and a
-  hardcoded `micromamba run -n towbintools`. The per-block worker headers are now
-  config-driven, but this launch script is not — sbatch reads its `#SBATCH`
-  lines before any YAML is loaded, so config-driving it needs a different
-  mechanism (generate the script, or pass `sbatch` CLI flags). Separate
-  follow-up.
+- The outer orchestrator job's resources are now config-driven: `run_pipeline.sh`
+  passes sbatch CLI flags built from `sbatch_init`, overriding the minimal header
+  in `_sbatch_pipeline.sh`. Only the `micromamba run -n towbintools` env name
+  remains hardcoded there — part of the separate env-decoupling milestone.
