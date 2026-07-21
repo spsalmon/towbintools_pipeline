@@ -222,6 +222,57 @@ def test_resolve_init_slurm():
     assert init == {"sbatch_cpus": 4, "sbatch_memory": "8G"}
 
 
+def test_resolve_init_slurm_drops_gpu():
+    # The orchestrator job never needs the GPU, so it isn't inherited from the
+    # shared defaults (but shared extras like --account still flow through).
+    from towbintools_pipeline.utils import resolve_init_slurm
+
+    config = {
+        "sbatch_cpus": 32,
+        "sbatch_gpus": "rtx6000:1",
+        "sbatch_extra_options": ["--account=gratis"],
+        "sbatch_init": {"sbatch_cpus": 4},
+    }
+
+    init = resolve_init_slurm(config)
+    assert "sbatch_gpus" not in init
+    assert init["sbatch_cpus"] == 4
+    assert init["sbatch_extra_options"] == ["--account=gratis"]
+
+
+def test_build_resource_directives():
+    # Standard directives emitted only when set; extras appended verbatim.
+    from towbintools_pipeline.utils import build_resource_directives
+
+    assert build_resource_directives(8, "0-02:00:00", "16G", "rtx6000:1", None) == [
+        "-c 8",
+        "-t 0-02:00:00",
+        "--mem=16G",
+        "--gres=gpu:rtx6000:1",
+    ]
+    # memory omitted, replaced via an extra option
+    assert build_resource_directives(4, None, None, None, ["--mem-per-cpu=4G"]) == [
+        "-c 4",
+        "--mem-per-cpu=4G",
+    ]
+
+
+def test_run_params_sbatch_init_flags():
+    # The helper turns sbatch_init (over the defaults, minus GPU) into flags.
+    from towbintools_pipeline.run_params import sbatch_init_flags
+
+    config = {
+        "sbatch_cpus": 32,
+        "sbatch_memory": "64G",
+        "sbatch_gpus": "rtx6000:1",
+        "sbatch_extra_options": ["--account=gratis"],
+        "sbatch_init": {"sbatch_cpus": 4, "sbatch_memory": "8G", "sbatch_time": "0-12:00:00"},
+    }
+
+    flags = sbatch_init_flags(config)
+    assert flags == ["-c 4", "-t 0-12:00:00", "--mem=8G", "--account=gratis"]
+
+
 def test_experiment_dir_cli_overrides_config(tmp_path):
     # The config records a wrong experiment_dir; --experiment_dir points at the
     # real data and must win, so the run finds the images and produces outputs.
