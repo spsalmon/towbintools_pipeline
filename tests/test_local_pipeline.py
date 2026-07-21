@@ -59,9 +59,10 @@ def _build_experiment(tmp_path, config_experiment_dir=None, analysis_dir_name="a
     return config_path
 
 
-def _run_pipeline(config_path, extra_args=()):
-    # Run from the repo root so `-m towbintools_pipeline...` resolves; the local
-    # backend launches the workers with this same interpreter (sys.executable).
+def _run_pipeline(config_path, extra_args=(), cwd=REPO_ROOT):
+    # PYTHONPATH lets `-m towbintools_pipeline...` resolve from any cwd; the
+    # local backend launches the workers with this same interpreter and resolves
+    # their scripts by absolute path, so cwd only affects a relative temp dir.
     env = dict(os.environ, PYTHONPATH=REPO_ROOT)
     return subprocess.run(
         [
@@ -72,7 +73,7 @@ def _run_pipeline(config_path, extra_args=()):
             str(config_path),
             *extra_args,
         ],
-        cwd=REPO_ROOT,
+        cwd=cwd,
         env=env,
         capture_output=True,
         text=True,
@@ -102,18 +103,17 @@ def test_local_pipeline_segmentation_and_morphology(tmp_path):
     assert all(float(r["ch1_seg_area"]) > 0 for r in rows)
 
 
-def test_local_pipeline_default_temp_dir_next_to_experiment(tmp_path):
-    # Without --temp_dir (and no temp_dir config key), temp files default next
-    # to the experiment data, not the repo/cwd.
+def test_local_pipeline_default_temp_dir_in_cwd(tmp_path):
+    # Without --temp_dir (and no temp_dir config key), temp files default to
+    # ./temp_files in the working directory (matching the sbatch launcher).
     config_path = _build_experiment(tmp_path)
 
-    result = _run_pipeline(config_path)
+    result = _run_pipeline(config_path, cwd=str(tmp_path))
     assert (
         result.returncode == 0
     ), f"pipeline failed:\n{result.stdout}\n{result.stderr}"
 
-    default_temp = tmp_path / "exp" / "temp_files"
-    assert (default_temp / "pickles").is_dir()
+    assert (tmp_path / "temp_files" / "pickles").is_dir()
     # the run still produced its outputs under the experiment dir
     morph_csv = tmp_path / "exp" / "analysis" / "report" / "ch1_seg_morphology.csv"
     assert morph_csv.exists()

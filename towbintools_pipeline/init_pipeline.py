@@ -53,16 +53,14 @@ if args.experiment_dir:
 # Pull SLURM resources in from their separate file (cluster backend only).
 global_config = merge_slurm_config(global_config, config_file)
 
-# Temp files: --temp_dir, else a temp_dir config key, else next to the
-# experiment data (keeps outputs out of the repo, runnable from any directory).
+# Temp files: --temp_dir, else a temp_dir config key, else ./temp_files in the
+# working directory (transient, gitignored; matches the sbatch launcher).
 if temp_dir:
     temp_dir = os.path.abspath(temp_dir)
 elif global_config.get("temp_dir"):
     temp_dir = os.path.abspath(global_config["temp_dir"])
 else:
-    temp_dir = os.path.abspath(
-        os.path.join(global_config["experiment_dir"], "temp_files")
-    )
+    temp_dir = os.path.abspath("temp_files")
 
 temp_dir_basename = os.path.basename(temp_dir)
 create_temp_folders(temp_dir)
