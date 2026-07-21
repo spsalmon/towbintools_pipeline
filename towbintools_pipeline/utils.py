@@ -590,23 +590,27 @@ def run_command(
         )
         return
 
+    # Per-block resources: shared defaults overlaid with this block type's
+    # sbatch_overrides entry.
+    block_slurm = resolve_block_slurm(config, script_name)
+
     # GPU directive only for blocks that need it and when a gpu is configured.
-    gpus = config.get("sbatch_gpus", None)
+    gpus = block_slurm.get("sbatch_gpus")
     if not requires_gpu:
         gpus = None
 
     # Cores requested follow n_jobs when sbatch_cpus is unset (and vice versa).
-    cores = config.get("sbatch_cpus", config.get("n_jobs"))
+    cores = block_slurm.get("sbatch_cpus", config.get("n_jobs"))
 
     script_path = create_sbatch_file(
         script_name,
         config["temp_dir"],
         cores,
-        config.get("sbatch_time"),
-        config.get("sbatch_memory"),
+        block_slurm.get("sbatch_time"),
+        block_slurm.get("sbatch_memory"),
         command,
         gpus=gpus,
-        extra_options=config.get("sbatch_extra_options"),
+        extra_options=block_slurm.get("sbatch_extra_options"),
         run_linker=run_linker,
         linker_command=linker_command,
     )
