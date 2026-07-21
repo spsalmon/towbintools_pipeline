@@ -61,5 +61,19 @@ if [ ! -d "temp_files" ]; then
     mkdir temp_files
 fi
 
-# Pass command line arguments to the SBATCH script
-sbatch scripts/_sbatch_pipeline.sh "$@"
+# Find the config among the forwarded arguments (same default as the sbatch
+# script), so we can derive the outer job's sbatch resources from it.
+CONFIG_FILE="./defaults/config/config.yaml"
+args=("$@")
+for ((i = 0; i < ${#args[@]}; i++)); do
+    case "${args[$i]}" in
+        -c|--config) CONFIG_FILE="${args[$((i + 1))]}" ;;
+    esac
+done
+
+# Config-drive the outer job's sbatch resources from sbatch_init. If this yields
+# nothing (e.g. non-slurm config), sbatch falls back to the header in the script.
+SBATCH_INIT_FLAGS=$(~/.local/bin/micromamba run -n towbintools python3 -m towbintools_pipeline.run_params --sbatch-init -c "$CONFIG_FILE" 2>/dev/null)
+
+# Pass the resource flags and the forwarded arguments to the SBATCH script.
+sbatch $SBATCH_INIT_FLAGS scripts/_sbatch_pipeline.sh "$@"
