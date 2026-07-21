@@ -83,9 +83,13 @@ docs piecemeal in the meantime.
 - `run_pipeline.sh` forwards `-e/--experiment_dir` and `-t/--temp_dir` through to
   the pipeline (previously only `-c`).
 - Still hardcoded in `_sbatch_pipeline.sh`: the `micromamba run -n towbintools`
-  env name (env-decoupling, separate) and the default in-repo `./temp_files`
-  temp base (now overridable with `-t`; a "default next to the experiment"
-  fix needs the experiment dir in bash — small follow-up).
+  env name (env-decoupling, separate milestone).
+- Temp working dir defaults to in-repo `./temp_files` (gitignored, transient,
+  cleared by cleanup_temp_files.sh). Decision: keep this default rather than
+  auto-placing it next to the experiment — the durable outputs and backup are
+  already external, and `-t <path>` covers the large-experiment / home-quota
+  case (e.g. put temp on the data storage). Not worth the bash complexity of
+  resolving the experiment dir before Python runs.
 
 ## Run backup / provenance
 - The pipeline snapshots the config(s) used and a `git_info.txt` (git
