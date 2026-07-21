@@ -106,7 +106,8 @@ def get_and_create_folders(config, subdir=None):
     os.makedirs(analysis_subdir, exist_ok=True)
     report_subdir = os.path.join(analysis_subdir, "report")
     os.makedirs(report_subdir, exist_ok=True)
-    pipeline_backup_dir = os.path.join(report_subdir, "pipeline_backup")
+    # Run provenance sits beside the report, not inside it (report holds results).
+    pipeline_backup_dir = os.path.join(analysis_subdir, "pipeline_backup")
     os.makedirs(pipeline_backup_dir, exist_ok=True)
 
     if subdir is not None:
