@@ -91,6 +91,15 @@ docs piecemeal in the meantime.
   prefix-stripping in output naming. The `report/` subfolder name is currently
   fixed (no config key).
 
+## Deferred design / cleanup (later PRs)
+- Folder inputs: decouple internal references from the analysis-dir name (today
+  the config repeats the prefix, so renaming `analysis_dir_name` forces
+  rewriting every reference). Aim to support: (a) absolute path, (b) name-only
+  (resolved under the experiment folder), (c) maybe relative. One place holds
+  the dir name.
+- Default config uses mixed single/double quotes for strings — make consistent
+  (or drop unnecessary quotes).
+
 ## Known cleanups to mention / finish before docs
 - `CustomBuildingBlock.create_command` was broken (missing `config` param) — fix
   and document custom blocks.
