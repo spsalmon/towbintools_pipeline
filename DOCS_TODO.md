@@ -69,8 +69,14 @@ docs piecemeal in the meantime.
   option strings rendered verbatim as `#SBATCH <option>` lines — cluster-specific
   directives (`--account`, `--mem-per-cpu`, `--partition`, custom gres) are now
   config-only, no edits to `towbintools_pipeline/utils.py`.
-- Per-block SLURM resources are still future work (currently one resource set
-  for all worker jobs).
+- Per-block SLURM resources: the top-level `sbatch_*` keys are the shared
+  default for every worker block. Override per block type under
+  `sbatch_overrides` (keyed by block name, e.g. `segmentation`), merged over the
+  default. The outer/orchestrator job's resources go under `sbatch_init`.
+  Per-instance (a specific occurrence) overrides are still future work.
+- The outer sbatch header is not yet driven by `sbatch_init` — that wiring
+  (`run_pipeline.sh`/`_sbatch_pipeline.sh` passing sbatch CLI flags) is the next
+  PR; for now `sbatch_init` is resolved but only consumed once that lands.
 
 ## Run backup / provenance
 - The pipeline snapshots the config(s) used and a `git_info.txt` (git
