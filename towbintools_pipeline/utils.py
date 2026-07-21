@@ -484,6 +484,37 @@ def backup_run_config(global_config, config_file, temp_dir):
             shutil.copy2(slurm_config_path, temp_dir)
 
 
+def save_version_control_info(temp_dir):
+    # Record git branch/commit/status + interpreter/package versions into the
+    # run's temp dir (synced to the backup) so a run stays reproducible.
+    lines = []
+    try:
+        for label, rev in (("Git Branch", "--abbrev-ref"), ("Git Commit", "")):
+            out = subprocess.run(
+                ["git", "-C", _REPO_DIR, "rev-parse", *( [rev] if rev else [] ), "HEAD"],
+                capture_output=True,
+                text=True,
+            )
+            lines.append(f"{label}: {out.stdout.strip()}")
+        status = subprocess.run(
+            ["git", "-C", _REPO_DIR, "status"], capture_output=True, text=True
+        )
+        lines.append("Git Status:\n" + status.stdout.strip())
+    except Exception as e:
+        lines.append(f"Version control info unavailable: {e}")
+
+    lines.append(f"Python Version: {sys.version}")
+    try:
+        import towbintools
+
+        lines.append(f"towbintools Version: {towbintools.__version__}")
+    except Exception as e:
+        lines.append(f"towbintools Version unavailable: {e}")
+
+    with open(os.path.join(temp_dir, "git_info.txt"), "w") as f:
+        f.write("\n".join(lines) + "\n")
+
+
 def get_python_command(config):
     # Command prefix used to launch python workers. Slurm/micromamba setups keep
     # the micromamba runner; local runs use the active python interpreter.

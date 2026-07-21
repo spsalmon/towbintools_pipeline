@@ -16,6 +16,7 @@ from towbintools_pipeline.utils import get_experiment_subdirs
 from towbintools_pipeline.utils import get_experiment_time_from_filemap
 from towbintools_pipeline.utils import merge_slurm_config
 from towbintools_pipeline.utils import pickle_objects
+from towbintools_pipeline.utils import save_version_control_info
 from towbintools_pipeline.utils import sync_backup_folder
 
 
@@ -66,8 +67,10 @@ else:
 temp_dir_basename = os.path.basename(temp_dir)
 create_temp_folders(temp_dir)
 
-# Snapshot the config(s) used into the run's temp dir (synced to the backup).
+# Snapshot the config(s) and version info into the run's temp dir (synced to
+# the backup) as a write-only record of the run.
 backup_run_config(global_config, config_file, temp_dir)
+save_version_control_info(temp_dir)
 
 
 def main(global_config, temp_dir_basename, temp_dir, subdir=None):
