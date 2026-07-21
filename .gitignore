@@ -165,6 +165,9 @@ temp_files/*
 sbatch_output/*
 **/lightning_logs/
 
+# Local pipeline test output (e.g. tests/26-07-21_analysis/)
+tests/*_analysis/
+
 *.pkl
 *.csv
 *.log
