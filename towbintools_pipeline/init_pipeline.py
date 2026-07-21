@@ -9,6 +9,7 @@ from towbintools.foundation.file_handling import read_filemap
 from towbintools.foundation.file_handling import write_filemap
 
 from towbintools_pipeline.building_blocks import parse_and_create_building_blocks
+from towbintools_pipeline.utils import backup_run_config
 from towbintools_pipeline.utils import create_temp_folders
 from towbintools_pipeline.utils import get_and_create_folders
 from towbintools_pipeline.utils import get_experiment_subdirs
@@ -64,6 +65,9 @@ else:
 
 temp_dir_basename = os.path.basename(temp_dir)
 create_temp_folders(temp_dir)
+
+# Snapshot the config(s) used into the run's temp dir (synced to the backup).
+backup_run_config(global_config, config_file, temp_dir)
 
 
 def main(global_config, temp_dir_basename, temp_dir, subdir=None):

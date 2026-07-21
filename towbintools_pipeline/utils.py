@@ -437,6 +437,20 @@ def cleanup_files(*filepaths):
 _REPO_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 
+def resolve_slurm_config_path(global_config, config_file):
+    # Where the SLURM resource file lives: an explicit slurm_config path
+    # (relative ones resolved against the main config file's directory), else
+    # the bundled default shipped alongside the example config.
+    slurm_config_path = global_config.get("slurm_config")
+    if slurm_config_path is None:
+        return os.path.join(_REPO_DIR, "defaults", "config", "slurm_config.yaml")
+    if not os.path.isabs(slurm_config_path):
+        return os.path.join(
+            os.path.dirname(os.path.abspath(config_file)), slurm_config_path
+        )
+    return slurm_config_path
+
+
 def merge_slurm_config(global_config, config_file):
     # SLURM resource requests live in a separate file for the cluster backend,
     # so the cluster knobs sit in one place. Merge them into the config at
@@ -445,16 +459,7 @@ def merge_slurm_config(global_config, config_file):
     if global_config.get("backend", "slurm") != "slurm":
         return global_config
 
-    slurm_config_path = global_config.get("slurm_config")
-    if slurm_config_path is None:
-        # Bundled default, shipped alongside the example config.
-        slurm_config_path = os.path.join(_REPO_DIR, "defaults", "config", "slurm_config.yaml")
-    elif not os.path.isabs(slurm_config_path):
-        # A relative path is resolved against the main config file's directory.
-        slurm_config_path = os.path.join(
-            os.path.dirname(os.path.abspath(config_file)), slurm_config_path
-        )
-
+    slurm_config_path = resolve_slurm_config_path(global_config, config_file)
     if not os.path.exists(slurm_config_path):
         print(f"SLURM config file not found, skipping: {slurm_config_path}")
         return global_config
@@ -466,6 +471,17 @@ def merge_slurm_config(global_config, config_file):
     for key, value in slurm_config.items():
         global_config.setdefault(key, value)
     return global_config
+
+
+def backup_run_config(global_config, config_file, temp_dir):
+    # Snapshot the config file(s) actually used into the run's temp dir (synced
+    # into the pipeline backup) as a write-only record of the run. Copies the
+    # main config, plus the resolved SLURM config for the cluster backend.
+    shutil.copy2(config_file, temp_dir)
+    if global_config.get("backend", "slurm") == "slurm":
+        slurm_config_path = resolve_slurm_config_path(global_config, config_file)
+        if os.path.exists(slurm_config_path):
+            shutil.copy2(slurm_config_path, temp_dir)
 
 
 def get_python_command(config):
