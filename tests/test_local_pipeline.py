@@ -17,6 +17,7 @@ tifffile = pytest.importorskip("tifffile")
 yaml = pytest.importorskip("yaml")
 
 REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, REPO_ROOT)  # import the package directly for unit tests
 
 
 def _write_image(path, blob_width):
@@ -27,7 +28,7 @@ def _write_image(path, blob_width):
     tifffile.imwrite(str(path), image, photometric="minisblack")
 
 
-def _build_experiment(tmp_path, config_experiment_dir=None):
+def _build_experiment(tmp_path, config_experiment_dir=None, analysis_dir_name="analysis"):
     # Tiny 2-image raw experiment + a local-backend config; returns config_path.
     # config_experiment_dir overrides what the config records as experiment_dir.
     raw_dir = tmp_path / "exp" / "raw"
@@ -37,7 +38,7 @@ def _build_experiment(tmp_path, config_experiment_dir=None):
 
     config = {
         "experiment_dir": config_experiment_dir or str(tmp_path / "exp"),
-        "analysis_dir_name": "analysis",
+        "analysis_dir_name": analysis_dir_name,
         "raw_dir_name": "raw",
         "report_format": "csv",
         "pixelsize": [0.65],
@@ -49,7 +50,7 @@ def _build_experiment(tmp_path, config_experiment_dir=None):
         "segmentation_method": ["threshold"],
         "segmentation_channels": [[0]],
         "segmentation_name_suffix": [None],
-        "morphology_computation_masks": ["analysis/ch1_seg"],
+        "morphology_computation_masks": [f"{analysis_dir_name}/ch1_seg"],
         "morphological_features": [["area"]],
     }
     config_path = tmp_path / "config.yaml"
@@ -116,6 +117,72 @@ def test_local_pipeline_default_temp_dir_next_to_experiment(tmp_path):
     # the run still produced its outputs under the experiment dir
     morph_csv = tmp_path / "exp" / "analysis" / "report" / "ch1_seg_morphology.csv"
     assert morph_csv.exists()
+
+
+def test_run_config_and_version_info_backed_up(tmp_path):
+    # The config and a git_info.txt land in the backup, which sits beside the
+    # report (under the analysis dir), not inside it.
+    config_path = _build_experiment(tmp_path)
+
+    result = _run_pipeline(config_path, ["--temp_dir", str(tmp_path / "pipeline_temp")])
+    assert (
+        result.returncode == 0
+    ), f"pipeline failed:\n{result.stdout}\n{result.stderr}"
+
+    backup = tmp_path / "exp" / "analysis" / "pipeline_backup" / "pipeline_temp"
+    assert (backup / "config.yaml").exists()
+    assert (backup / "git_info.txt").exists()
+
+
+def test_custom_analysis_dir_name(tmp_path):
+    # A non-default analysis_dir_name flows through: outputs land under it and
+    # the downstream morphology block resolves its mask input correctly.
+    config_path = _build_experiment(tmp_path, analysis_dir_name="results")
+
+    result = _run_pipeline(config_path, ["--temp_dir", str(tmp_path / "pipeline_temp")])
+    assert (
+        result.returncode == 0
+    ), f"pipeline failed:\n{result.stdout}\n{result.stderr}"
+
+    masks = sorted((tmp_path / "exp" / "results" / "ch1_seg").glob("*.tiff"))
+    assert len(masks) == 2
+    morph_csv = tmp_path / "exp" / "results" / "report" / "ch1_seg_morphology.csv"
+    assert morph_csv.exists()
+    with open(morph_csv, newline="") as f:
+        rows = list(csv.DictReader(f))
+    assert len(rows) == 2
+    assert all(float(r["ch1_seg_area"]) > 0 for r in rows)
+
+
+def test_merge_slurm_config_resolves_relative_sibling(tmp_path):
+    # A relative slurm_config resolves next to the main config file; its keys
+    # merge in, but inline sbatch_* keys still win.
+    from towbintools_pipeline.utils import merge_slurm_config
+
+    (tmp_path / "slurm_config.yaml").write_text(
+        "sbatch_time: 0-02:00:00\nsbatch_cpus: 8\n"
+    )
+    config_path = tmp_path / "config.yaml"
+    config_path.write_text(
+        "backend: slurm\nslurm_config: slurm_config.yaml\nsbatch_cpus: 4\n"
+    )
+
+    config = yaml.safe_load(config_path.read_text())
+    merged = merge_slurm_config(config, str(config_path))
+    assert merged["sbatch_time"] == "0-02:00:00"  # from the file
+    assert merged["sbatch_cpus"] == 4  # inline wins
+
+
+def test_merge_slurm_config_missing_is_skipped(tmp_path):
+    # A missing slurm_config is skipped, leaving the config untouched.
+    from towbintools_pipeline.utils import merge_slurm_config
+
+    config_path = tmp_path / "config.yaml"
+    config_path.write_text("backend: slurm\nslurm_config: does_not_exist.yaml\n")
+
+    config = yaml.safe_load(config_path.read_text())
+    merged = merge_slurm_config(config, str(config_path))
+    assert "sbatch_time" not in merged
 
 
 def test_experiment_dir_cli_overrides_config(tmp_path):
