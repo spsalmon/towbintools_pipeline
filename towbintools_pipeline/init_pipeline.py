@@ -10,6 +10,7 @@ from towbintools.foundation.file_handling import write_filemap
 
 from towbintools_pipeline.building_blocks import parse_and_create_building_blocks
 from towbintools_pipeline.utils import backup_run_config
+from towbintools_pipeline.utils import block_label
 from towbintools_pipeline.utils import create_temp_folders
 from towbintools_pipeline.utils import get_and_create_folders
 from towbintools_pipeline.utils import get_experiment_subdirs
@@ -228,7 +229,7 @@ def main(global_config, temp_dir_basename, temp_dir, subdir=None):
         {"block": block, "subdir": subdir, "config": config}
         for block in building_blocks
     ]
-    print(f"Building blocks created: {building_blocks}")
+    print(f"Building blocks created: {len(building_blocks)}")
 
     return building_blocks
 
@@ -248,6 +249,11 @@ progress_tracker_pickle = {"path": "progress_tracker", "obj": progress_tracker}
 
 _ = pickle_objects(temp_dir, progress_tracker_pickle)
 
+# The planned sequence, so the per-block logs further down can be placed.
+print(f"### Pipeline plan: {len(building_blocks)} blocks ###")
+for index in range(len(building_blocks)):
+    print(f"  {block_label(building_blocks, index)}")
+
 # Run the first building block
 current = building_blocks[0]
 current_building_block, current_subdir, current_config = (
@@ -257,4 +263,6 @@ current_building_block, current_subdir, current_config = (
 )
 
 experiment_filemap = read_filemap(current_config["filemap_path"])
+print(f"### Starting block {block_label(building_blocks, 0)} ###")
+print(f"Running {current_building_block} ...", flush=True)
 current_building_block.run(experiment_filemap, current_config, subdir=current_subdir)

@@ -119,6 +119,34 @@ def test_local_pipeline_default_temp_dir_in_cwd(tmp_path):
     assert morph_csv.exists()
 
 
+def test_block_progress_is_logged(tmp_path):
+    # Every block announces its start and its completion, numbered within the
+    # planned sequence, and the run ends with the closing line.
+    config_path = _build_experiment(tmp_path)
+
+    result = _run_pipeline(config_path, ["--temp_dir", str(tmp_path / "pipeline_temp")])
+    assert (
+        result.returncode == 0
+    ), f"pipeline failed:\n{result.stdout}\n{result.stderr}"
+
+    markers = [
+        line.strip()
+        for line in result.stdout.splitlines()
+        if line.startswith("###") or line.startswith("  1/") or line.startswith("  2/")
+    ]
+    assert markers == [
+        "### Initializing the pipeline for subdir None ###",
+        "### Pipeline plan: 2 blocks ###",
+        "1/2 segmentation",
+        "2/2 morphology_computation",
+        "### Starting block 1/2 segmentation ###",
+        "### Finished block 1/2 segmentation ###",
+        "### Starting block 2/2 morphology_computation ###",
+        "### Finished block 2/2 morphology_computation ###",
+        "### End of the pipeline! (2 blocks) ###",
+    ]
+
+
 def test_run_config_and_version_info_backed_up(tmp_path):
     # The config and a git_info.txt land in the backup, which sits beside the
     # report (under the analysis dir), not inside it.

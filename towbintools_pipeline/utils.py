@@ -603,6 +603,17 @@ def create_linker_command(
     return linker_command
 
 
+def block_label(building_blocks, index):
+    # Short "3/12 straightening" tag identifying one entry of the block sequence,
+    # used by the progress prints (blocks of the same type repeat, so the
+    # position is what tells them apart).
+    entry = building_blocks[index]
+    label = f"{index + 1}/{len(building_blocks)} {entry['block'].name}"
+    if entry["subdir"] is not None:
+        label += f" [{entry['subdir']}]"
+    return label
+
+
 def run_command_local(command, run_linker=True, linker_command=None):
     # Run a block's command synchronously, then chain to the linker (next block).
     # Skip empty / commented-out commands (a block with no input files to process).
@@ -652,6 +663,8 @@ def run_command(
         run_linker=run_linker,
         linker_command=linker_command,
     )
+    # Give sbatch's own "Submitted batch job <id>" line some context.
+    print(f"Submitting {script_name} to slurm ...", flush=True)
     subprocess.run(["sbatch", script_path])
 
 

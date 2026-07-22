@@ -51,6 +51,18 @@ docs piecemeal in the meantime.
   script still makes a repo-root `sbatch_output/` — part of the
   `_sbatch_pipeline.sh` follow-up below.
 
+## Log output
+- The run prints a numbered plan of the blocks up front, then a
+  `### Starting block 3/12 straightening ###` / `### Finished block ... ###` pair
+  around each one, and a closing line. Same on both backends: on slurm the
+  linker is appended to the worker's job script, so the finish line and the next
+  block's submission land in that block's sbatch `.out` file. A
+  `Submitting <block> to slurm ...` line precedes sbatch's own
+  "Submitted batch job <id>" so the job id has context.
+- Prints that precede a subprocess are flushed, otherwise Python's block
+  buffering (stdout redirected to a file under slurm) reorders them after the
+  worker's output.
+
 ## Testing
 - `python -m pytest tests/ -v` runs the local-backend smoke test (synthetic
   images, no bundled data). Document how to add more tests.
