@@ -4,6 +4,9 @@ Running notes of things to include when the docs (README + book) are rewritten
 at the end of the refactor. Add to this as we change things; don't edit the
 docs piecemeal in the meantime.
 
+Decisions that cost something go in `TRADEOFFS.md` instead — that file is the
+list to hand to a reviewer, this one feeds the docs.
+
 ## Repo structure
 - `towbintools_pipeline/` = core pipeline package (`python -m
   towbintools_pipeline...`). `defaults/` = bundled `config/` + `models/`
