@@ -74,6 +74,16 @@ docs piecemeal in the meantime.
   `sbatch_overrides` (keyed by block name, e.g. `segmentation`), merged over the
   default. The outer/orchestrator job's resources go under `sbatch_init`.
   Per-instance (a specific occurrence) overrides are still future work.
+- Merge rule inside the slurm config: scalar `sbatch_*` keys in a section
+  (`sbatch_overrides.<block>`, `sbatch_init`) REPLACE the top-level default,
+  while `sbatch_extra_options` entries are APPENDED to it. So cluster-wide
+  invariants (`--account`, `--mem-per-cpu`) belong at the top level and always
+  apply; a section can add to them but not drop them (move an option down into
+  the sections if it must not apply everywhere).
+- `sbatch_init` is deliberately NOT a key inside `sbatch_overrides`: the outer
+  job is not a building block, it's resolved by a different program at a
+  different time (`run_params.py`, from bash, before the pipeline starts), and
+  it would collide with the block-name namespace.
 - The outer/orchestrator job's resources come from `sbatch_init`. `run_pipeline.sh`
   turns them into sbatch CLI flags (via `python -m towbintools_pipeline.run_params
   --sbatch-init`) which override `_sbatch_pipeline.sh`'s minimal header. So a new
@@ -116,6 +126,24 @@ docs piecemeal in the meantime.
   rewriting every reference). Aim to support: (a) absolute path, (b) name-only
   (resolved under the experiment folder), (c) maybe relative. One place holds
   the dir name.
+- Naming: `analysis_dir_name` / `analysis_subdir` really denote the OUTPUT
+  directory. Renaming only the variables would desync them from the config key,
+  and renaming the key is a breaking config change — so settle the naming as
+  part of the folder-decoupling work above, not separately.
+- Move the worker entry-point scripts (`straighten.py`, `learning_based_segment.py`,
+  `compute_morphology.py`, ...) into a `towbintools_pipeline/workers/` subfolder,
+  leaving the core (`init_pipeline`, `building_blocks`, `block_linker`, `utils`,
+  `run_params`) at the top. Do it in the packaging milestone: the workers are
+  resolved by path and use a bare `import utils`, which packaging rewrites anyway.
+
+## CLI flags — the rule
+- Precedence is uniform: CLI flag > config key > default. `-c/--config` is the
+  only flag with no config counterpart (by definition) and is required.
+- Flags cover what varies per invocation or per machine (`-e/--experiment_dir`
+  where the data is, `-t/--temp_dir` where scratch goes); everything scientific
+  stays in the config. Deliberately no flag for `analysis_dir_name` — it is an
+  output-layout choice, and today changing it also means rewriting every
+  `analysis/...` reference in the config, so a flag would be a half-measure.
 
 ## Known cleanups to mention / finish before docs
 - Document custom blocks. The `CustomBuildingBlock.create_command` bug (missing
