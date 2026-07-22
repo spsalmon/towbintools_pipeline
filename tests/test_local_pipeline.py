@@ -167,18 +167,20 @@ def test_concatenate_sbatch_logs(tmp_path):
                         ("straightening-3.out", 3000)):
         _os.utime(log_dir / name, (stamp, stamp))
 
-    concatenate_sbatch_logs(str(temp_dir))
+    concatenate_sbatch_logs(str(temp_dir), "PIPELINE FINISHED -- all 3 blocks completed")
 
     combined = (temp_dir / "pipeline-4242.out").read_text()
     assert combined.index("first") < combined.index("second") < combined.index("third")
     assert "===== init-1.out =====" in combined
+    # the last line says whether the run got to the end
+    assert combined.rstrip().endswith("PIPELINE FINISHED -- all 3 blocks completed =====")
     # each stream gets its own file, and the originals stay put
     assert (temp_dir / "pipeline-4242.err").read_text().count("a warning") == 1
     assert (log_dir / "init-1.out").read_text() == "first\n"
 
     # Rebuilding is idempotent: the combined file lives outside the log dir, so
     # it is never folded into itself.
-    concatenate_sbatch_logs(str(temp_dir))
+    concatenate_sbatch_logs(str(temp_dir), "PIPELINE FINISHED -- all 3 blocks completed")
     assert (temp_dir / "pipeline-4242.out").read_text() == combined
 
 

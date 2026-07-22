@@ -603,11 +603,12 @@ def create_linker_command(
     return linker_command
 
 
-def concatenate_sbatch_logs(temp_dir):
+def concatenate_sbatch_logs(temp_dir, closing=""):
     # Join the per-block slurm logs into one file per stream in the run's temp
     # dir, ordered by write time (blocks run sequentially). Originals are kept
     # and the combined files are rebuilt on every call, so a run that stops
-    # mid-chain still leaves a readable log.
+    # mid-chain still leaves a readable log. `closing` is the last line, saying
+    # whether the run got to the end or is still going.
     log_dir = os.path.join(temp_dir, "sbatch_output")
     if not os.path.isdir(log_dir):
         return
@@ -631,10 +632,7 @@ def concatenate_sbatch_logs(temp_dir):
                     with open(part, errors="replace") as f:
                         shutil.copyfileobj(f, out)
                     out.write("\n")
-                out.write(
-                    "===== end of combined log "
-                    "(the tail of the running block is not included) =====\n"
-                )
+                out.write(f"===== {closing} =====\n")
     except Exception as e:
         # Log housekeeping must never take the pipeline down with it.
         print(f"Warning: could not combine the sbatch logs: {e}")

@@ -69,9 +69,15 @@ docs piecemeal in the meantime.
   whole chain — with a `===== <file> =====` header per section. Originals are
   kept, and the combined files sync into the run backup.
 - The combined files are rebuilt at every link, not just at the end, so a run
-  that dies mid-chain still leaves a readable log. Consequence: the tail of the
-  block that is running while it is written is never included (the linker runs
-  inside that job, whose log is still open) — hence the closing marker line.
+  that dies mid-chain still leaves a readable log. Their last line says which:
+  `PIPELINE FINISHED -- all N blocks completed` only ever gets written by the
+  link that found no next block, so anything else (`pipeline still running --
+  k/N blocks done so far`) means the run stopped without reaching the end.
+- Deliberately NOT a separate end-of-run slurm job: it would sit in the queue,
+  so the completion marker could arrive long after the run actually ended, and
+  a failed submission would lose the marker entirely. The final link writes it
+  instead. The prints it makes are flushed before the concatenation, so they do
+  land in the combined log.
 
 ## Testing
 - `python -m pytest tests/ -v` runs the local-backend smoke test (synthetic

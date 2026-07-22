@@ -158,13 +158,23 @@ def main():
         result = current_building_block.run(
             experiment_filemap, current_config, subdir=current_subdir
         )
+        # The count of finished blocks doubles as a progress marker while the
+        # combined log is only a snapshot of a run still going.
+        closing = (
+            f"pipeline still running -- {current_block_index}"
+            f"/{len(building_blocks)} blocks done so far"
+        )
     else:
         print(f"### End of the pipeline! ({len(building_blocks)} blocks) ###", flush=True)
+        closing = (
+            f"PIPELINE FINISHED -- all {len(building_blocks)} blocks completed, "
+            "the run reached its end"
+        )
 
     # Refresh the combined logs last, once the block above has been submitted, so
     # they hold everything written up to this link. Sync again to carry them (and
     # the filemap updated above) into the backup.
-    concatenate_sbatch_logs(temp_dir)
+    concatenate_sbatch_logs(temp_dir, closing)
     if current_block_index > 0:
         sync_backup_folder(temp_dir, pipeline_backup_dir)
 
