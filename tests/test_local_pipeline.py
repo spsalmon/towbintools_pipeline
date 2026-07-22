@@ -113,7 +113,13 @@ def test_local_pipeline_default_temp_dir_in_cwd(tmp_path):
         result.returncode == 0
     ), f"pipeline failed:\n{result.stdout}\n{result.stderr}"
 
-    assert (tmp_path / "temp_files" / "pickles").is_dir()
+    # each run gets its own subdirectory, named after its start time locally
+    runs = list((tmp_path / "temp_files").glob("pipeline_*"))
+    assert len(runs) == 1
+    assert (runs[0] / "pickles").is_dir()
+    # the slurm-only folders are not created for a local run
+    assert not (runs[0] / "batch").exists()
+    assert not (runs[0] / "sbatch_output").exists()
     # the run still produced its outputs under the experiment dir
     morph_csv = tmp_path / "exp" / "analysis" / "report" / "ch1_seg_morphology.csv"
     assert morph_csv.exists()
@@ -204,9 +210,25 @@ def test_run_config_and_version_info_backed_up(tmp_path):
         result.returncode == 0
     ), f"pipeline failed:\n{result.stdout}\n{result.stderr}"
 
-    backup = tmp_path / "exp" / "analysis" / "pipeline_backup" / "pipeline_temp"
-    assert (backup / "config.yaml").exists()
-    assert (backup / "git_info.txt").exists()
+    backups = list((tmp_path / "exp" / "analysis" / "pipeline_backup").glob("pipeline_*"))
+    assert len(backups) == 1
+    assert (backups[0] / "config.yaml").exists()
+    assert (backups[0] / "git_info.txt").exists()
+
+
+def test_repeated_runs_get_separate_backups(tmp_path):
+    # Two runs of the same experiment must not overwrite each other's backup;
+    # each gets its own run directory (slurm keys it on the job id instead).
+    config_path = _build_experiment(tmp_path)
+
+    for _ in range(2):
+        result = _run_pipeline(config_path, ["--temp_dir", str(tmp_path / "t")])
+        assert (
+            result.returncode == 0
+        ), f"pipeline failed:\n{result.stdout}\n{result.stderr}"
+
+    backups = list((tmp_path / "exp" / "analysis" / "pipeline_backup").glob("pipeline_*"))
+    assert len(backups) == 2
 
 
 def test_custom_analysis_dir_name(tmp_path):

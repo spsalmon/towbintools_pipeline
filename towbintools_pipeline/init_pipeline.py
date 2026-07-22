@@ -18,6 +18,7 @@ from towbintools_pipeline.utils import get_experiment_time_from_filemap
 from towbintools_pipeline.utils import merge_slurm_config
 from towbintools_pipeline.utils import pickle_objects
 from towbintools_pipeline.utils import save_version_control_info
+from towbintools_pipeline.utils import setup_run_dir
 from towbintools_pipeline.utils import sync_backup_folder
 
 
@@ -63,8 +64,11 @@ elif global_config.get("temp_dir"):
 else:
     temp_dir = os.path.abspath("temp_files")
 
+# Each run gets its own subdirectory, so repeated runs never overwrite one
+# another's temp files or their backup.
+temp_dir = setup_run_dir(temp_dir)
 temp_dir_basename = os.path.basename(temp_dir)
-create_temp_folders(temp_dir)
+create_temp_folders(temp_dir, global_config.get("backend", "slurm"))
 
 # Snapshot the config(s) and version info into the run's temp dir (synced to
 # the backup) as a write-only record of the run.

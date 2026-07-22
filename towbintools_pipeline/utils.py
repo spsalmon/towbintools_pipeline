@@ -4,6 +4,7 @@ import pickle
 import shutil
 import subprocess
 import sys
+from datetime import datetime
 
 import numpy as np
 import polars as pl
@@ -212,11 +213,44 @@ def get_output_name(
     return output_name
 
 
-def create_temp_folders(temp_dir):
+def setup_run_dir(temp_dir):
+    # Give the run its own directory under temp_dir, identified by the slurm job
+    # id or, without slurm, by the start time. Returns the new path.
+    job_id = os.environ.get("SLURM_JOB_ID")
+    if not job_id:
+        return os.path.join(temp_dir, datetime.now().strftime("pipeline_%Y%m%d-%H%M%S"))
+
+    run_dir = os.path.join(temp_dir, f"pipeline_{job_id}")
+    log_dir = os.path.join(run_dir, "sbatch_output")
+    os.makedirs(log_dir, exist_ok=True)
+    try:
+        # The launcher's -o/-e land next to the submit directory; bring them in
+        # with the block logs and point slurm at their new home.
+        moved = {}
+        for stream, suffix in (("StdOut", "out"), ("StdErr", "err")):
+            target = os.path.join(log_dir, f"init_pipeline-{job_id}.{suffix}")
+            source = os.path.join("sbatch_output", f"pipeline-{job_id}.{suffix}")
+            if os.path.exists(source):
+                shutil.move(source, target)
+            moved[stream] = target
+        subprocess.run(
+            ["scontrol", "update", f"JobId={job_id}"]
+            + [f"{stream}={path}" for stream, path in moved.items()],
+            check=False,
+        )
+    except Exception as e:
+        print(f"Warning: could not move the launcher logs into {log_dir}: {e}")
+    return run_dir
+
+
+def create_temp_folders(temp_dir, backend="slurm"):
+    # batch/ and sbatch_output/ only hold generated job scripts and their slurm
+    # logs, so they are pointless for a local run.
     os.makedirs(temp_dir, exist_ok=True)
     os.makedirs(os.path.join(temp_dir, "pickles"), exist_ok=True)
-    os.makedirs(os.path.join(temp_dir, "batch"), exist_ok=True)
-    os.makedirs(os.path.join(temp_dir, "sbatch_output"), exist_ok=True)
+    if backend == "slurm":
+        os.makedirs(os.path.join(temp_dir, "batch"), exist_ok=True)
+        os.makedirs(os.path.join(temp_dir, "sbatch_output"), exist_ok=True)
 
 
 def process_input_output_files(input_files, output_dir, rerun):
