@@ -51,6 +51,23 @@ docs piecemeal in the meantime.
   script still makes a repo-root `sbatch_output/` — part of the
   `init_pipeline.sh` follow-up below.
 
+## Which script does what
+- `scripts/run_pipeline.sh` — the user entry point, runs on the login node:
+  update check, creates the repo-root `sbatch_output/` landing zone, finds the
+  config among the arguments, derives the outer job's sbatch flags from
+  `sbatch_init`, submits.
+- `scripts/init_pipeline.sh` — the submitted job, named after the module it
+  launches: a `#SBATCH` header (which must live in a file for sbatch), the env
+  activation, and `"$@"` passed straight through. Nothing else belongs here.
+- Everything else is Python. `setup_run_dir()` resolves the per-run directory
+  (`pipeline_<jobid>` under slurm, `pipeline_<timestamp>` otherwise) and, under
+  slurm, moves the launcher's logs into it — so the temp path has a single
+  definition instead of one in bash and one in argparse. Tradeoff: if the env is
+  broken and Python never starts, those logs stay in the repo-root
+  `sbatch_output/` instead of moving into the run dir.
+- Only `batch/` and `sbatch_output/` are slurm-specific; every other write
+  (outputs, report, backup, provenance, pickles) happens on both backends.
+
 ## Log output
 - The run prints a numbered plan of the blocks up front, then a
   `### Starting block 3/12 straightening ###` / `### Finished block ... ###` pair
