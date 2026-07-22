@@ -26,7 +26,7 @@ def get_args():
     parser.add_argument(
         "-t",
         "--temp_dir",
-        help="Path to the directory storing temporary files",
+        help="Path to the directory storing temporary files (overrides the config)",
         required=False,
     )
     parser.add_argument(

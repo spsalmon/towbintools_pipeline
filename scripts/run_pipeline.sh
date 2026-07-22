@@ -15,12 +15,9 @@ check_git_updates() {
     echo "Checking for updates..."
     git fetch --quiet
 
-    # Get current and remote commit hashes
+    # Get current and remote commit hashes; no upstream means nothing to compare
     local_commit=$(git rev-parse HEAD)
-    remote_commit=$(git rev-parse @{u} 2>/dev/null)
-
-    # Check if remote tracking branch exists
-    if [ $? -ne 0 ]; then
+    if ! remote_commit=$(git rev-parse @{u} 2>/dev/null); then
         echo "No remote tracking branch found. Skipping update check."
         return 0
     fi
@@ -62,12 +59,19 @@ if [ ! -d "temp_files" ]; then
 fi
 
 # Find the config among the forwarded arguments (same default as the sbatch
-# script), so we can derive the outer job's sbatch resources from it.
+# script), so we can derive the outer job's sbatch resources from it. Read by
+# index rather than shift, so "$@" stays intact for forwarding below.
 CONFIG_FILE="./defaults/config/config.yaml"
 args=("$@")
 for ((i = 0; i < ${#args[@]}; i++)); do
     case "${args[$i]}" in
-        -c|--config) CONFIG_FILE="${args[$((i + 1))]}" ;;
+        -c|--config)
+            if (( i + 1 >= ${#args[@]} )); then
+                echo "Error: ${args[$i]} requires a value" >&2
+                exit 1
+            fi
+            CONFIG_FILE="${args[$((i + 1))]}"
+            ;;
     esac
 done
 
