@@ -49,7 +49,7 @@ docs piecemeal in the meantime.
   default `<experiment_dir>/temp_files`. Nothing is written inside the repo by
   default (outputs already live under `experiment_dir`). Note the outer launch
   script still makes a repo-root `sbatch_output/` — part of the
-  `_sbatch_pipeline.sh` follow-up below.
+  `init_pipeline.sh` follow-up below.
 
 ## Log output
 - The run prints a numbered plan of the blocks up front, then a
@@ -63,7 +63,7 @@ docs piecemeal in the meantime.
   buffering (stdout redirected to a file under slurm) reorders them after the
   worker's output.
 - Slurm log layout: every job writes into `<temp>/pipeline_<id>/sbatch_output/`,
-  the outer one as `init-<id>.out/.err` (so it sorts first), each block as
+  the outer one as `init_pipeline-<id>.out/.err` (so it sorts first), each block as
   `<block>-<id>.out/.err`. The linker joins them per stream into
   `<temp>/pipeline_<id>/pipeline-<id>.out` (and `.err`) — one file to read the
   whole chain — with a `===== <file> =====` header per section. Originals are
@@ -114,13 +114,13 @@ docs piecemeal in the meantime.
   it would collide with the block-name namespace.
 - The outer/orchestrator job's resources come from `sbatch_init`. `run_pipeline.sh`
   turns them into sbatch CLI flags (via `python -m towbintools_pipeline.run_params
-  --sbatch-init`) which override `_sbatch_pipeline.sh`'s minimal header. So a new
+  --sbatch-init`) which override `init_pipeline.sh`'s minimal header. So a new
   cluster is adjusted entirely in the config now — cluster-specific outer
   directives (`--account`, a custom `--gres` like the old `pipelinecapacity`
   throttle, `--mem-per-cpu`) go under `sbatch_init.sbatch_extra_options`.
 - `run_pipeline.sh` forwards `-e/--experiment_dir` and `-t/--temp_dir` through to
   the pipeline (previously only `-c`).
-- Still hardcoded in `_sbatch_pipeline.sh`: the `micromamba run -n towbintools`
+- Still hardcoded in `init_pipeline.sh`: the `micromamba run -n towbintools`
   env name (env-decoupling, separate milestone).
 - Temp working dir defaults to in-repo `./temp_files` (gitignored, transient,
   cleared by cleanup_temp_files.sh). Decision: keep this default rather than
@@ -191,5 +191,5 @@ docs piecemeal in the meantime.
   when packaging.
 - The outer orchestrator job's resources are now config-driven: `run_pipeline.sh`
   passes sbatch CLI flags built from `sbatch_init`, overriding the minimal header
-  in `_sbatch_pipeline.sh`. Only the `micromamba run -n towbintools` env name
+  in `init_pipeline.sh`. Only the `micromamba run -n towbintools` env name
   remains hardcoded there — part of the separate env-decoupling milestone.
