@@ -240,6 +240,39 @@ def test_resolve_init_slurm_drops_gpu():
     assert init["sbatch_extra_options"] == ["--account=gratis"]
 
 
+def test_slurm_extra_options_accumulate():
+    # Scalar keys are replaced by a section, but sbatch_extra_options entries are
+    # appended, so a cluster-wide option is never silently dropped.
+    from towbintools_pipeline.utils import resolve_block_slurm
+    from towbintools_pipeline.utils import resolve_init_slurm
+
+    config = {
+        "sbatch_cpus": 32,
+        "sbatch_extra_options": ["--account=gratis"],
+        "sbatch_overrides": {
+            "segmentation": {
+                "sbatch_cpus": 8,
+                "sbatch_extra_options": ["--partition=gpu"],
+            }
+        },
+        "sbatch_init": {"sbatch_extra_options": ["--gres=pipelinecapacity:1"]},
+    }
+
+    seg = resolve_block_slurm(config, "segmentation")
+    assert seg["sbatch_cpus"] == 8  # scalar replaced
+    assert seg["sbatch_extra_options"] == ["--account=gratis", "--partition=gpu"]
+
+    # A block without an override keeps only the shared extras.
+    other = resolve_block_slurm(config, "straightening")
+    assert other["sbatch_extra_options"] == ["--account=gratis"]
+
+    init = resolve_init_slurm(config)
+    assert init["sbatch_extra_options"] == [
+        "--account=gratis",
+        "--gres=pipelinecapacity:1",
+    ]
+
+
 def test_build_resource_directives():
     # Standard directives emitted only when set; extras appended verbatim.
     from towbintools_pipeline.utils import build_resource_directives

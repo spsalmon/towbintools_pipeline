@@ -489,12 +489,26 @@ def _slurm_defaults(config):
     return {key: config[key] for key in _SBATCH_KEYS if key in config}
 
 
+def _merge_slurm_section(resolved, section):
+    # Scalar sbatch_* keys of the section override the defaults, but the
+    # sbatch_extra_options list accumulates, so a section cannot silently drop a
+    # cluster-wide entry (e.g. --account).
+    extra = list(resolved.get("sbatch_extra_options") or []) + list(
+        section.get("sbatch_extra_options") or []
+    )
+    resolved.update(section)
+    if extra:
+        resolved["sbatch_extra_options"] = extra
+    return resolved
+
+
 def resolve_block_slurm(config, block_name):
     # Effective SLURM resources for a worker block: the shared defaults overlaid
     # with any per-type entry under sbatch_overrides.
     resolved = _slurm_defaults(config)
-    resolved.update(config.get("sbatch_overrides", {}).get(block_name, {}))
-    return resolved
+    return _merge_slurm_section(
+        resolved, config.get("sbatch_overrides", {}).get(block_name, {})
+    )
 
 
 def resolve_init_slurm(config):
@@ -506,8 +520,7 @@ def resolve_init_slurm(config):
         for key, value in _slurm_defaults(config).items()
         if key != "sbatch_gpus"
     }
-    resolved.update(config.get("sbatch_init", {}))
-    return resolved
+    return _merge_slurm_section(resolved, config.get("sbatch_init", {}))
 
 
 def build_resource_directives(cores, time_limit, memory, gpus, extra_options):
