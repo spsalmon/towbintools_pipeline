@@ -147,6 +147,51 @@ def test_block_progress_is_logged(tmp_path):
     ]
 
 
+def test_concatenate_sbatch_logs(tmp_path):
+    # Per-block logs are joined per stream in write order, headed by their file
+    # name, without touching the originals.
+    import os as _os
+
+    from towbintools_pipeline.utils import concatenate_sbatch_logs
+
+    temp_dir = tmp_path / "pipeline_4242"
+    log_dir = temp_dir / "sbatch_output"
+    log_dir.mkdir(parents=True)
+
+    # Written out of order on purpose; mtimes decide the order, not the names.
+    (log_dir / "straightening-3.out").write_text("third\n")
+    (log_dir / "init-1.out").write_text("first\n")
+    (log_dir / "segmentation-2.out").write_text("second\n")
+    (log_dir / "segmentation-2.err").write_text("a warning\n")
+    for name, stamp in (("init-1.out", 1000), ("segmentation-2.out", 2000),
+                        ("straightening-3.out", 3000)):
+        _os.utime(log_dir / name, (stamp, stamp))
+
+    concatenate_sbatch_logs(str(temp_dir))
+
+    combined = (temp_dir / "pipeline-4242.out").read_text()
+    assert combined.index("first") < combined.index("second") < combined.index("third")
+    assert "===== init-1.out =====" in combined
+    # each stream gets its own file, and the originals stay put
+    assert (temp_dir / "pipeline-4242.err").read_text().count("a warning") == 1
+    assert (log_dir / "init-1.out").read_text() == "first\n"
+
+    # Rebuilding is idempotent: the combined file lives outside the log dir, so
+    # it is never folded into itself.
+    concatenate_sbatch_logs(str(temp_dir))
+    assert (temp_dir / "pipeline-4242.out").read_text() == combined
+
+
+def test_concatenate_sbatch_logs_without_logs(tmp_path):
+    # A local run has no sbatch logs at all; that must be a quiet no-op.
+    from towbintools_pipeline.utils import concatenate_sbatch_logs
+
+    concatenate_sbatch_logs(str(tmp_path))  # no sbatch_output dir
+    (tmp_path / "sbatch_output").mkdir()
+    concatenate_sbatch_logs(str(tmp_path))  # empty sbatch_output dir
+    assert list(tmp_path.glob("pipeline-*")) == []
+
+
 def test_run_config_and_version_info_backed_up(tmp_path):
     # The config and a git_info.txt land in the backup, which sits beside the
     # report (under the analysis dir), not inside it.

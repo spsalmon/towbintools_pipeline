@@ -8,6 +8,7 @@ from towbintools.foundation.file_handling import write_filemap
 
 from towbintools_pipeline.utils import block_label
 from towbintools_pipeline.utils import cleanup_files
+from towbintools_pipeline.utils import concatenate_sbatch_logs
 from towbintools_pipeline.utils import load_pickles
 from towbintools_pipeline.utils import merge_and_save_records
 from towbintools_pipeline.utils import pickle_objects
@@ -159,6 +160,13 @@ def main():
         )
     else:
         print(f"### End of the pipeline! ({len(building_blocks)} blocks) ###", flush=True)
+
+    # Refresh the combined logs last, once the block above has been submitted, so
+    # they hold everything written up to this link. Sync again to carry them (and
+    # the filemap updated above) into the backup.
+    concatenate_sbatch_logs(temp_dir)
+    if current_block_index > 0:
+        sync_backup_folder(temp_dir, pipeline_backup_dir)
 
 
 if __name__ == "__main__":

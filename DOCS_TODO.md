@@ -62,6 +62,16 @@ docs piecemeal in the meantime.
 - Prints that precede a subprocess are flushed, otherwise Python's block
   buffering (stdout redirected to a file under slurm) reorders them after the
   worker's output.
+- Slurm log layout: every job writes into `<temp>/pipeline_<id>/sbatch_output/`,
+  the outer one as `init-<id>.out/.err` (so it sorts first), each block as
+  `<block>-<id>.out/.err`. The linker joins them per stream into
+  `<temp>/pipeline_<id>/pipeline-<id>.out` (and `.err`) — one file to read the
+  whole chain — with a `===== <file> =====` header per section. Originals are
+  kept, and the combined files sync into the run backup.
+- The combined files are rebuilt at every link, not just at the end, so a run
+  that dies mid-chain still leaves a readable log. Consequence: the tail of the
+  block that is running while it is written is never included (the linker runs
+  inside that job, whose log is still open) — hence the closing marker line.
 
 ## Testing
 - `python -m pytest tests/ -v` runs the local-backend smoke test (synthetic

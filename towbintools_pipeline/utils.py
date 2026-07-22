@@ -603,6 +603,43 @@ def create_linker_command(
     return linker_command
 
 
+def concatenate_sbatch_logs(temp_dir):
+    # Join the per-block slurm logs into one file per stream in the run's temp
+    # dir, ordered by write time (blocks run sequentially). Originals are kept
+    # and the combined files are rebuilt on every call, so a run that stops
+    # mid-chain still leaves a readable log.
+    log_dir = os.path.join(temp_dir, "sbatch_output")
+    if not os.path.isdir(log_dir):
+        return
+    job_id = os.path.basename(os.path.normpath(temp_dir)).removeprefix("pipeline_")
+    try:
+        for suffix in (".out", ".err"):
+            parts = sorted(
+                (
+                    os.path.join(log_dir, name)
+                    for name in os.listdir(log_dir)
+                    if name.endswith(suffix)
+                ),
+                key=os.path.getmtime,
+            )
+            if not parts:
+                continue
+            # Written to the parent, so a rerun never reads its own output back.
+            with open(os.path.join(temp_dir, f"pipeline-{job_id}{suffix}"), "w") as out:
+                for part in parts:
+                    out.write(f"===== {os.path.basename(part)} =====\n")
+                    with open(part, errors="replace") as f:
+                        shutil.copyfileobj(f, out)
+                    out.write("\n")
+                out.write(
+                    "===== end of combined log "
+                    "(the tail of the running block is not included) =====\n"
+                )
+    except Exception as e:
+        # Log housekeeping must never take the pipeline down with it.
+        print(f"Warning: could not combine the sbatch logs: {e}")
+
+
 def block_label(building_blocks, index):
     # Short "3/12 straightening" tag identifying one entry of the block sequence,
     # used by the progress prints (blocks of the same type repeat, so the
