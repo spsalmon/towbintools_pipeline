@@ -27,8 +27,9 @@ The script lives in `training/classification/`, with example configs under
 
 ## Example configuration
 
-An example is kept up to date under
-`training/classification/configs/qc_dataset_config.yaml`.
+An example configuration lives under
+`training/classification/configs/qc_dataset_config.yaml`; the block below is
+an illustrative, trimmed version.
 
 ```yaml
 storage_path: "/mnt/towbin.data/shared"
@@ -92,7 +93,8 @@ experiments_to_exclude: []
 - **threshold** : residual quantile above which a timepoint is flagged
   `potential_error` (labelled mode only).
 - **extra_adulthood_time** : how many frames after M4 to keep (points annotated
-  with M4). Limits how far into adulthood images are sampled.
+  with M4). Limits how far into adulthood images are sampled (labelled mode
+  only).
 - **valid_scopes** : only keep experiments whose directory name mentions one of
   these microscopes.
 - **scopes_alt_names** : maps each canonical scope name to the spelling

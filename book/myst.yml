@@ -28,7 +28,7 @@ project:
           children:
             - file: training/GatheringQCDataset.md
             - file: training/TrainingQCModels.md
-      #   - file: training/TrainingMoltDetectionModels.md
+        #   - file: training/TrainingMoltDetectionModels.md
     - title: Building Blocks
       children:
         - file: building_blocks/BuildingBlock.md

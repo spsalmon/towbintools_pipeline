@@ -21,7 +21,7 @@ rerun_feature_extraction: true
 
 # Bayesian optimization budget (only used when optimize_hyperparameters is true).
 n_points: 10
-n_iter: 50
+n_iter: 50 # applies to both the QC model and the optional egg model
 
 # Fraction of samples held out for validation, and the split seed.
 test_split_ratio: 0.2

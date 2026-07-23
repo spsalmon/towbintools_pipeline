@@ -56,7 +56,8 @@ random_state: 42
   classifier file name(s), the class list, and whether the model is
   `mask_only`.
 - **qc_classifier_name** / **egg_classifier_name** : file names of the raw
-  XGBoost classifiers inside `output_path`.
+  XGBoost classifiers inside `output_path` (`egg_classifier_name` is only
+  written when `train_egg_detector` is true).
 - **optimize_hyperparameters** : if true, run Bayesian optimization over the
   XGBoost hyperparameters before fitting the final model; otherwise fit with
   defaults.

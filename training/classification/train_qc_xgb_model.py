@@ -149,7 +149,6 @@ if __name__ == "__main__":
         project_config = yaml.safe_load(f)
 
     classes = project_config["classes"]
-    image_dir = os.path.join(dataset_path, "images")
     mask_dir = os.path.join(dataset_path, "masks")
     annotation_csv_path = os.path.join(dataset_path, "annotations", "annotations.csv")
     annotations_df = pd.read_csv(annotation_csv_path)
