@@ -39,10 +39,9 @@ database_path: "/mnt/towbin.data/shared/spsalmon/towbinlab_classification_databa
 database_configs: {
   'pharynx': {
       'size': 2000,
-      'scope_proportions': {'ti2': 0.5, 'squid': 0.5},
       'channel': [0],
       'strains': ["186", "160", "125", "318", "446"],
-      'magnification': "10x",
+      'magnifications': ["10x"],
   },
 }
 
@@ -76,9 +75,15 @@ experiments_to_exclude: []
 - **database_configs** : one entry per sub-dataset to build. Each entry accepts:
   - **size** : the target number of images for that sub-dataset.
   - **channel** : the raw channel(s) to extract (0-indexed).
-  - **scope_proportions** : optional target proportions per microscope.
   - **strains** : optional list of strain numbers to restrict to.
-  - **magnification** : optional magnification filter.
+  - **magnifications** : optional list of magnification strings to restrict to
+    (e.g. `["10x"]`); case variations are generated automatically. Note the
+    key is plural — a singular `magnification` entry (seen in some existing
+    configs) is not read and has no effect.
+  - **stage_proportions** : optional. Only its presence matters (its per-stage
+    values are not otherwise used): setting it restricts the scan to
+    GUI-annotated filemaps (`analysis_filemap_annotated`) instead of all
+    filemaps.
 - **class_proportions** : the target proportion of each class
   (`error`, `potential_error`, `good`, `egg`). Set to `null` for unlabelled
   mode.

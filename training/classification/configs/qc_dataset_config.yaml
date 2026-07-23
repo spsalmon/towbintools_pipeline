@@ -7,7 +7,6 @@ database_configs: {
   'pharynx': {
       'size': 2000,
       # 'stage_proportions': {'L1': 0.25, 'L2': 0.25, 'L3': 0.25, 'L4': 0.25,},
-      'scope_proportions': {'ti2': 0.5, 'squid': 0.5},
       'channel': [0],
       'strains': ["186", "160", "125", "318", "446"],
       'magnification': "10x",
@@ -22,7 +21,6 @@ threshold: 0.90
 
 # sets a limit on how far after M4 images will be included
 extra_adulthood_time: 40
-n_picks_per_stage: 50
 
 valid_scopes: ["squid", "ti2"]
 scopes_alt_names: {

@@ -16,11 +16,9 @@ class_proportions: null
 lambda: null
 # threshold quantile
 threshold: null
-get_straightened: true
 
 # sets a limit on how far after M4 images will be included
 extra_adulthood_time: 40
-n_picks_per_stage: 50
 
 valid_scopes: ["ziva", "kinetix", "orca"]
 scopes_alt_names: {
