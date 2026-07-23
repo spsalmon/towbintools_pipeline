@@ -7,7 +7,7 @@ database_configs: {
   'fluorescent_bacteria': {
       'size': 2000,
       'channel': [0, 1],
-      'magnification': "10x",
+      'magnifications': ["10x"],
   },
 }
 

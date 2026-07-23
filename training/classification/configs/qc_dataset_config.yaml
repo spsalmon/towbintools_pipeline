@@ -9,7 +9,7 @@ database_configs: {
       # 'stage_proportions': {'L1': 0.25, 'L2': 0.25, 'L3': 0.25, 'L4': 0.25,},
       'channel': [0],
       'strains': ["186", "160", "125", "318", "446"],
-      'magnification': "10x",
+      'magnifications': ["10x"],
   },
 }
 

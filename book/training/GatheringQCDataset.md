@@ -79,8 +79,8 @@ experiments_to_exclude: []
   - **strains** : optional list of strain numbers to restrict to.
   - **magnifications** : optional list of magnification strings to restrict to
     (e.g. `["10x"]`); case variations are generated automatically. Note the
-    key is plural — a singular `magnification` entry (seen in some existing
-    configs) is not read and has no effect.
+    key is plural and takes a list — a singular `magnification: "10x"` entry is
+    not read and silently disables the filter, so check older configs for it.
   - **stage_proportions** : optional. Only its presence matters (its per-stage
     values are not otherwise used): setting it restricts the scan to
     GUI-annotated filemaps (`analysis_filemap_annotated`) instead of all

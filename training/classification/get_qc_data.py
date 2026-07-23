@@ -14,6 +14,19 @@ from tqdm import tqdm
 
 np.random.seed(387799)
 
+# Schema of the gathered classification database. Every code path that returns a
+# database must use it, including the "skip this experiment" paths: the caller
+# vstacks the result, and an empty DataFrame without this schema raises a
+# ShapeError instead of contributing zero rows.
+DATABASE_SCHEMA = {
+    "Class": pl.Utf8,
+    "Image": pl.Utf8,
+    "Microscope": pl.Utf8,
+    "Point": pl.Int64,
+    "Stage": pl.Utf8,
+    "Mask": pl.Utf8,
+}
+
 
 def process_strains(strains):
     # to be correct the strain number needs to be followed by a separator like -, _ or space
@@ -161,7 +174,7 @@ def get_images_from_filemap(
             (pl.col("ExperimentTime") / 3600).alias("ExperimentTime")
         )
 
-    database = pl.DataFrame()
+    database = pl.DataFrame(schema=DATABASE_SCHEMA)
 
     seg_columns = [
         column
@@ -172,6 +185,19 @@ def get_images_from_filemap(
     straigthened_raw_columns = [
         column for column in filemap_df.columns if (straigthened_raw in column)
     ]
+
+    # these have to come before the rename and the indexing below
+    if len(straigthened_raw_columns) == 0:
+        print(
+            f"Skipping experiment {experiment_name} as it does not have straightened raw images for channel {channel_name}."
+        )
+        return database
+
+    if len(seg_columns) == 0:
+        print(
+            f"Skipping experiment {experiment_name} as it does not have straightened segmentation masks for channel {channel_name}."
+        )
+        return database
 
     # remove the previous raw column if it exists
     if "raw" in filemap_df.columns:
@@ -201,12 +227,6 @@ def get_images_from_filemap(
             # make a fake qc column with all good if no qc column exists, so we can still use the data for training but just label everything as good
             filemap_df = filemap_df.with_columns(pl.lit("worm").alias("placeholder_qc"))
             worm_type_columns = ["placeholder_qc"]
-
-        if len(straigthened_raw_columns) == 0:
-            print(
-                f"Skipping experiment {experiment_name} as it does not have straightened raw images for channel {channel_name}."
-            )
-            return database
 
         if len(volume_columns) == 0:
             print(
@@ -326,14 +346,7 @@ def get_images_from_filemap(
             rows.extend(filemap_rows)
         database = pl.DataFrame(
             rows,
-            schema={
-                "Class": pl.Utf8,
-                "Image": pl.Utf8,
-                "Microscope": pl.Utf8,
-                "Point": pl.Int64,
-                "Stage": pl.Utf8,
-                "Mask": pl.Utf8,
-            },
+            schema=DATABASE_SCHEMA,
         )
     else:
         for filemap in filemaps_of_points:
@@ -374,14 +387,7 @@ def get_images_from_filemap(
             rows.extend(filemap_rows)
         database = pl.DataFrame(
             rows,
-            schema={
-                "Class": pl.Utf8,
-                "Image": pl.Utf8,
-                "Microscope": pl.Utf8,
-                "Point": pl.Int64,
-                "Stage": pl.Utf8,
-                "Mask": pl.Utf8,
-            },
+            schema=DATABASE_SCHEMA,
         )
 
     return database
@@ -483,14 +489,7 @@ if __name__ == "__main__":
         )
 
         database = pl.DataFrame(
-            schema={
-                "Class": pl.Utf8,
-                "Image": pl.Utf8,
-                "Microscope": pl.Utf8,
-                "Point": pl.Int64,
-                "Stage": pl.Utf8,
-                "Mask": pl.Utf8,
-            }
+            schema=DATABASE_SCHEMA,
         )
         for filemap in filemaps:
             # try:
@@ -520,14 +519,7 @@ if __name__ == "__main__":
                 class_counts[cls] = int(total_images * prop)
             # sample images per class
             sampled_database = pl.DataFrame(
-                schema={
-                    "Class": pl.Utf8,
-                    "Image": pl.Utf8,
-                    "Microscope": pl.Utf8,
-                    "Point": pl.Int64,
-                    "Stage": pl.Utf8,
-                    "Mask": pl.Utf8,
-                }
+                schema=DATABASE_SCHEMA,
             )
             for cls, count in class_counts.items():
                 class_images = database.filter(pl.col("Class") == cls)
