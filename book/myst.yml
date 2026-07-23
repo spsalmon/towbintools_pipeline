@@ -24,11 +24,11 @@ project:
           children:
             - file: training/GatheringSegmentationDataset.md
             - file: training/TrainingSegmentationModels.md
-      #   - title: Training Quality Control Models
-      #     children:
-      #       - file: training/GatheringQCDataset.md
-      #       - file: training/TrainingQCModels.md
-      #   - file: training/TrainingMoltDetectionModels.md
+        - file: training/TrainingMoltDetection.md
+        - title: Training Quality Control Models
+          children:
+            - file: training/GatheringQCDataset.md
+            - file: training/TrainingQCModels.md
     - title: Building Blocks
       children:
         - file: building_blocks/BuildingBlock.md
