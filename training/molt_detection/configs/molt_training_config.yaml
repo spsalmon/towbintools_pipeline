@@ -1,0 +1,40 @@
+# Configuration for training the molt detection model.
+# Run with:
+#   cd ~/towbintools_pipeline/training/molt_detection
+#   bash run_training.sh -c configs/molt_training_config.yaml
+
+# Dataset produced by get_molt_detection_data.py. Either point at the directory
+# it wrote to (the three pickles are resolved automatically using keymap_type),
+# or set the three explicit pickle paths below.
+dataset_dir: "./molt_detection_dataset"
+keymap_type: "gaussian"
+# features_pickle: null
+# heatmaps_pickle: null
+# keypoints_pickle: null
+
+# Where to save the trained model. The checkpoints are written to
+# <save_dir>/<model_name>/, together with a copy of this config and a
+# lightweight checkpoint (best_light.ckpt) for deployment.
+save_dir: "./model_checkpoints"
+model_name: "molt_detection_model"
+
+# Model architecture. The two input channels are the log-volume series and its
+# instantaneous growth rate; the four classes are the hatch and M1-M4 molts.
+input_channels: 2
+n_classes: 4
+activation: "sigmoid"
+learning_rate: 1.0e-4
+
+# How the variable-length 1D series are padded/resized into batches.
+enforce_divisibility_by: 32
+resize_method: "pad"
+
+# Training loop.
+batch_size: 64
+max_epochs: 50
+num_workers: 32
+accumulate_grad_batches: 1
+train_test_split_ratio: 0.2
+save_best_k_models: 1
+swa_lrs: 1.0e-2
+random_state: 42

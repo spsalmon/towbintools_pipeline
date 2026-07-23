@@ -1,15 +1,14 @@
 #!/bin/bash
 
-#SBATCH -J train
-#SBATCH -o ../../sbatch_output/train-%j.out
-#SBATCH -e ../../sbatch_output/train-%j.err
-#SBATCH -c 64
-#SBATCH -t 72:00:00
-#SBATCH --mem=64GB
-#SBATCH --gres=gpu:rtx4090:1
+#SBATCH -J gather_molt
+#SBATCH -o ../../sbatch_output/gather_molt-%j.out
+#SBATCH -e ../../sbatch_output/gather_molt-%j.err
+#SBATCH -c 16
+#SBATCH -t 24:00:00
+#SBATCH --mem=32GB
 
 # Default configuration file
-DEFAULT_CONFIG_FILE="./configs/segmentation_training_config.yaml"
+DEFAULT_CONFIG_FILE="./configs/molt_dataset_config.yaml"
 CONFIG_FILE="$DEFAULT_CONFIG_FILE"
 
 # Function to show usage
@@ -40,4 +39,4 @@ if [ ! -f "$CONFIG_FILE" ]; then
 fi
 
 # Run the Python script with the specified or default configuration file
-CUDA_LAUNCH_BLOCKING=1 ~/.local/bin/micromamba run -n towbintools python3 train_your_segmentation_model.py -c "$CONFIG_FILE"
+~/.local/bin/micromamba run -n towbintools python3 get_molt_detection_data.py -c "$CONFIG_FILE"

@@ -1,14 +1,30 @@
+import argparse
 import os
 import pickle
 
 import numpy as np
 import polars as pl
+import yaml
 from towbintools.data_analysis.growth_rate import (
     compute_instantaneous_growth_rate_classified,
 )
 from towbintools.data_analysis.time_series import correct_series_with_classification
 from towbintools.foundation.file_handling import read_filemap
 from tqdm import tqdm
+
+# Internal feature-engineering parameters for the instantaneous growth rate.
+# These are implementation details of how the log-volume series is smoothed and
+# differentiated, not user-facing knobs, so they are kept as module constants.
+GROWTH_RATE_LAMBDA = 0.005
+GROWTH_RATE_ORDER = 2
+GROWTH_RATE_MEDFILT_WINDOW = 5
+
+
+def get_args():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("-c", "--config", help="Path to the config file", required=True)
+    args = parser.parse_args()
+    return args
 
 
 def landmarks_to_gaussian_keymap(landmarks, length, sigma_frames=3.0):
@@ -52,6 +68,8 @@ def get_features_and_ground_truth_molts(
     worm_type_column="ch2_seg_str_worm_type",
     volume_column="ch2_seg_str_volume",
     sigma_frames=3.0,
+    min_series_length=200,
+    max_series_length=1000,
 ):
     X = []
     y = []
@@ -79,8 +97,11 @@ def get_features_and_ground_truth_molts(
 
         volume_data = point_data[volume_column].to_numpy()
         series_length = volume_data.shape[-1]
-        if not 200 <= series_length <= 1000:
-            print(f"Skipping point {point}: length {series_length} outside [200, 1000]")
+        if not min_series_length <= series_length <= max_series_length:
+            print(
+                f"Skipping point {point}: length {series_length} outside "
+                f"[{min_series_length}, {max_series_length}]"
+            )
             continue
 
         log_volume_data = np.log(
@@ -91,9 +112,9 @@ def get_features_and_ground_truth_molts(
             log_volume_data,
             time=np.linspace(0, series_length - 1, series_length),
             qc=worm_type_data,
-            lmbda=0.005,
-            order=2,
-            medfilt_window=5,
+            lmbda=GROWTH_RATE_LAMBDA,
+            order=GROWTH_RATE_ORDER,
+            medfilt_window=GROWTH_RATE_MEDFILT_WINDOW,
         )
 
         features = np.stack([log_volume_data, log_volume_growth_rate], axis=0)
@@ -114,6 +135,8 @@ def get_all_features_and_ground_truth_molts(
     worm_type_column="ch2_seg_str_worm_type",
     volume_column="ch2_seg_str_volume",
     sigma_frames=3.0,
+    min_series_length=200,
+    max_series_length=1000,
 ):
     X = []
     y = []
@@ -127,6 +150,8 @@ def get_all_features_and_ground_truth_molts(
                 worm_type_column=worm_type_column,
                 volume_column=volume_column,
                 sigma_frames=sigma_frames,
+                min_series_length=min_series_length,
+                max_series_length=max_series_length,
             )
             X.extend(X_i)
             y.extend(y_i)
@@ -142,6 +167,8 @@ def find_valid_filemaps(
     experimentalists=("kstojanovski", "plenart", "igheor", "spsalmon"),
     scopes=("ti2", "orca", "lipsi", "crest", "squid"),
     volume_column="ch2_seg_str_volume",
+    min_year=2024,
+    magnifications=("10x", "10X"),
 ):
     scope_variations = {
         variation
@@ -158,12 +185,12 @@ def find_valid_filemaps(
                 continue
 
             try:
-                if int(name[:4]) < 2024:
+                if int(name[:4]) < min_year:
                     continue
             except ValueError:
                 continue
 
-            if "10x" not in name and "10X" not in name:
+            if not any(magnification in name for magnification in magnifications):
                 continue
             if not any(scope in name for scope in scope_variations):
                 continue
@@ -181,19 +208,52 @@ def find_valid_filemaps(
 
 
 if __name__ == "__main__":
-    keymap_type = "gaussian"
-    sigma_frames = 2.0
+    config_file = get_args().config
+    with open(config_file) as f:
+        config = yaml.load(f, Loader=yaml.FullLoader)
 
-    filemaps = find_valid_filemaps()
+    storage_cluster_path = config.get("storage_cluster_path", "/mnt/towbin.data/shared")
+    experimentalists = config.get(
+        "experimentalists", ["kstojanovski", "plenart", "igheor", "spsalmon"]
+    )
+    scopes = config.get("scopes", ["ti2", "orca", "lipsi", "crest", "squid"])
+    min_year = config.get("min_year", 2024)
+    magnifications = config.get("magnifications", ["10x", "10X"])
+    worm_type_column = config.get("worm_type_column", "ch2_seg_str_worm_type")
+    volume_column = config.get("volume_column", "ch2_seg_str_volume")
+    sigma_frames = config.get("sigma_frames", 2.0)
+    keymap_type = config.get("keymap_type", "gaussian")
+    min_series_length = config.get("min_series_length", 200)
+    max_series_length = config.get("max_series_length", 1000)
+    output_dir = config.get("output_dir", "./molt_detection_dataset")
+
+    os.makedirs(output_dir, exist_ok=True)
+
+    filemaps = find_valid_filemaps(
+        storage_cluster_path=storage_cluster_path,
+        experimentalists=experimentalists,
+        scopes=scopes,
+        volume_column=volume_column,
+        min_year=min_year,
+        magnifications=magnifications,
+    )
     print(f"Found {len(filemaps)} valid experiments")
 
     X, y, keypoints_all = get_all_features_and_ground_truth_molts(
         filemaps,
-        worm_type_column="ch2_seg_str_worm_type",
-        volume_column="ch2_seg_str_volume",
+        worm_type_column=worm_type_column,
+        volume_column=volume_column,
         sigma_frames=sigma_frames,
+        min_series_length=min_series_length,
+        max_series_length=max_series_length,
     )
 
-    pickle.dump(X, open("X_molt_detection.pickle", "wb"))
-    pickle.dump(y, open(f"y_{keymap_type}_molt_detection.pickle", "wb"))
-    pickle.dump(keypoints_all, open("keypoints_molt_detection.pickle", "wb"))
+    pickle.dump(X, open(os.path.join(output_dir, "X_molt_detection.pickle"), "wb"))
+    pickle.dump(
+        y,
+        open(os.path.join(output_dir, f"y_{keymap_type}_molt_detection.pickle"), "wb"),
+    )
+    pickle.dump(
+        keypoints_all,
+        open(os.path.join(output_dir, "keypoints_molt_detection.pickle"), "wb"),
+    )

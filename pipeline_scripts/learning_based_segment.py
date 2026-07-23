@@ -270,7 +270,13 @@ def deep_learning_segmentation(
 
 
 def cellpose_segmentation(
-    block_config, input_files, output_files, segmentation_channels, z_dim, t_dim
+    block_config,
+    input_files,
+    output_files,
+    segmentation_channels,
+    z_dim,
+    t_dim,
+    stitch_3D=True,
 ):
     gpu = torch.cuda.is_available()
     batch_size = block_config.get("batch_size", 8)
@@ -280,7 +286,12 @@ def cellpose_segmentation(
         output_files,
     ):
         masks, _, _ = model.eval(
-            image, z_axis=None, channel_axis=None, do_3D=False, batch_size=batch_size
+            image,
+            z_axis=None,
+            channel_axis=None,
+            do_3D=False,
+            batch_size=batch_size,
+            stitch_threshold=(0.25 if stitch_3D else 0.0),
         )
         save_prediction(masks.astype(np.uint16), output_path, z_dim=z_dim, t_dim=t_dim)
 

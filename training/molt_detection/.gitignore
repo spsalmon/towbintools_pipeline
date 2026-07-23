@@ -1,0 +1,4 @@
+# Generated training dataset and model artifacts
+*.pickle
+molt_detection_dataset/
+model_checkpoints/
