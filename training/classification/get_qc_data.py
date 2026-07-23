@@ -28,32 +28,32 @@ def process_strains(strains):
 
 
 def get_analysis_filemap(experiment_path, get_annotated_only=False):
-    directories = [
+    """Return the newest analysis filemap for an experiment, or None.
+
+    Scans every ``analysis*/report`` directory and returns the most recently
+    modified filemap. When ``get_annotated_only`` is set, only GUI-annotated
+    filemaps (``analysis_filemap_annotated``) are considered.
+    """
+    keyword = "analysis_filemap_annotated" if get_annotated_only else "analysis_filemap"
+
+    analysis_dirs = [
         os.path.join(experiment_path, d)
         for d in os.listdir(experiment_path)
-        if os.path.isdir(os.path.join(experiment_path, d))
+        if os.path.isdir(os.path.join(experiment_path, d)) and "analysis" in d
+    ]
+    report_dirs = [
+        report
+        for d in analysis_dirs
+        if os.path.isdir(report := os.path.join(d, "report"))
     ]
 
-    analysis_directories = [d for d in directories if "analysis" in d]
-    report_directories = [os.path.join(d, "report") for d in analysis_directories]
-
-    report_directories = [d for d in report_directories if os.path.isdir(d)]
-
-    filemap_files = []
-    for report_dir in report_directories:
-        files = [os.path.join(report_dir, f) for f in os.listdir(report_dir)]
-        if get_annotated_only:
-            files = [f for f in files if "analysis_filemap_annotated" in f]
-        else:
-            files = [f for f in files if "analysis_filemap" in f]
-        if files:
-            filemap_files.sort(key=lambda x: os.path.getctime(x))
-            filemap_files.append(os.path.join(report_dir, files[-1]))
-
-    if filemap_files:
-        filemap_files.sort(key=lambda x: os.path.getctime(x))
-        return os.path.join(report_dir, filemap_files[-1])
-
+    candidates = []
+    for report_dir in report_dirs:
+        candidates.extend(
+            os.path.join(report_dir, f) for f in os.listdir(report_dir) if keyword in f
+        )
+    if candidates:
+        return max(candidates, key=os.path.getmtime)
     return None
 
 
@@ -118,30 +118,6 @@ def find_all_relevant_filemaps(
     return filemaps
 
 
-def pick_within_larval_stage(filemap, ls_beg, ls_end, n_picks=1):
-    try:
-        if np.isnan(ls_beg) or np.isnan(ls_end):
-            return []
-
-        filemap_of_stage = filemap.filter(
-            (pl.col("Time") >= ls_beg) & (pl.col("Time") <= ls_end)
-        )
-
-        if filemap_of_stage.height > 0:
-            picks = min(n_picks, filemap_of_stage.height)
-            picked_filemap = filemap_of_stage.sample(picks, with_replacement=False)
-            picked_images = picked_filemap.select(pl.col("raw")).to_series().to_list()
-
-            return picked_images
-        else:
-            return []
-    except Exception as e:
-        print(
-            f"Error in picking image within larval stage: {ls_beg}, {ls_end}. Error: {e}"
-        )
-        return []
-
-
 def get_images_from_filemap(
     filemap_path,
     database_config,
@@ -150,7 +126,6 @@ def get_images_from_filemap(
     threshold=0.95,
     lmbda=0.0075,
     extra_adulthood_time=40,
-    n_picks=10,
     get_classes=True,
 ):
     experiment_name = filemap_path.split("/")[-4]
@@ -411,24 +386,6 @@ def get_images_from_filemap(
     return database
 
 
-def calculate_image_combinations(database_size, scope_proportions, stage_proportions):
-    """Calculate number of images needed for each scope and stage combination."""
-    combinations = {}
-
-    # Calculate for each scope and stage combination
-    for scope, scope_prop in scope_proportions.items():
-        combinations[scope] = {}
-        if not stage_proportions:
-            n_images = int(database_size * scope_prop)
-            combinations[scope]["unknown"] = n_images
-        else:
-            for stage, stage_prop in stage_proportions.items():
-                n_images = int(database_size * scope_prop * stage_prop)
-                combinations[scope][stage] = n_images
-
-    return combinations
-
-
 def get_args():
     parser = argparse.ArgumentParser()
     parser.add_argument("-c", "--config", help="Path to the config file", required=True)
@@ -436,132 +393,95 @@ def get_args():
     return args
 
 
-args = get_args()
-config_path = args.config
+if __name__ == "__main__":
+    args = get_args()
+    config_path = args.config
 
-with open(config_path) as f:
-    config = yaml.load(f, Loader=yaml.FullLoader)
+    with open(config_path) as f:
+        config = yaml.load(f, Loader=yaml.FullLoader)
 
-storage_path = config.get("storage_path", "")
-valid_subdirectories = config.get("valid_subdirectories", [])
+    storage_path = config.get("storage_path", "")
+    valid_subdirectories = config.get("valid_subdirectories", [])
 
-database_path = config.get("database_path", None)
-database_configs = config.get("database_configs", {})
-extra_adulthood_time = config.get("extra_adulthood_time", 0)
-valid_scopes = config.get("valid_scopes", [])
-scopes_alt_names = config.get("scopes_alt_names", {})
-keywords_to_exclude = config.get("keywords_to_exclude", [])
-keywords_to_include = config.get("keywords_to_include", [])
-experiments_to_consider = config.get("experiments_to_consider", [])
-experiments_to_always_include = config.get("experiments_to_always_include", [])
-experiments_to_exclude = config.get("experiments_to_exclude", [])
-n_picks_per_stage = config.get("n_picks_per_stage", 10)
-class_proportions = config.get(
-    "class_proportions",
-    None,
-)
+    database_path = config.get("database_path", None)
+    database_configs = config.get("database_configs", {})
+    extra_adulthood_time = config.get("extra_adulthood_time", 0)
+    valid_scopes = config.get("valid_scopes", [])
+    scopes_alt_names = config.get("scopes_alt_names", {})
+    keywords_to_exclude = config.get("keywords_to_exclude", [])
+    keywords_to_include = config.get("keywords_to_include", [])
+    experiments_to_consider = config.get("experiments_to_consider", [])
+    experiments_to_always_include = config.get("experiments_to_always_include", [])
+    experiments_to_exclude = config.get("experiments_to_exclude", [])
+    class_proportions = config.get(
+        "class_proportions",
+        None,
+    )
 
-get_classes = class_proportions is not None
+    get_classes = class_proportions is not None
 
-print(f"Extracting classes: {get_classes}")
+    print(f"Extracting classes: {get_classes}")
 
-lmbda = config.get("lambda", 0.0075)
-threshold = config.get("threshold", 0.95)
-valid_scopes_expanded = []
-for scope in valid_scopes:
-    if scope in scopes_alt_names:
-        valid_scopes_expanded.extend(scopes_alt_names[scope])
+    lmbda = config.get("lambda", 0.0075)
+    threshold = config.get("threshold", 0.95)
+    valid_scopes_expanded = []
+    for scope in valid_scopes:
+        if scope in scopes_alt_names:
+            valid_scopes_expanded.extend(scopes_alt_names[scope])
+        else:
+            valid_scopes_expanded.append(scope)
+
+    os.makedirs(database_path, exist_ok=True)
+
+    # Create mapping from variations to standard names
+    variation_to_unified_scope_name = {}
+    for microscope, variations in scopes_alt_names.items():
+        for variation in variations:
+            variation_to_unified_scope_name[variation] = microscope
+
+    os.makedirs(database_path, exist_ok=True)
+    for sub_db in database_configs.keys():
+        sub_db_dir = os.path.join(database_path, sub_db)
+        os.makedirs(sub_db_dir, exist_ok=True)
+        os.makedirs(os.path.join(sub_db_dir, "images"), exist_ok=True)
+        # os.makedirs(os.path.join(sub_db_dir, "masks"), exist_ok=True)
+
+    # get all experiment directories
+    experiment_directories = []
+    valid_subdirectories = [
+        os.path.join(storage_path, sub_dir) for sub_dir in valid_subdirectories
+    ]
+    if experiments_to_consider:
+        experiment_directories = experiments_to_consider
     else:
-        valid_scopes_expanded.append(scope)
-
-os.makedirs(database_path, exist_ok=True)
-
-# Create mapping from variations to standard names
-variation_to_unified_scope_name = {}
-for microscope, variations in scopes_alt_names.items():
-    for variation in variations:
-        variation_to_unified_scope_name[variation] = microscope
-
-os.makedirs(database_path, exist_ok=True)
-for sub_db in database_configs.keys():
-    sub_db_dir = os.path.join(database_path, sub_db)
-    os.makedirs(sub_db_dir, exist_ok=True)
-    os.makedirs(os.path.join(sub_db_dir, "images"), exist_ok=True)
-    # os.makedirs(os.path.join(sub_db_dir, "masks"), exist_ok=True)
-
-# get all experiment directories
-experiment_directories = []
-valid_subdirectories = [
-    os.path.join(storage_path, sub_dir) for sub_dir in valid_subdirectories
-]
-if experiments_to_consider:
-    experiment_directories = experiments_to_consider
-else:
-    for exp_dir in valid_subdirectories:
-        experiment_directories.extend(
-            [
-                os.path.join(exp_dir, d)
-                for d in os.listdir(exp_dir)
-                if os.path.isdir(os.path.join(exp_dir, d))
-            ]
-        )
-
-experiment_directories.extend(experiments_to_always_include)
-experiment_directories = list(set(experiment_directories))
-
-# filter experiment directories based on the criteria and get their filemaps
-for database_name, database_config in database_configs.items():
-    channel = database_config.get("channel", [0])
-    get_annotated_only = database_config.get("stage_proportions", None) is not None
-    filemaps = find_all_relevant_filemaps(
-        experiment_directories,
-        experiments_to_always_include,
-        keywords_to_include,
-        experiments_to_exclude,
-        valid_scopes_expanded,
-        keywords_to_exclude,
-        database_config,
-        get_annotated_only=get_annotated_only,
-    )
-
-    database = pl.DataFrame(
-        schema={
-            "Class": pl.Utf8,
-            "Image": pl.Utf8,
-            "Microscope": pl.Utf8,
-            "Point": pl.Int64,
-            "Stage": pl.Utf8,
-            "Mask": pl.Utf8,
-        }
-    )
-    for filemap in filemaps:
-        # try:
-        database = database.vstack(
-            get_images_from_filemap(
-                filemap,
-                database_config,
-                valid_scopes_expanded,
-                channel=channel,
-                lmbda=lmbda,
-                threshold=threshold,
-                extra_adulthood_time=extra_adulthood_time,
-                n_picks=n_picks_per_stage,
-                get_classes=get_classes,
+        for exp_dir in valid_subdirectories:
+            experiment_directories.extend(
+                [
+                    os.path.join(exp_dir, d)
+                    for d in os.listdir(exp_dir)
+                    if os.path.isdir(os.path.join(exp_dir, d))
+                ]
             )
+
+    experiment_directories.extend(experiments_to_always_include)
+    experiment_directories = list(set(experiment_directories))
+
+    # filter experiment directories based on the criteria and get their filemaps
+    for database_name, database_config in database_configs.items():
+        channel = database_config.get("channel", [0])
+        get_annotated_only = database_config.get("stage_proportions", None) is not None
+        filemaps = find_all_relevant_filemaps(
+            experiment_directories,
+            experiments_to_always_include,
+            keywords_to_include,
+            experiments_to_exclude,
+            valid_scopes_expanded,
+            keywords_to_exclude,
+            database_config,
+            get_annotated_only=get_annotated_only,
         )
-        # except Exception as e:
-        #     print(f"Error processing filemap {filemap}: {e}")
-        #     continue
 
-    total_images = database_config.get("size", 1000)
-    if get_classes:
-        # calculate number of images per class
-        class_counts = {}
-
-        for cls, prop in class_proportions.items():
-            class_counts[cls] = int(total_images * prop)
-        # sample images per class
-        sampled_database = pl.DataFrame(
+        database = pl.DataFrame(
             schema={
                 "Class": pl.Utf8,
                 "Image": pl.Utf8,
@@ -571,54 +491,98 @@ for database_name, database_config in database_configs.items():
                 "Mask": pl.Utf8,
             }
         )
-        for cls, count in class_counts.items():
-            class_images = database.filter(pl.col("Class") == cls)
-            n = min(count, class_images.height)
-            class_images = class_images.sample(n, with_replacement=False)
-            sampled_database = sampled_database.vstack(class_images)
+        for filemap in filemaps:
+            # try:
+            database = database.vstack(
+                get_images_from_filemap(
+                    filemap,
+                    database_config,
+                    valid_scopes_expanded,
+                    channel=channel,
+                    lmbda=lmbda,
+                    threshold=threshold,
+                    extra_adulthood_time=extra_adulthood_time,
+                    get_classes=get_classes,
+                )
+            )
+            # except Exception as e:
+            #     print(f"Error processing filemap {filemap}: {e}")
+            #     continue
 
-        # sort the dataset by class to group similar images together
-        sampled_database = sampled_database.sort("Class")
-    else:
-        sampled_database = database.sample(total_images, with_replacement=False)
+        total_images = database_config.get("size", 1000)
+        if get_classes:
+            # calculate number of images per class
+            class_counts = {}
 
-    # create output names
-    def get_output_name(i, row):
-        return f'image_{i}_{row["Class"]}_{row["Microscope"]}.tiff'
+            for cls, prop in class_proportions.items():
+                class_counts[cls] = int(total_images * prop)
+            # sample images per class
+            sampled_database = pl.DataFrame(
+                schema={
+                    "Class": pl.Utf8,
+                    "Image": pl.Utf8,
+                    "Microscope": pl.Utf8,
+                    "Point": pl.Int64,
+                    "Stage": pl.Utf8,
+                    "Mask": pl.Utf8,
+                }
+            )
+            for cls, count in class_counts.items():
+                class_images = database.filter(pl.col("Class") == cls)
+                n = min(count, class_images.height)
+                class_images = class_images.sample(n, with_replacement=False)
+                sampled_database = sampled_database.vstack(class_images)
 
-    sampled_database = sampled_database.with_columns(
-        pl.arange(0, sampled_database.height).alias("Index")
-    )
-    sampled_database = sampled_database.with_columns(
-        pl.struct(["Index", "Class", "Microscope"])
-        .map_elements(lambda x: get_output_name(x["Index"], x), return_dtype=pl.String)
-        .alias("OutputName")
-    )
-    sampled_database = sampled_database.select(pl.exclude("Index", "Point"))
-    sampled_database.write_csv(
-        os.path.join(
-            database_path, database_name, f"{database_name}_classification_filemap.csv"
+            # sort the dataset by class to group similar images together
+            sampled_database = sampled_database.sort("Class")
+        else:
+            sampled_database = database.sample(total_images, with_replacement=False)
+
+        # create output names
+        def get_output_name(i, row):
+            return f'image_{i}_{row["Class"]}_{row["Microscope"]}.tiff'
+
+        sampled_database = sampled_database.with_columns(
+            pl.arange(0, sampled_database.height).alias("Index")
         )
-    )
+        sampled_database = sampled_database.with_columns(
+            pl.struct(["Index", "Class", "Microscope"])
+            .map_elements(
+                lambda x: get_output_name(x["Index"], x), return_dtype=pl.String
+            )
+            .alias("OutputName")
+        )
+        sampled_database = sampled_database.select(pl.exclude("Index", "Point"))
+        sampled_database.write_csv(
+            os.path.join(
+                database_path,
+                database_name,
+                f"{database_name}_classification_filemap.csv",
+            )
+        )
 
-    # copy the config file to the database directory
-    shutil.copy(
-        config_path,
-        os.path.join(database_path, database_name, f"{database_name}_config.yaml"),
-    )
+        # copy the config file to the database directory
+        shutil.copy(
+            config_path,
+            os.path.join(database_path, database_name, f"{database_name}_config.yaml"),
+        )
 
-    images_output_dir = os.path.join(database_path, database_name, "images")
-    masks_output_dir = os.path.join(database_path, database_name, "masks")
-    os.makedirs(images_output_dir, exist_ok=True)
-    os.makedirs(masks_output_dir, exist_ok=True)
-    for row in tqdm(
-        sampled_database.iter_rows(named=True), total=sampled_database.height
-    ):
-        image_path = row["Image"]
-        mask_path = row["Mask"]
-        image = read_tiff_file(image_path, channels_to_keep=channel)
-        mask = read_tiff_file(mask_path)
-        image_name = row["OutputName"]
-        # save the image
-        imwrite(os.path.join(images_output_dir, image_name), image, compression="zlib")
-        imwrite(os.path.join(masks_output_dir, image_name), mask, compression="zlib")
+        images_output_dir = os.path.join(database_path, database_name, "images")
+        masks_output_dir = os.path.join(database_path, database_name, "masks")
+        os.makedirs(images_output_dir, exist_ok=True)
+        os.makedirs(masks_output_dir, exist_ok=True)
+        for row in tqdm(
+            sampled_database.iter_rows(named=True), total=sampled_database.height
+        ):
+            image_path = row["Image"]
+            mask_path = row["Mask"]
+            image = read_tiff_file(image_path, channels_to_keep=channel)
+            mask = read_tiff_file(mask_path)
+            image_name = row["OutputName"]
+            # save the image
+            imwrite(
+                os.path.join(images_output_dir, image_name), image, compression="zlib"
+            )
+            imwrite(
+                os.path.join(masks_output_dir, image_name), mask, compression="zlib"
+            )
