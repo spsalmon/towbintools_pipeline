@@ -1,0 +1,3 @@
+# Generated training datasets and model artifacts
+*.pkl
+model_checkpoints/
