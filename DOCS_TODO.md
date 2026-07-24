@@ -87,10 +87,10 @@ Four tiers:
   cluster launcher uses until the package is installed there (env consolidation).
 - `experiment_dir` can be given with `--experiment_dir` (overrides the config).
 - Temp/output location precedence: `--temp_dir` flag > `temp_dir` config key >
-  default `<experiment_dir>/temp_files`. Nothing is written inside the repo by
-  default (outputs already live under `experiment_dir`). Note the outer launch
-  script still makes a repo-root `sbatch_output/` — part of the
-  `_init_pipeline.sh` follow-up below.
+  default `./temp_files` (in-repo, gitignored). Durable outputs and the backup
+  live under `experiment_dir`; the outer launcher makes a repo-root
+  `sbatch_output/` landing zone that the pipeline relocates into the run dir (and
+  `cleanup_on_success` can remove).
 
 ## Which script does what
 - `scripts/run_pipeline.sh` — the user entry point, runs on the login node:
@@ -262,8 +262,6 @@ Four tiers:
 - Document custom blocks. The `CustomBuildingBlock.create_command` bug (missing
   `config` param, plus a doubled `run -n towbintools python3` launcher) is fixed;
   custom blocks now work on both backends.
-- Workers use a bare `import utils` (rely on script dir on sys.path) — revisit
-  when packaging.
 - The outer orchestrator job's resources are now config-driven: `run_pipeline.sh`
   passes sbatch CLI flags built from `sbatch_init`, overriding the minimal header
   in `_init_pipeline.sh`. The env launcher is now overridable too (see
