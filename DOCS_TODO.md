@@ -169,6 +169,12 @@ list to hand to a reviewer, this one feeds the docs.
   fixed (no config key).
 
 ## Deferred design / cleanup (later PRs)
+- Post-run cleanup script (pendant to `init_pipeline`, called by the final
+  linker when there is no next block): repurpose `cleanup_temp_files.sh` into a
+  configurable protocol. Candidate tasks to move there: remove the launcher's
+  now-empty repo-root `sbatch_output/` landing zone (flagged in
+  `setup_run_dir`), optional temp-dir clearing. Weighed against a separate
+  end-of-run slurm job and rejected (queue latency) — see the log-output notes.
 - Folder inputs: decouple internal references from the analysis-dir name (today
   the config repeats the prefix, so renaming `analysis_dir_name` forces
   rewriting every reference). Aim to support: (a) absolute path, (b) name-only
