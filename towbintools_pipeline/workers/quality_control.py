@@ -3,7 +3,7 @@ import os
 import numpy as np
 import pandas as pd
 import polars as pl
-import utils
+from towbintools_pipeline import utils
 import xgboost as xgb
 from joblib import delayed
 from joblib import load

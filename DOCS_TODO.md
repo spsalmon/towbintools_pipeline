@@ -73,6 +73,15 @@ list to hand to a reviewer, this one feeds the docs.
   `sbatch_output/` instead of moving into the run dir.
 - Only `batch/` and `sbatch_output/` are slurm-specific; every other write
   (outputs, report, backup, provenance, pickles) happens on both backends.
+- `towbintools_pipeline/workers/` holds one worker per block implementation,
+  named after its block (`straightening`, `morphology_computation`,
+  `segmentation_non_learning`/`segmentation_learning_based`, ...). Each
+  `BuildingBlock` stores its `worker_module` and `create_command` runs it with
+  `python -m towbintools_pipeline.workers.<name>`, so workers resolve by import
+  rather than by a working-directory-relative path. Custom blocks run a
+  user-supplied `custom_script_path` (file, `.py` or `.sh`) instead. Generated
+  job scripts and logs stay named after the BLOCK (what `sbatch_overrides` keys
+  on and the progress log prints); a block can map to several workers.
 
 ## Log output
 - The run prints a numbered plan of the blocks up front, then a
@@ -192,21 +201,6 @@ list to hand to a reviewer, this one feeds the docs.
   directory. Renaming only the variables would desync them from the config key,
   and renaming the key is a breaking config change — so settle the naming as
   part of the folder-decoupling work above, not separately.
-- Move the worker entry-point scripts (`straighten.py`, `learning_based_segment.py`,
-  `compute_morphology.py`, ...) into a `towbintools_pipeline/workers/` subfolder,
-  leaving the core (`init_pipeline`, `building_blocks`, `block_linker`, `utils`,
-  `run_params`) at the top. Do it in the packaging milestone: the workers are
-  resolved by path and use a bare `import utils`, which packaging rewrites anyway.
-- In the same move, rename each worker to start with the block it serves, so a
-  1:1 block/worker pair ends up identically named: `straighten.py` ->
-  `straightening.py`, `compute_morphology.py` -> `morphology_computation.py`,
-  `detect_molts.py` -> `molt_detection.py`, `quantify_fluorescence.py` ->
-  `fluorescence_quantification.py` (`quality_control.py` already matches), and
-  the two segmentation variants -> `segmentation_non_learning.py` /
-  `segmentation_learning_based.py`. Touches the 7 hardcoded `script_path`
-  literals in `building_blocks.py`. Generated job scripts and logs stay named
-  after the BLOCK (that is what `sbatch_overrides` keys on and what the progress
-  log prints); a block can map to several workers, so they cannot always match.
 
 ## CLI flags — the rule
 - Precedence is uniform: CLI flag > config key > default. `-c/--config` is the

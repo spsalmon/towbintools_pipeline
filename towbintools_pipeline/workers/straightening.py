@@ -5,7 +5,7 @@ os.environ["OPENBLAS_NUM_THREADS"] = "1"
 
 import cv2  # noqa: E402
 import numpy as np  # noqa: E402
-import utils  # noqa: E402
+from towbintools_pipeline import utils  # noqa: E402
 from joblib import Parallel, delayed, parallel_config  # noqa: E402
 from scipy.ndimage import binary_fill_holes  # noqa: E402
 from tifffile import imwrite  # noqa: E402
