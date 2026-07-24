@@ -20,7 +20,7 @@ list to hand to a reviewer, this one feeds the docs.
 
 ## Installation / environment
 - Local install without micromamba, any OS: `conda env create -f
-  requirements/environment_local.yml`, then `conda activate towbintools_local`.
+  env/environment_local.yml`, then `conda activate towbintools_local`.
 - `lxml` is needed to read OME-TIFF metadata cleanly (otherwise a warning).
 - Keep the existing cluster path documented too (micromamba + conda-lock +
   `scripts/install_pipeline.sh`) — install logic unchanged, only moved to
@@ -28,7 +28,7 @@ list to hand to a reviewer, this one feeds the docs.
 - `pip install -e ".[dev]"` (via pyproject.toml) installs the pipeline as a
   package so it runs from anywhere (no repo-root / PYTHONPATH). Local install is
   two steps from the repo root: `conda env create -f
-  requirements/environment_local.yml`, then `pip install -e ".[dev]"`. (conda
+  env/environment_local.yml`, then `pip install -e ".[dev]"`. (conda
   resolves a pip `-e .` relative to the yml's dir, so we don't put it in the yml.)
 - Explain the dependency layering:
   1. pyproject.toml = what the pipeline needs (abstract deps, single source).
