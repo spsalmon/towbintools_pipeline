@@ -11,7 +11,6 @@ from towbintools.foundation.file_handling import write_filemap
 from towbintools_pipeline.building_blocks import parse_and_create_building_blocks
 from towbintools_pipeline.utils import backup_run_config
 from towbintools_pipeline.utils import block_label
-from towbintools_pipeline.utils import create_temp_folders
 from towbintools_pipeline.utils import get_and_create_folders
 from towbintools_pipeline.utils import get_experiment_subdirs
 from towbintools_pipeline.utils import get_experiment_time_from_filemap
@@ -66,9 +65,8 @@ else:
 
 # Each run gets its own subdirectory, so repeated runs never overwrite one
 # another's temp files or their backup.
-temp_dir = setup_run_dir(temp_dir)
+temp_dir = setup_run_dir(temp_dir, global_config.get("backend", "slurm"))
 temp_dir_basename = os.path.basename(temp_dir)
-create_temp_folders(temp_dir, global_config.get("backend", "slurm"))
 
 # Snapshot the config(s) and version info into the run's temp dir (synced to
 # the backup) as a write-only record of the run.

@@ -213,16 +213,27 @@ def get_output_name(
     return output_name
 
 
-def setup_run_dir(temp_dir):
-    # Give the run its own directory under temp_dir, identified by the slurm job
-    # id or, without slurm, by the start time. Returns the new path.
+def setup_run_dir(temp_dir, backend="slurm"):
+    # Give the run its own directory under temp_dir (slurm job id, or start time
+    # without slurm), create its folder structure and, on slurm, move the
+    # launcher's logs in. Returns the run directory.
     job_id = os.environ.get("SLURM_JOB_ID")
     if not job_id:
-        return os.path.join(temp_dir, datetime.now().strftime("pipeline_%Y%m%d-%H%M%S"))
+        run_dir = os.path.join(temp_dir, datetime.now().strftime("pipeline_%Y%m%d-%H%M%S"))
+    else:
+        run_dir = os.path.join(temp_dir, f"pipeline_{job_id}")
 
-    run_dir = os.path.join(temp_dir, f"pipeline_{job_id}")
+    # batch/ and sbatch_output/ only hold generated job scripts and their slurm
+    # logs, so they are pointless for a local run.
+    os.makedirs(os.path.join(run_dir, "pickles"), exist_ok=True)
+    if backend == "slurm":
+        os.makedirs(os.path.join(run_dir, "batch"), exist_ok=True)
+        os.makedirs(os.path.join(run_dir, "sbatch_output"), exist_ok=True)
+
+    if not job_id:
+        return run_dir
+
     log_dir = os.path.join(run_dir, "sbatch_output")
-    os.makedirs(log_dir, exist_ok=True)
     try:
         # The launcher's -o/-e land next to the submit directory; bring them in
         # with the block logs and point slurm at their new home.
@@ -240,17 +251,9 @@ def setup_run_dir(temp_dir):
         )
     except Exception as e:
         print(f"Warning: could not move the launcher logs into {log_dir}: {e}")
+    # The launcher's repo-root sbatch_output/ is now an empty landing zone. A
+    # future post-run cleanup script could remove it (optionally).
     return run_dir
-
-
-def create_temp_folders(temp_dir, backend="slurm"):
-    # batch/ and sbatch_output/ only hold generated job scripts and their slurm
-    # logs, so they are pointless for a local run.
-    os.makedirs(temp_dir, exist_ok=True)
-    os.makedirs(os.path.join(temp_dir, "pickles"), exist_ok=True)
-    if backend == "slurm":
-        os.makedirs(os.path.join(temp_dir, "batch"), exist_ok=True)
-        os.makedirs(os.path.join(temp_dir, "sbatch_output"), exist_ok=True)
 
 
 def process_input_output_files(input_files, output_dir, rerun):
