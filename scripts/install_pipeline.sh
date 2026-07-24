@@ -15,4 +15,9 @@ git reset --hard origin/main
 # over to it. See env/build_env.sh for why we never mutate the live env.
 bash ./env/build_env.sh
 
+# Register the pipeline package (and the towbintools-pipeline command) in the new
+# env. Editable, so it tracks this checkout; --no-deps because the locked env
+# already holds every dependency and pip must not touch the pinned set.
+~/.local/bin/micromamba run -n towbintools pip install -e . --no-deps
+
 mkdir -p ./sbatch_output

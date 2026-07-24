@@ -51,9 +51,12 @@ Four tiers:
   `pip install -e ".[dev]"`. Three install paths: cluster
   (`install_pipeline.sh`), local (`install_pipeline_local.sh`), manual package.
 - `lxml` is needed to read OME-TIFF metadata cleanly (otherwise a warning).
-- Keep the existing cluster path documented too (micromamba + conda-lock +
-  `scripts/install_pipeline.sh`) — install logic unchanged, only moved to
-  scripts/.
+- Cluster path (micromamba + conda-lock + `scripts/install_pipeline.sh`): builds
+  the locked env, then registers the pipeline package into it with
+  `pip install -e . --no-deps` (so `towbintools_pipeline` imports from any cwd and
+  the `towbintools-pipeline` command exists). `update_pipeline.sh` reinstalls it
+  only when it rebuilds the env; a pipeline-only update relies on the editable
+  install already tracking the checkout.
 - `pip install -e ".[dev]"` (via pyproject.toml) installs the pipeline as a
   package so it runs from anywhere (no repo-root / PYTHONPATH). Local install is
   two steps from the repo root: `conda env create -f
@@ -65,10 +68,13 @@ Four tiers:
   3. conda-lock.yml / conda-linux-64.lock = exact pinned solve (cluster).
 
 ## Deferred cleanup (engineering, not just docs)
-- Consolidate the CLUSTER `environment.yml` to source deps from pyproject
-  (pip section `- .`), so the dep list is not duplicated; then regenerate the
-  lock. Needs deliberate testing on the cluster — do it in the packaging
-  milestone, not before.
+- Cluster dep de-duplication was CONSIDERED and dropped: the cluster build is a
+  hash-pinned `--require-hashes --no-deps` install from `conda-linux-64.lock`, so
+  a `- .` (unhashable local path) does not fit, and `environment.yml` is a
+  superset of pyproject (gui/training/cellpose/bioio, conda-delivered). Instead
+  the package is installed separately, editable + `--no-deps`, by
+  `install_pipeline.sh`/`update_pipeline.sh` after the env build — lock untouched.
+  A future pyproject-extras approach (gui/training groups) could revisit de-dup.
 
 ## Running the pipeline
 - New `backend` config option: `slurm` (default, submits jobs) vs `local` (runs
