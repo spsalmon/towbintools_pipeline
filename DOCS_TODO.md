@@ -34,8 +34,9 @@ Four tiers:
 - EXTRAS: `tools/`, `training/`, `gui/` (each owns its own launch scripts),
   `analysis_and_plots/`, `examples/`.
 - META: `README`, `pyproject.toml`, `book/` (docs), `tests/`, TRADEOFFS/DOCS_TODO.
-- `scripts/` by lifecycle: SETUP (`install_pipeline`, `update_pipeline`) | RUN
-  (`run_pipeline` -> `init_pipeline`) | MAINTAIN (`cleanup_temp_files`).
+- `scripts/` by lifecycle: SETUP (`install_pipeline` cluster,
+  `install_pipeline_local` local, `update_pipeline`) | RUN (`run_pipeline` ->
+  `init_pipeline`) | MAINTAIN (`cleanup_temp_files`).
 
 ## Doc path fixes for the rewrite (files moved/renamed in the layout PR)
 - `book/usage/UsingGUI.md`: `bash launch_gui.sh` -> `bash gui/launch_gui.sh`.
@@ -43,8 +44,12 @@ Four tiers:
   `./env/conda-lock.yml`.
 
 ## Installation / environment
-- Local install without micromamba, any OS: `conda env create -f
-  env/environment_local.yml`, then `conda activate towbintools_local`.
+- Local install without micromamba, any OS: run `bash scripts/install_pipeline_local.sh`
+  (creates the env + editable install via `conda run`), then `conda activate
+  towbintools_local`. Manual equivalent: `conda env create -f
+  env/environment_local.yml`, `conda activate towbintools_local`,
+  `pip install -e ".[dev]"`. Three install paths: cluster
+  (`install_pipeline.sh`), local (`install_pipeline_local.sh`), manual package.
 - `lxml` is needed to read OME-TIFF metadata cleanly (otherwise a warning).
 - Keep the existing cluster path documented too (micromamba + conda-lock +
   `scripts/install_pipeline.sh`) — install logic unchanged, only moved to
