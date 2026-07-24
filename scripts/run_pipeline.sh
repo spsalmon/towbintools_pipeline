@@ -69,9 +69,16 @@ for ((i = 0; i < ${#args[@]}; i++)); do
     esac
 done
 
+# Resolve the python launcher for the pre-flight and the submitted job: an
+# exported TOWBINTOOLS_PYTHON wins, else the config's python_command, else the
+# micromamba default. Grepped (not read via python) because python is the very
+# thing we are resolving. Exported so the sbatch job inherits the same launcher.
+CONFIG_PYTHON=$(grep -E '^[[:space:]]*python_command:' "$CONFIG_FILE" 2>/dev/null | head -1 | sed -E 's/^[^:]*:[[:space:]]*//; s/[[:space:]]*(#.*)?$//; s/^["'\'']//; s/["'\'']$//')
+export TOWBINTOOLS_PYTHON="${TOWBINTOOLS_PYTHON:-${CONFIG_PYTHON:-$HOME/.local/bin/micromamba run -n towbintools python3}}"
+
 # Config-drive the outer job's sbatch resources from sbatch_init. If this yields
 # nothing (e.g. non-slurm config), sbatch falls back to the header in the script.
-SBATCH_INIT_FLAGS=$(~/.local/bin/micromamba run -n towbintools python3 -m towbintools_pipeline.run_params --sbatch-init -c "$CONFIG_FILE" 2>/dev/null)
+SBATCH_INIT_FLAGS=$($TOWBINTOOLS_PYTHON -m towbintools_pipeline.run_params --sbatch-init -c "$CONFIG_FILE" 2>/dev/null)
 
 # Pass the resource flags and the forwarded arguments to the SBATCH script.
 sbatch $SBATCH_INIT_FLAGS scripts/init_pipeline.sh "$@"

@@ -337,6 +337,25 @@ def test_resolve_init_slurm_drops_gpu():
     assert init["sbatch_extra_options"] == ["--account=gratis"]
 
 
+def test_get_python_command():
+    # python_command overrides both backends; otherwise local uses the active
+    # interpreter and slurm the default micromamba runner.
+    from towbintools_pipeline.utils import get_python_command
+
+    assert get_python_command({"backend": "local"}) == sys.executable
+    assert get_python_command({"backend": "slurm"}) == (
+        "~/.local/bin/micromamba run -n towbintools python3"
+    )
+    assert (
+        get_python_command({"backend": "slurm", "python_command": "conda run -n x python"})
+        == "conda run -n x python"
+    )
+    assert (
+        get_python_command({"backend": "local", "python_command": "conda run -n x python"})
+        == "conda run -n x python"
+    )
+
+
 def test_slurm_extra_options_accumulate():
     # Scalar keys are replaced by a section, but sbatch_extra_options entries are
     # appended, so a cluster-wide option is never silently dropped.
