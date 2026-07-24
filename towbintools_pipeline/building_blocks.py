@@ -15,7 +15,6 @@ from towbintools_pipeline.utils import run_command
 # Resolve bundled scripts/models relative to this package, so the pipeline
 # works regardless of the current working directory.
 _PIPELINE_DIR = os.path.dirname(os.path.abspath(__file__))
-_REPO_DIR = os.path.dirname(_PIPELINE_DIR)
 
 OPTIONS_MAP = {
     "segmentation": [
@@ -109,7 +108,7 @@ DEFAULT_OPTIONS = {
         "rerun_molt_detection": [False],
         "molt_detection_method": ["deep_learning"],
         "molt_detection_model_path": [
-            os.path.join(_REPO_DIR, "defaults", "models", "molt_detection_model.ckpt")
+            os.path.join(_PIPELINE_DIR, "defaults", "models", "molt_detection_model.ckpt")
         ],
         "molt_detection_batch_size": [1],
         "molt_detection_volume": [

@@ -9,10 +9,11 @@ list to hand to a reviewer, this one feeds the docs.
 
 ## Repo structure
 - `towbintools_pipeline/` = core pipeline package (`python -m
-  towbintools_pipeline...`). `defaults/` = bundled `config/` + `models/`
-  (fallbacks/examples). `scripts/` = automation bash. `tools/` = one-off
-  data-conversion helpers (auxiliary). `examples/custom_scripts/` = user
-  extension-point templates. `training/` and `gui/` are separate auxiliary
+  towbintools_pipeline...`), with `workers/` (one worker per block) and
+  `defaults/` = bundled `config/` + `models/` (fallbacks/examples, shipped as
+  package data and resolved package-relative). `scripts/` = automation bash.
+  `tools/` = one-off data-conversion helpers (auxiliary). `examples/custom_scripts/`
+  = user extension-point templates. `training/` and `gui/` are separate auxiliary
   trees. Add a repo map to the README.
 - Run/install now via scripts/: `bash scripts/run_pipeline.sh`,
   `bash scripts/install_pipeline.sh`.

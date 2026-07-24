@@ -80,7 +80,7 @@ qc_import_eggs_from: [ null, "ch2_seg_str_qc" ]
 
 # molt detection parameters
 molt_detection_method: [ "deep_learning" ]
-molt_detection_model_path: [ "./defaults/models/molt_detection_model.ckpt" ]
+# molt_detection_model_path defaults to the bundled model; set it to override.
 molt_detection_columns: [ [ "ch2_seg_str_volume" ] ]
 
 # fluo quantification parameters

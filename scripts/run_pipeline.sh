@@ -10,7 +10,7 @@ mkdir -p sbatch_output
 # Find the config among the forwarded arguments (same default as the pipeline),
 # so we can derive the outer job's sbatch resources from it. Read by
 # index rather than shift, so "$@" stays intact for forwarding below.
-CONFIG_FILE="./defaults/config/config.yaml"
+CONFIG_FILE="./towbintools_pipeline/defaults/config/config.yaml"
 args=("$@")
 for ((i = 0; i < ${#args[@]}; i++)); do
     case "${args[$i]}" in

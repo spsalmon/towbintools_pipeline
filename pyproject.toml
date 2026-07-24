@@ -31,3 +31,7 @@ towbintools-pipeline = "towbintools_pipeline.init_pipeline:main"
 [tool.setuptools]
 # The pipeline core and its workers; gui/ and training/ are not part of it.
 packages = ["towbintools_pipeline", "towbintools_pipeline.workers"]
+
+[tool.setuptools.package-data]
+# Ship the bundled example configs and default models with the package.
+towbintools_pipeline = ["defaults/**/*.yaml", "defaults/**/*.ckpt", "defaults/**/*.json"]

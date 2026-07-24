@@ -59,6 +59,19 @@ new, but a run started from elsewhere without an install would now fail to find
 the workers.*
 Reversible: easy — `create_command` is the single place.
 
+**Bundled `defaults/` (configs + models) live inside the package, resolved by `__file__`.**
+`defaults/` moved from the repo root into `towbintools_pipeline/`, is declared as
+package data, and is looked up via `_PIPELINE_DIR` (the package dir from
+`__file__`) rather than `importlib.resources`. The flat layout means the package
+is always real files on disk (editable, checkout, or a normal wheel), so a plain
+path works and keeps model paths as filesystem strings for loaders/subprocess —
+`importlib.resources` would only matter for a zipped install, which this project
+does not use.
+*Cost: the 47 MB default molt-detection checkpoint now ships inside the package,
+so a non-editable `pip install` copies it into site-packages. Keeping only the
+configs bundled and the models external would avoid this.*
+Reversible: easy — `git mv` back and repoint two constants.
+
 **Dependencies are now declared in two places.**
 `pyproject.toml` was introduced as the single source for the local install, but
 the cluster `environment.yml` (symlink-flip + hash-pinned pip + conda-lock) is
