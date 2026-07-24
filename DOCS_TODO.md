@@ -56,9 +56,10 @@ list to hand to a reviewer, this one feeds the docs.
 
 ## Which script does what
 - `scripts/run_pipeline.sh` — the user entry point, runs on the login node:
-  update check, creates the repo-root `sbatch_output/` landing zone, finds the
-  config among the arguments, derives the outer job's sbatch flags from
-  `sbatch_init`, submits.
+  creates the repo-root `sbatch_output/` landing zone, finds the config among the
+  arguments, resolves the python launcher, derives the outer job's sbatch flags
+  from `sbatch_init`, submits. No longer auto-updates from git; to update, run
+  `scripts/update_pipeline.sh` (`--pipeline-only` to skip the env rebuild).
 - `scripts/init_pipeline.sh` — the submitted job, named after the module it
   launches: a `#SBATCH` header (which must live in a file for sbatch), the env
   activation, and `"$@"` passed straight through. Nothing else belongs here.
