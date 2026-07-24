@@ -28,9 +28,12 @@ def _write_image(path, blob_width):
     tifffile.imwrite(str(path), image, photometric="minisblack")
 
 
-def _build_experiment(tmp_path, config_experiment_dir=None, analysis_dir_name="analysis"):
+def _build_experiment(
+    tmp_path, config_experiment_dir=None, analysis_dir_name="analysis", extra_config=None
+):
     # Tiny 2-image raw experiment + a local-backend config; returns config_path.
     # config_experiment_dir overrides what the config records as experiment_dir.
+    # extra_config merges extra keys into the config before writing.
     raw_dir = tmp_path / "exp" / "raw"
     raw_dir.mkdir(parents=True)
     _write_image(raw_dir / "Time000000_Point000000_synthetic.tiff", 50)
@@ -53,6 +56,8 @@ def _build_experiment(tmp_path, config_experiment_dir=None, analysis_dir_name="a
         "morphology_computation_masks": [f"{analysis_dir_name}/ch1_seg"],
         "morphological_features": [["area"]],
     }
+    if extra_config:
+        config.update(extra_config)
     config_path = tmp_path / "config.yaml"
     with open(config_path, "w") as f:
         yaml.safe_dump(config, f)
@@ -121,6 +126,26 @@ def test_local_pipeline_default_temp_dir_in_cwd(tmp_path):
     assert not (runs[0] / "batch").exists()
     assert not (runs[0] / "sbatch_output").exists()
     # the run still produced its outputs under the experiment dir
+    morph_csv = tmp_path / "exp" / "analysis" / "report" / "ch1_seg_morphology.csv"
+    assert morph_csv.exists()
+
+
+def test_cleanup_on_success_removes_temp_dir(tmp_path):
+    # With cleanup_on_success, a finished run deletes its own temp dir; the
+    # backup and the outputs survive.
+    config_path = _build_experiment(tmp_path, extra_config={"cleanup_on_success": True})
+
+    result = _run_pipeline(config_path, cwd=str(tmp_path))
+    assert (
+        result.returncode == 0
+    ), f"pipeline failed:\n{result.stdout}\n{result.stderr}"
+
+    # the run's temp subdir is gone
+    assert list((tmp_path / "temp_files").glob("pipeline_*")) == []
+    # the durable backup remains
+    backups = list((tmp_path / "exp" / "analysis" / "pipeline_backup").glob("pipeline_*"))
+    assert len(backups) == 1
+    # the outputs remain
     morph_csv = tmp_path / "exp" / "analysis" / "report" / "ch1_seg_morphology.csv"
     assert morph_csv.exists()
 

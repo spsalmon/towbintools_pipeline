@@ -196,12 +196,22 @@ Four tiers:
   it via `get_python_command`. Exporting `TOWBINTOOLS_PYTHON` directly still wins
   (bootstrap escape hatch when the default can't even start python). Unset
   everywhere = the micromamba default, so behaviour is unchanged.
-- Temp working dir defaults to in-repo `./temp_files` (gitignored, transient,
-  cleared by cleanup_temp_files.sh). Decision: keep this default rather than
-  auto-placing it next to the experiment — the durable outputs and backup are
-  already external, and `-t <path>` covers the large-experiment / home-quota
-  case (e.g. put temp on the data storage). Not worth the bash complexity of
-  resolving the experiment dir before Python runs.
+- Temp working dir defaults to in-repo `./temp_files` (gitignored, transient).
+  Decision: keep this default rather than auto-placing it next to the experiment
+  — the durable outputs and backup are already external, and `-t <path>` covers
+  the large-experiment / home-quota case (e.g. put temp on the data storage). Not
+  worth the bash complexity of resolving the experiment dir before Python runs.
+- Two ways to clear scratch:
+  - `cleanup_on_success` config key (default false): on SUCCESSFUL completion the
+    final linker deletes THIS run's whole temp dir (`temp_files/pipeline_<id>/` —
+    pickles, batch, per-block + combined logs) AND the empty repo-root
+    `sbatch_output/` landing zone. Safe: `sync_backup_folder` mirrors the full
+    temp dir into `pipeline_backup/` first, and results live under `analysis/`, so
+    only redundant scratch is removed. Never fires mid-run or on failure (nothing
+    resumable is touched). Reclaims scratch, keeps the durable backup.
+  - `scripts/cleanup_temp_files.sh` — manual sledgehammer: clears the DEFAULT
+    `temp_files/` (all runs) + repo-root `sbatch_output/`. A custom `temp_dir`
+    must be cleared by hand.
 
 ## Run backup / provenance
 - The pipeline snapshots the config(s) used and a `git_info.txt` (git
@@ -223,12 +233,6 @@ Four tiers:
   fixed (no config key).
 
 ## Deferred design / cleanup (later PRs)
-- Post-run cleanup script (pendant to `init_pipeline`, called by the final
-  linker when there is no next block): repurpose `cleanup_temp_files.sh` into a
-  configurable protocol. Candidate tasks to move there: remove the launcher's
-  now-empty repo-root `sbatch_output/` landing zone (flagged in
-  `setup_run_dir`), optional temp-dir clearing. Weighed against a separate
-  end-of-run slurm job and rejected (queue latency) — see the log-output notes.
 - Folder inputs: decouple internal references from the analysis-dir name (today
   the config repeats the prefix, so renaming `analysis_dir_name` forces
   rewriting every reference). Aim to support: (a) absolute path, (b) name-only

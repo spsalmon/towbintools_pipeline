@@ -251,9 +251,20 @@ def setup_run_dir(temp_dir, backend="slurm"):
         )
     except Exception as e:
         print(f"Warning: could not move the launcher logs into {log_dir}: {e}")
-    # The launcher's repo-root sbatch_output/ is now an empty landing zone. A
-    # future post-run cleanup script could remove it (optionally).
+    # The launcher's repo-root sbatch_output/ is left an empty landing zone;
+    # cleanup_run() removes it at the end of a successful run.
     return run_dir
+
+
+def cleanup_run(temp_dir):
+    # End-of-run cleanup for a finished run: drop its whole temp dir (already
+    # mirrored into the backup) and the launcher's now-empty repo-root
+    # sbatch_output landing zone. Only the durable backup and the outputs remain.
+    shutil.rmtree(temp_dir, ignore_errors=True)
+    try:
+        os.rmdir("sbatch_output")  # succeeds only if empty; absent in local runs
+    except OSError:
+        pass
 
 
 def process_input_output_files(input_files, output_dir, rerun):

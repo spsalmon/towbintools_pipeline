@@ -6,6 +6,10 @@ analysis_dir_name: "analysis"
 # an explicit temp_dir key here.
 # temp_dir: "/path/to/temp_files"
 
+# Delete this run's temp dir + the empty sbatch_output landing zone once the
+# pipeline finishes (the backup keeps a full copy). Default false.
+# cleanup_on_success: false
+
 raw_dir_name: "raw"
 report_format: "parquet"
 pixelsize: [ 0.65 ]
