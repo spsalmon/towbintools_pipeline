@@ -29,7 +29,7 @@ Four tiers:
       --build_env.sh--> the `towbintools` env
     `scripts/install_pipeline.sh` orchestrates that build (+ `pip install -e .
       --no-deps` once PR C lands, to register the package + entry point)
-    `scripts/run_pipeline.sh` -> `scripts/init_pipeline.sh` -> the package
+    `scripts/run_pipeline.sh` -> `scripts/_init_pipeline.sh` -> the package
       (submits the self-propagating slurm chain)
 - EXTRAS: `tools/`, `training/`, `gui/` (each owns its own launch scripts),
   `analysis_and_plots/`, `examples/`.
@@ -84,7 +84,7 @@ Four tiers:
   default `<experiment_dir>/temp_files`. Nothing is written inside the repo by
   default (outputs already live under `experiment_dir`). Note the outer launch
   script still makes a repo-root `sbatch_output/` — part of the
-  `init_pipeline.sh` follow-up below.
+  `_init_pipeline.sh` follow-up below.
 
 ## Which script does what
 - `scripts/run_pipeline.sh` — the user entry point, runs on the login node:
@@ -92,9 +92,10 @@ Four tiers:
   arguments, resolves the python launcher, derives the outer job's sbatch flags
   from `sbatch_init`, submits. No longer auto-updates from git; to update, run
   `scripts/update_pipeline.sh` (`--pipeline-only` to skip the env rebuild).
-- `scripts/init_pipeline.sh` — the submitted job, named after the module it
-  launches: a `#SBATCH` header (which must live in a file for sbatch), the env
-  activation, and `"$@"` passed straight through. Nothing else belongs here.
+- `scripts/_init_pipeline.sh` — the submitted job, named after the module it
+  launches; the leading `_` marks it internal (run_pipeline.sh submits it, the
+  user never runs it). A `#SBATCH` header (which must live in a file for sbatch),
+  the env activation, and `"$@"` passed straight through. Nothing else belongs here.
 - Everything else is Python. `setup_run_dir()` resolves the per-run directory
   (`pipeline_<jobid>` under slurm, `pipeline_<timestamp>` otherwise) and, under
   slurm, moves the launcher's logs into it — so the temp path has a single
@@ -176,7 +177,7 @@ Four tiers:
   it would collide with the block-name namespace.
 - The outer/orchestrator job's resources come from `sbatch_init`. `run_pipeline.sh`
   turns them into sbatch CLI flags (via `python -m towbintools_pipeline.run_params
-  --sbatch-init`) which override `init_pipeline.sh`'s minimal header. So a new
+  --sbatch-init`) which override `_init_pipeline.sh`'s minimal header. So a new
   cluster is adjusted entirely in the config now — cluster-specific outer
   directives (`--account`, a custom `--gres` like the old `pipelinecapacity`
   throttle, `--mem-per-cpu`) go under `sbatch_init.sbatch_extra_options`.
@@ -249,5 +250,5 @@ Four tiers:
   when packaging.
 - The outer orchestrator job's resources are now config-driven: `run_pipeline.sh`
   passes sbatch CLI flags built from `sbatch_init`, overriding the minimal header
-  in `init_pipeline.sh`. The env launcher is now overridable too (see
+  in `_init_pipeline.sh`. The env launcher is now overridable too (see
   `TOWBINTOOLS_PYTHON` under "Which script does what").
