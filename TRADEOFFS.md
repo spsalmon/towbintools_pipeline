@@ -93,6 +93,15 @@ Reversible: easy.
 
 ## Configuration
 
+**Folder refs are resolved by basename to `{analysis_dir_name}/{name}`.**
+Lets a mask/source ref be written with or without the analysis-dir prefix and
+survive renaming `analysis_dir_name`, instead of repeating the prefix in every
+ref. Backward-compatible: the old prefixed form still resolves.
+*Cost: `resolve_ref` keys on the basename, so a multi-level ref under the analysis
+dir would collapse to its last segment (not used today); first-class absolute /
+relative-to-experiment external refs are not modelled.*
+Reversible: easy.
+
 **`sbatch_extra_options` accumulate; scalar `sbatch_*` keys replace.**
 Prevents a per-block or init section from silently dropping a cluster-wide entry
 such as `--account`.
