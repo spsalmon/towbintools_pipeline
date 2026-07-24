@@ -18,6 +18,30 @@ list to hand to a reviewer, this one feeds the docs.
 - Run/install now via scripts/: `bash scripts/run_pipeline.sh`,
   `bash scripts/install_pipeline.sh`.
 
+## Repo map & deployment lifecycle (turn into a README diagram at the docs step)
+Four tiers:
+- PACKAGE: `towbintools_pipeline/` (core + `workers/` + `defaults/`) -- the
+  installable, self-contained pipeline.
+- DEPLOYMENT: `env/` and `scripts/`, which pair up. `env/` = define & build the
+  conda environment (spec + generated locks + `build_env.sh`/`generate_lock.sh`);
+  `scripts/` = operate the pipeline. Flow:
+    `env/environment.yml` --generate_lock.sh--> `env/conda-linux-64.lock`
+      --build_env.sh--> the `towbintools` env
+    `scripts/install_pipeline.sh` orchestrates that build (+ `pip install -e .
+      --no-deps` once PR C lands, to register the package + entry point)
+    `scripts/run_pipeline.sh` -> `scripts/init_pipeline.sh` -> the package
+      (submits the self-propagating slurm chain)
+- EXTRAS: `tools/`, `training/`, `gui/` (each owns its own launch scripts),
+  `analysis_and_plots/`, `examples/`.
+- META: `README`, `pyproject.toml`, `book/` (docs), `tests/`, TRADEOFFS/DOCS_TODO.
+- `scripts/` by lifecycle: SETUP (`install_pipeline`, `update_pipeline`) | RUN
+  (`run_pipeline` -> `init_pipeline`) | MAINTAIN (`cleanup_temp_files`).
+
+## Doc path fixes for the rewrite (files moved/renamed in the layout PR)
+- `book/usage/UsingGUI.md`: `bash launch_gui.sh` -> `bash gui/launch_gui.sh`.
+- `book/getting_started/Update.md`: `./requirements/conda-lock.yml` ->
+  `./env/conda-lock.yml`.
+
 ## Installation / environment
 - Local install without micromamba, any OS: `conda env create -f
   env/environment_local.yml`, then `conda activate towbintools_local`.
