@@ -276,6 +276,36 @@ def test_custom_analysis_dir_name(tmp_path):
     assert all(float(r["ch1_seg_area"]) > 0 for r in rows)
 
 
+def test_prefix_free_folder_refs(tmp_path):
+    # A mask ref written WITHOUT the analysis-dir prefix resolves to the right
+    # column and the run completes.
+    config_path = _build_experiment(
+        tmp_path, extra_config={"morphology_computation_masks": ["ch1_seg"]}
+    )
+
+    result = _run_pipeline(config_path, ["--temp_dir", str(tmp_path / "pipeline_temp")])
+    assert (
+        result.returncode == 0
+    ), f"pipeline failed:\n{result.stdout}\n{result.stderr}"
+    assert (tmp_path / "exp" / "analysis" / "report" / "ch1_seg_morphology.csv").exists()
+
+
+def test_prefix_free_refs_survive_analysis_dir_rename(tmp_path):
+    # The same prefix-free ref works under a renamed analysis_dir_name, with no
+    # ref to rewrite -- the coupling this PR removes.
+    config_path = _build_experiment(
+        tmp_path,
+        analysis_dir_name="output",
+        extra_config={"morphology_computation_masks": ["ch1_seg"]},
+    )
+
+    result = _run_pipeline(config_path, ["--temp_dir", str(tmp_path / "pipeline_temp")])
+    assert (
+        result.returncode == 0
+    ), f"pipeline failed:\n{result.stdout}\n{result.stderr}"
+    assert (tmp_path / "exp" / "output" / "report" / "ch1_seg_morphology.csv").exists()
+
+
 def test_merge_slurm_config_resolves_relative_sibling(tmp_path):
     # A relative slurm_config resolves next to the main config file; its keys
     # merge in, but inline sbatch_* keys still win.
@@ -388,6 +418,24 @@ def test_init_pipeline_importable_without_side_effects():
 
     assert callable(ip.main)
     assert callable(ip.build_blocks_for_subdir)
+
+
+def test_resolve_ref():
+    # Directory refs normalize to `{analysis_dir_name}/{name}` whether or not they
+    # carry a prefix; raw and absolute paths pass through.
+    from towbintools_pipeline.utils import resolve_ref
+
+    assert resolve_ref("ch2_seg", {}) == "analysis/ch2_seg"
+    assert resolve_ref("analysis/ch2_seg", {}) == "analysis/ch2_seg"
+    assert resolve_ref("raw", {}) == "raw"
+    # a renamed analysis_dir_name re-homes both forms to the new prefix
+    assert resolve_ref("ch2_seg", {"analysis_dir_name": "output"}) == "output/ch2_seg"
+    assert (
+        resolve_ref("analysis/ch2_seg", {"analysis_dir_name": "output"})
+        == "output/ch2_seg"
+    )
+    # absolute paths are left alone
+    assert resolve_ref("/mnt/data/ch2_seg", {}) == "/mnt/data/ch2_seg"
 
 
 def test_slurm_extra_options_accumulate():
