@@ -45,8 +45,10 @@ list to hand to a reviewer, this one feeds the docs.
   in-process, no slurm/micromamba).
 - Local run, from the repo root:
   `python -m towbintools_pipeline.init_pipeline -c <config> --temp_dir <dir>`.
-- For now the pipeline must be launched from the repo root (module invocation);
-  this goes away once it is a proper installed package with an entry point.
+- Installed console command (equivalent, works from any cwd once pip-installed):
+  `towbintools-pipeline -c <config> --temp_dir <dir>` (entry point ->
+  `init_pipeline:main`). The `-m` form stays the fallback and is still what the
+  cluster launcher uses until the package is installed there (env consolidation).
 - `experiment_dir` can be given with `--experiment_dir` (overrides the config).
 - Temp/output location precedence: `--temp_dir` flag > `temp_dir` config key >
   default `<experiment_dir>/temp_files`. Nothing is written inside the repo by

@@ -1,7 +1,6 @@
-# Minimal packaging for the pipeline core. Makes the repo pip-installable
-# (`pip install -e .`) so it can run from anywhere, and declares the core
-# runtime dependencies in one place. Fuller packaging (entry points, bundled
-# models as package data, worker import cleanup) is a later milestone.
+# Packaging for the pipeline core: makes the repo pip-installable
+# (`pip install -e .`) so it runs from any cwd, declares the core runtime
+# dependencies, and exposes the `towbintools-pipeline` command.
 [build-system]
 requires = ["setuptools>=64"]
 build-backend = "setuptools.build_meta"
@@ -24,6 +23,10 @@ dependencies = [
 
 [project.optional-dependencies]
 dev = ["pytest"]
+
+[project.scripts]
+# Installed command equivalent to `python -m towbintools_pipeline.init_pipeline`.
+towbintools-pipeline = "towbintools_pipeline.init_pipeline:main"
 
 [tool.setuptools]
 # Only the pipeline core; gui/ and training/ are packaged separately later.
