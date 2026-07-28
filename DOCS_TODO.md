@@ -299,6 +299,14 @@ Four tiers:
     produces is not caught here.
   - unknown/typo'd option keys (a param not in `OPTIONS_MAP`) are silently ignored,
     not flagged.
+- Follow-up (nice-to-have): also run `validate_config` in the login-node pre-flight
+  (`run_pipeline.sh` already loads the config there for `sbatch_init`), so a bad
+  config fails BEFORE the sbatch submission with the error printed straight to the
+  terminal. Today validation runs inside the submitted job and aborts before the
+  run dir / log relocation, so the error lands in the outer job's slurm err file in
+  the repo-root landing zone (`sbatch_output/pipeline-<jobid>.err`) -- correct, but
+  easy to miss, and it still cost a job submission. Confirmed on the cluster:
+  the error is there and no folders are created.
 
 ## Deferred design / cleanup (later PRs)
 - Folder inputs, further: `resolve_ref` covers name-only refs (done). Still open
