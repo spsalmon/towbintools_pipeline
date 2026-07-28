@@ -59,7 +59,7 @@ package. (It is installed from the repository, not from a public index like PyPI
 **Why —** reproducible installs, no path/`PYTHONPATH` juggling, and something
 that can actually be distributed and onboarded.
 
-**Where —** [`…feature/packaging-entry-point`](https://github.com/quasar1357/towbintools_pipeline/compare/chore/retire-git-self-update...feature/packaging-entry-point) (then `refactor/deployment-layout`, `feature/cluster-package-install`)
+**Where —** [`…feature/packaging-entry-point`](https://github.com/quasar1357/towbintools_pipeline/compare/chore/retire-git-self-update...feature/packaging-entry-point) (then [`refactor/deployment-layout`](https://github.com/quasar1357/towbintools_pipeline/compare/feature/packaging-entry-point...refactor/deployment-layout), [`feature/cluster-package-install`](https://github.com/quasar1357/towbintools_pipeline/compare/refactor/deployment-layout...feature/cluster-package-install))
 
 ### 3. Not tied to one environment manager
 Micromamba and a specific environment name used to be hardcoded in the code and
@@ -81,7 +81,7 @@ partitions) that previously required editing the code.
 **Why —** moving to a different cluster, or changing account/partition/memory, is
 a config-only change — no edits to the pipeline code.
 
-**Where —** [`…feature/slurm-config`](https://github.com/quasar1357/towbintools_pipeline/compare/feature/env-install...feature/slurm-config) (then `feature/slurm-per-block`, `feature/slurm-outer-script`)
+**Where —** [`…feature/slurm-config`](https://github.com/quasar1357/towbintools_pipeline/compare/feature/env-install...feature/slurm-config) (then [`feature/slurm-per-block`](https://github.com/quasar1357/towbintools_pipeline/compare/fix/config-loading-and-backup...feature/slurm-per-block), [`feature/slurm-outer-script`](https://github.com/quasar1357/towbintools_pipeline/compare/feature/slurm-per-block...feature/slurm-outer-script))
 
 ### 5. Simpler, less error-prone configuration
 Folder references used to repeat the analysis-directory prefix everywhere, and
@@ -114,7 +114,7 @@ written outside the repository; that did not change.)
 **Why —** reproducibility, no accidental overwrites, and a clear record of what
 actually ran.
 
-**Where —** [`…feature/externalize-io`](https://github.com/quasar1357/towbintools_pipeline/compare/feature/slurm-config...feature/externalize-io) (then `fix/config-loading-and-backup`, `feature/cleanup-on-success`)
+**Where —** [`…feature/externalize-io`](https://github.com/quasar1357/towbintools_pipeline/compare/feature/slurm-config...feature/externalize-io) (then [`fix/config-loading-and-backup`](https://github.com/quasar1357/towbintools_pipeline/compare/refactor/repo-structure...fix/config-loading-and-backup), [`feature/cleanup-on-success`](https://github.com/quasar1357/towbintools_pipeline/compare/feature/cluster-package-install...feature/cleanup-on-success))
 
 ### 8. Observability — know what ran and where it stopped
 The run prints its planned sequence of steps and a start/finish marker around
@@ -135,7 +135,7 @@ git on every launch" behaviour was replaced by an explicit update command.
 **Why —** a newcomer can tell what each part is for, and launching a run no longer
 silently changes your working copy.
 
-**Where —** [`…refactor/repo-structure`](https://github.com/quasar1357/towbintools_pipeline/compare/feature/externalize-io...refactor/repo-structure) (then `refactor/deployment-layout`, `chore/retire-git-self-update`)
+**Where —** [`…refactor/repo-structure`](https://github.com/quasar1357/towbintools_pipeline/compare/feature/externalize-io...refactor/repo-structure) (then [`refactor/deployment-layout`](https://github.com/quasar1357/towbintools_pipeline/compare/feature/packaging-entry-point...refactor/deployment-layout), [`chore/retire-git-self-update`](https://github.com/quasar1357/towbintools_pipeline/compare/feature/launcher-decoupling...chore/retire-git-self-update))
 
 ### 10. A safety net — tests and continuous integration
 There is now an end-to-end smoke test plus unit tests for the core logic, run
