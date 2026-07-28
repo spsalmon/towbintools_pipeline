@@ -504,6 +504,89 @@ def test_run_params_sbatch_init_flags():
     assert flags == ["-c 4", "-t 0-12:00:00", "--mem=8G", "--account=gratis"]
 
 
+def _valid_config():
+    # A minimal config that validate_config accepts.
+    return {
+        "experiment_dir": "/some/exp",
+        "pixelsize": [0.65],
+        "building_blocks": ["segmentation", "morphology_computation"],
+        "segmentation_method": ["threshold"],
+        "segmentation_channels": [[0]],
+        "morphology_computation_masks": ["ch1_seg"],
+    }
+
+
+def test_validate_config_accepts_valid():
+    from towbintools_pipeline.building_blocks import validate_config
+
+    validate_config(_valid_config())  # must not raise
+
+
+def test_validate_config_missing_required_keys():
+    from towbintools_pipeline.building_blocks import validate_config
+
+    with pytest.raises(ValueError) as excinfo:
+        validate_config({})
+    message = str(excinfo.value)
+    assert "experiment_dir" in message
+    assert "building_blocks" in message
+
+
+def test_validate_config_unknown_block():
+    from towbintools_pipeline.building_blocks import validate_config
+
+    config = _valid_config()
+    config["building_blocks"] = ["segmentation", "not_a_block"]
+    with pytest.raises(ValueError, match="unknown building block 'not_a_block'"):
+        validate_config(config)
+
+
+def test_validate_config_classification_hint():
+    from towbintools_pipeline.building_blocks import validate_config
+
+    config = _valid_config()
+    config["building_blocks"] = ["classification"]
+    with pytest.raises(ValueError, match="'classification' was replaced by"):
+        validate_config(config)
+
+
+def test_validate_config_list_length_mismatch():
+    from towbintools_pipeline.building_blocks import validate_config
+
+    # Two segmentation blocks but only enough channels for one and not the two
+    # allowed lengths (1 or 2).
+    config = _valid_config()
+    config["building_blocks"] = ["segmentation", "segmentation"]
+    config["segmentation_channels"] = [[0], [1], [2]]
+    with pytest.raises(ValueError, match="segmentation_channels"):
+        validate_config(config)
+
+
+def test_validate_config_reports_all_errors_at_once():
+    from towbintools_pipeline.building_blocks import validate_config
+
+    config = _valid_config()
+    config["backend"] = "cluster"
+    config["report_format"] = "xlsx"
+    with pytest.raises(ValueError) as excinfo:
+        validate_config(config)
+    message = str(excinfo.value)
+    assert "backend" in message
+    assert "report_format" in message
+
+
+def test_pipeline_rejects_invalid_config(tmp_path):
+    # An invalid config fails at startup, before any run dir is created.
+    config_path = _build_experiment(
+        tmp_path, extra_config={"building_blocks": ["not_a_block"]}
+    )
+
+    result = _run_pipeline(config_path, ["--temp_dir", str(tmp_path / "pipeline_temp")])
+    assert result.returncode != 0
+    assert "unknown building block 'not_a_block'" in result.stderr
+    assert not (tmp_path / "pipeline_temp").exists()
+
+
 def test_experiment_dir_cli_overrides_config(tmp_path):
     # The config records a wrong experiment_dir; --experiment_dir points at the
     # real data and must win, so the run finds the images and produces outputs.

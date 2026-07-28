@@ -662,6 +662,67 @@ class CustomBuildingBlock(BuildingBlock):
         return command
 
 
+def validate_config(config):
+    # Pre-flight check run before any run dir or job is created. Collects every
+    # problem and raises them together, rather than failing on the first.
+    errors = []
+
+    for key in ("experiment_dir", "building_blocks"):
+        if key not in config:
+            errors.append(f"missing required key '{key}'")
+
+    blocks = config.get("building_blocks")
+    if "building_blocks" in config and (not isinstance(blocks, list) or not blocks):
+        errors.append("'building_blocks' must be a non-empty list")
+    elif isinstance(blocks, list):
+        for name in blocks:
+            if name == "classification":
+                errors.append(
+                    "building block 'classification' was replaced by "
+                    "'quality_control'; update your config"
+                )
+            elif name not in OPTIONS_MAP:
+                errors.append(f"unknown building block '{name}'")
+
+        # Each per-block option list must hold one value per block of that type
+        # (or a single value broadcast to all of them).
+        counts = count_building_blocks_types(blocks)
+        for name, indices in counts.items():
+            if name not in OPTIONS_MAP:
+                continue
+            n = len(indices)
+            for option in OPTIONS_MAP[name]:
+                if option not in config:
+                    if option not in DEFAULT_OPTIONS.get(name, {}):
+                        errors.append(
+                            f"'{option}' is required for the '{name}' building block"
+                        )
+                    continue
+                value = config[option]
+                if not isinstance(value, list):
+                    errors.append(f"'{option}' must be a list")
+                elif len(value) not in (1, n):
+                    errors.append(
+                        f"'{option}' has {len(value)} value(s) but there are "
+                        f"{n} '{name}' block(s) (expected 1 or {n})"
+                    )
+
+    backend = config.get("backend", "slurm")
+    if backend not in ("slurm", "local"):
+        errors.append(f"'backend' must be 'slurm' or 'local', got '{backend}'")
+
+    report_format = config.get("report_format", "csv")
+    if report_format not in ("csv", "parquet"):
+        errors.append(
+            f"'report_format' must be 'csv' or 'parquet', got '{report_format}'"
+        )
+
+    if errors:
+        raise ValueError(
+            "Invalid pipeline config:\n" + "\n".join(f"  - {e}" for e in errors)
+        )
+
+
 def count_building_blocks_types(building_block_names):
     building_block_counts = {}
     for i, building_block in enumerate(building_block_names):

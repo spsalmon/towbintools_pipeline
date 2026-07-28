@@ -9,6 +9,7 @@ from towbintools.foundation.file_handling import read_filemap
 from towbintools.foundation.file_handling import write_filemap
 
 from towbintools_pipeline.building_blocks import parse_and_create_building_blocks
+from towbintools_pipeline.building_blocks import validate_config
 from towbintools_pipeline.utils import backup_run_config
 from towbintools_pipeline.utils import block_label
 from towbintools_pipeline.utils import get_and_create_folders
@@ -216,6 +217,9 @@ def main():
 
     # Pull SLURM resources in from their separate file (cluster backend only).
     global_config = merge_slurm_config(global_config, config_file)
+
+    # Fail fast on a bad config, before any run dir or job is created.
+    validate_config(global_config)
 
     # Temp files: --temp_dir, else a temp_dir config key, else ./temp_files in the
     # working directory (transient, gitignored; matches the sbatch launcher).

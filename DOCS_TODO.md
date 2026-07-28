@@ -240,6 +240,32 @@ Four tiers:
   directory refs only, NOT report-column refs like `molt_detection_columns`. The
   shipped config now uses the prefix-free form.
 
+## Config validation
+- The config is checked once at startup (`validate_config`, before any run dir
+  or job is created) and every problem is reported together, not one at a time.
+  Checks: required keys (`experiment_dir`, `building_blocks`), known block names
+  (with a hint that `classification` became `quality_control`), per-block option
+  lists holding one value per block of that type (or a single broadcast value),
+  and the enumerated `backend` / `report_format` values.
+- The per-block length rule mirrors the one `parse_building_blocks_config` still
+  enforces later; validation front-loads it so the whole config fails fast and
+  at once. See the TRADEOFFS entry on the small duplication.
+- A bad config ABORTS the run: `validate_config` raises, nothing catches it, the
+  process exits non-zero before any run dir/backup/job exists (on slurm the outer
+  job fails and the block chain never starts).
+- `building_blocks` rule is permissive by design — "every entry is a KNOWN type",
+  NOT "one of each". No required block, no ordering/dependency check, duplicates
+  are fine (several `segmentation` blocks is normal).
+- OPEN QUESTIONS for the product owner (currently NOT validated — confirm this is
+  intended before hardening):
+  - inter-block dependencies / order (e.g. a `morphology_computation` whose mask
+    is produced by an earlier `segmentation`) — a wrong order just yields "no
+    input files" at run time, not an upfront error.
+  - folder-ref existence — a mask/source ref pointing at a folder no earlier block
+    produces is not caught here.
+  - unknown/typo'd option keys (a param not in `OPTIONS_MAP`) are silently ignored,
+    not flagged.
+
 ## Deferred design / cleanup (later PRs)
 - Folder inputs, further: `resolve_ref` covers name-only refs (done). Still open
   if needed: first-class (a) absolute and (c) relative external-directory refs
