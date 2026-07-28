@@ -151,6 +151,15 @@ Four tiers:
 ## Testing
 - `python -m pytest tests/ -v` runs the local-backend smoke test (synthetic
   images, no bundled data). Document how to add more tests.
+- CI (`.github/workflows/tests.yml`): on every push and pull request, a GitHub
+  Actions job does `pip install -e ".[dev]"` + `pytest` on Ubuntu / Python 3.12
+  — the same pip path as the local install (`environment_local.yml`), so a red
+  build means a fresh local install would fail too. Deliberately NOT the cluster
+  micromamba/conda-lock build (that is a hash-pinned Linux artifact for
+  production, overkill for testing logic). pyproject deps are unpinned, so an
+  upstream release can turn CI red on its own; a version matrix and dependency
+  pinning are deferred (widen the workflow's single 3.12 to a matrix later if the
+  product owner wants multi-version support).
 
 ## Config
 - Document `backend` (`slurm` vs `local`).
