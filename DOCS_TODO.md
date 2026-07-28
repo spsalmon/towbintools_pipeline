@@ -151,6 +151,13 @@ Four tiers:
 ## Testing
 - `python -m pytest tests/ -v` runs the local-backend smoke test (synthetic
   images, no bundled data). Document how to add more tests.
+- Unit tests cover the pure helpers (config validation + parsing, output naming,
+  folder refs, input selection, slurm resolution, logging) alongside the local
+  e2e smoke test, and are grouped into labelled sections in the test file.
+- Known untested area: `get_experiment_time_from_filemap` (the T0 / incremental
+  ExperimentTime logic). The e2e test runs with `get_experiment_time=False`, so
+  this path has no coverage; a faithful test needs a filemap with acquisition
+  dates and exercises the recursive recompute branch. Worth adding later.
 - CI (`.github/workflows/tests.yml`): on every push and pull request, a GitHub
   Actions job does `pip install -e ".[dev]"` + `pytest` on Ubuntu / Python 3.12
   — the same pip path as the local install (`environment_local.yml`), so a red

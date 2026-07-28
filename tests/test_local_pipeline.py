@@ -1,8 +1,10 @@
-"""End-to-end smoke test for the local execution backend.
+"""Test suite for the pipeline.
 
-Generates tiny synthetic images, runs the pipeline with `backend: local`
-(threshold segmentation -> area morphology), and checks the outputs. No
-slurm, no micromamba, no bundled data.
+Unit tests for the pure helpers (config validation and parsing, output naming,
+folder refs, input selection, slurm resolution, logging) plus an end-to-end
+smoke test for the local backend: generates tiny synthetic images, runs the
+pipeline with `backend: local` (threshold segmentation -> area morphology), and
+checks the outputs. No slurm, no micromamba, no bundled data.
 """
 import csv
 import os
@@ -85,225 +87,225 @@ def _run_pipeline(config_path, extra_args=(), cwd=REPO_ROOT):
     )
 
 
-def test_local_pipeline_segmentation_and_morphology(tmp_path):
-    config_path = _build_experiment(tmp_path)
-    temp_dir = tmp_path / "pipeline_temp"
-
-    result = _run_pipeline(config_path, ["--temp_dir", str(temp_dir)])
-    assert (
-        result.returncode == 0
-    ), f"pipeline failed:\n{result.stdout}\n{result.stderr}"
-
-    # segmentation produced one mask per input image
-    mask_dir = tmp_path / "exp" / "analysis" / "ch1_seg"
-    masks = sorted(mask_dir.glob("*.tiff"))
-    assert len(masks) == 2
-
-    # morphology produced one record per image with a positive area
-    morph_csv = tmp_path / "exp" / "analysis" / "report" / "ch1_seg_morphology.csv"
-    assert morph_csv.exists()
-    with open(morph_csv, newline="") as f:
-        rows = list(csv.DictReader(f))
-    assert len(rows) == 2
-    assert all(float(r["ch1_seg_area"]) > 0 for r in rows)
+# ---- config validation ----
 
 
-def test_local_pipeline_default_temp_dir_in_cwd(tmp_path):
-    # Without --temp_dir (and no temp_dir config key), temp files default to
-    # ./temp_files in the working directory (matching the sbatch launcher).
-    config_path = _build_experiment(tmp_path)
-
-    result = _run_pipeline(config_path, cwd=str(tmp_path))
-    assert (
-        result.returncode == 0
-    ), f"pipeline failed:\n{result.stdout}\n{result.stderr}"
-
-    # each run gets its own subdirectory, named after its start time locally
-    runs = list((tmp_path / "temp_files").glob("pipeline_*"))
-    assert len(runs) == 1
-    assert (runs[0] / "pickles").is_dir()
-    # the slurm-only folders are not created for a local run
-    assert not (runs[0] / "batch").exists()
-    assert not (runs[0] / "sbatch_output").exists()
-    # the run still produced its outputs under the experiment dir
-    morph_csv = tmp_path / "exp" / "analysis" / "report" / "ch1_seg_morphology.csv"
-    assert morph_csv.exists()
+def _valid_config():
+    # A minimal config that validate_config accepts.
+    return {
+        "experiment_dir": "/some/exp",
+        "pixelsize": [0.65],
+        "building_blocks": ["segmentation", "morphology_computation"],
+        "segmentation_method": ["threshold"],
+        "segmentation_channels": [[0]],
+        "morphology_computation_masks": ["ch1_seg"],
+    }
 
 
-def test_cleanup_on_success_removes_temp_dir(tmp_path):
-    # With cleanup_on_success, a finished run deletes its own temp dir; the
-    # backup and the outputs survive.
-    config_path = _build_experiment(tmp_path, extra_config={"cleanup_on_success": True})
+def test_validate_config_accepts_valid():
+    from towbintools_pipeline.building_blocks import validate_config
 
-    result = _run_pipeline(config_path, cwd=str(tmp_path))
-    assert (
-        result.returncode == 0
-    ), f"pipeline failed:\n{result.stdout}\n{result.stderr}"
-
-    # the run's temp subdir is gone
-    assert list((tmp_path / "temp_files").glob("pipeline_*")) == []
-    # the durable backup remains
-    backups = list((tmp_path / "exp" / "analysis" / "pipeline_backup").glob("pipeline_*"))
-    assert len(backups) == 1
-    # the outputs remain
-    morph_csv = tmp_path / "exp" / "analysis" / "report" / "ch1_seg_morphology.csv"
-    assert morph_csv.exists()
+    validate_config(_valid_config())  # must not raise
 
 
-def test_block_progress_is_logged(tmp_path):
-    # Every block announces its start and its completion, numbered within the
-    # planned sequence, and the run ends with the closing line.
-    config_path = _build_experiment(tmp_path)
+def test_validate_config_missing_required_keys():
+    from towbintools_pipeline.building_blocks import validate_config
 
-    result = _run_pipeline(config_path, ["--temp_dir", str(tmp_path / "pipeline_temp")])
-    assert (
-        result.returncode == 0
-    ), f"pipeline failed:\n{result.stdout}\n{result.stderr}"
-
-    markers = [
-        line.strip()
-        for line in result.stdout.splitlines()
-        if line.startswith("###") or line.startswith("  1/") or line.startswith("  2/")
-    ]
-    assert markers == [
-        "### Initializing the pipeline for subdir None ###",
-        "### Pipeline plan: 2 blocks ###",
-        "1/2 segmentation",
-        "2/2 morphology_computation",
-        "### Starting block 1/2 segmentation ###",
-        "### Finished block 1/2 segmentation ###",
-        "### Starting block 2/2 morphology_computation ###",
-        "### Finished block 2/2 morphology_computation ###",
-        "### End of the pipeline! (2 blocks) ###",
-    ]
+    with pytest.raises(ValueError) as excinfo:
+        validate_config({})
+    message = str(excinfo.value)
+    assert "experiment_dir" in message
+    assert "building_blocks" in message
 
 
-def test_concatenate_sbatch_logs(tmp_path):
-    # Per-block logs are joined per stream in write order, headed by their file
-    # name, without touching the originals.
-    import os as _os
+def test_validate_config_unknown_block():
+    from towbintools_pipeline.building_blocks import validate_config
 
-    from towbintools_pipeline.utils import concatenate_sbatch_logs
-
-    temp_dir = tmp_path / "pipeline_4242"
-    log_dir = temp_dir / "sbatch_output"
-    log_dir.mkdir(parents=True)
-
-    # Written out of order on purpose; mtimes decide the order, not the names.
-    (log_dir / "straightening-3.out").write_text("third\n")
-    (log_dir / "init-1.out").write_text("first\n")
-    (log_dir / "segmentation-2.out").write_text("second\n")
-    (log_dir / "segmentation-2.err").write_text("a warning\n")
-    for name, stamp in (("init-1.out", 1000), ("segmentation-2.out", 2000),
-                        ("straightening-3.out", 3000)):
-        _os.utime(log_dir / name, (stamp, stamp))
-
-    concatenate_sbatch_logs(str(temp_dir), "PIPELINE FINISHED -- all 3 blocks completed")
-
-    combined = (temp_dir / "pipeline-4242.out").read_text()
-    assert combined.index("first") < combined.index("second") < combined.index("third")
-    assert "===== init-1.out =====" in combined
-    # the last line says whether the run got to the end
-    assert combined.rstrip().endswith("PIPELINE FINISHED -- all 3 blocks completed =====")
-    # each stream gets its own file, and the originals stay put
-    assert (temp_dir / "pipeline-4242.err").read_text().count("a warning") == 1
-    assert (log_dir / "init-1.out").read_text() == "first\n"
-
-    # Rebuilding is idempotent: the combined file lives outside the log dir, so
-    # it is never folded into itself.
-    concatenate_sbatch_logs(str(temp_dir), "PIPELINE FINISHED -- all 3 blocks completed")
-    assert (temp_dir / "pipeline-4242.out").read_text() == combined
+    config = _valid_config()
+    config["building_blocks"] = ["segmentation", "not_a_block"]
+    with pytest.raises(ValueError, match="unknown building block 'not_a_block'"):
+        validate_config(config)
 
 
-def test_concatenate_sbatch_logs_without_logs(tmp_path):
-    # A local run has no sbatch logs at all; that must be a quiet no-op.
-    from towbintools_pipeline.utils import concatenate_sbatch_logs
+def test_validate_config_classification_hint():
+    from towbintools_pipeline.building_blocks import validate_config
 
-    concatenate_sbatch_logs(str(tmp_path))  # no sbatch_output dir
-    (tmp_path / "sbatch_output").mkdir()
-    concatenate_sbatch_logs(str(tmp_path))  # empty sbatch_output dir
-    assert list(tmp_path.glob("pipeline-*")) == []
-
-
-def test_run_config_and_version_info_backed_up(tmp_path):
-    # The config and a git_info.txt land in the backup, which sits beside the
-    # report (under the analysis dir), not inside it.
-    config_path = _build_experiment(tmp_path)
-
-    result = _run_pipeline(config_path, ["--temp_dir", str(tmp_path / "pipeline_temp")])
-    assert (
-        result.returncode == 0
-    ), f"pipeline failed:\n{result.stdout}\n{result.stderr}"
-
-    backups = list((tmp_path / "exp" / "analysis" / "pipeline_backup").glob("pipeline_*"))
-    assert len(backups) == 1
-    assert (backups[0] / "config.yaml").exists()
-    assert (backups[0] / "git_info.txt").exists()
+    config = _valid_config()
+    config["building_blocks"] = ["classification"]
+    with pytest.raises(ValueError, match="'classification' was replaced by"):
+        validate_config(config)
 
 
-def test_repeated_runs_get_separate_backups(tmp_path):
-    # Two runs of the same experiment must not overwrite each other's backup;
-    # each gets its own run directory (slurm keys it on the job id instead).
-    config_path = _build_experiment(tmp_path)
+def test_validate_config_list_length_mismatch():
+    from towbintools_pipeline.building_blocks import validate_config
 
-    for _ in range(2):
-        result = _run_pipeline(config_path, ["--temp_dir", str(tmp_path / "t")])
-        assert (
-            result.returncode == 0
-        ), f"pipeline failed:\n{result.stdout}\n{result.stderr}"
-
-    backups = list((tmp_path / "exp" / "analysis" / "pipeline_backup").glob("pipeline_*"))
-    assert len(backups) == 2
+    # Two segmentation blocks but only enough channels for one and not the two
+    # allowed lengths (1 or 2).
+    config = _valid_config()
+    config["building_blocks"] = ["segmentation", "segmentation"]
+    config["segmentation_channels"] = [[0], [1], [2]]
+    with pytest.raises(ValueError, match="segmentation_channels"):
+        validate_config(config)
 
 
-def test_custom_analysis_dir_name(tmp_path):
-    # A non-default analysis_dir_name flows through: outputs land under it and
-    # the downstream morphology block resolves its mask input correctly.
-    config_path = _build_experiment(tmp_path, analysis_dir_name="results")
+def test_validate_config_reports_all_errors_at_once():
+    from towbintools_pipeline.building_blocks import validate_config
 
-    result = _run_pipeline(config_path, ["--temp_dir", str(tmp_path / "pipeline_temp")])
-    assert (
-        result.returncode == 0
-    ), f"pipeline failed:\n{result.stdout}\n{result.stderr}"
-
-    masks = sorted((tmp_path / "exp" / "results" / "ch1_seg").glob("*.tiff"))
-    assert len(masks) == 2
-    morph_csv = tmp_path / "exp" / "results" / "report" / "ch1_seg_morphology.csv"
-    assert morph_csv.exists()
-    with open(morph_csv, newline="") as f:
-        rows = list(csv.DictReader(f))
-    assert len(rows) == 2
-    assert all(float(r["ch1_seg_area"]) > 0 for r in rows)
+    config = _valid_config()
+    config["backend"] = "cluster"
+    config["report_format"] = "xlsx"
+    with pytest.raises(ValueError) as excinfo:
+        validate_config(config)
+    message = str(excinfo.value)
+    assert "backend" in message
+    assert "report_format" in message
 
 
-def test_prefix_free_folder_refs(tmp_path):
-    # A mask ref written WITHOUT the analysis-dir prefix resolves to the right
-    # column and the run completes.
+def test_pipeline_rejects_invalid_config(tmp_path):
+    # An invalid config fails at startup, before any run dir is created.
     config_path = _build_experiment(
-        tmp_path, extra_config={"morphology_computation_masks": ["ch1_seg"]}
+        tmp_path, extra_config={"building_blocks": ["not_a_block"]}
     )
 
     result = _run_pipeline(config_path, ["--temp_dir", str(tmp_path / "pipeline_temp")])
-    assert (
-        result.returncode == 0
-    ), f"pipeline failed:\n{result.stdout}\n{result.stderr}"
-    assert (tmp_path / "exp" / "analysis" / "report" / "ch1_seg_morphology.csv").exists()
+    assert result.returncode != 0
+    assert "unknown building block 'not_a_block'" in result.stderr
+    assert not (tmp_path / "pipeline_temp").exists()
 
 
-def test_prefix_free_refs_survive_analysis_dir_rename(tmp_path):
-    # The same prefix-free ref works under a renamed analysis_dir_name, with no
-    # ref to rewrite -- the coupling this PR removes.
-    config_path = _build_experiment(
-        tmp_path,
-        analysis_dir_name="output",
-        extra_config={"morphology_computation_masks": ["ch1_seg"]},
+# ---- building-block config parsing ----
+
+
+def test_parse_building_blocks_broadcast_and_select():
+    # A single option value is broadcast to every block of its type; a per-block
+    # list is selected positionally; a missing option falls back to its default.
+    from towbintools_pipeline.building_blocks import parse_building_blocks_config
+
+    config = {
+        "building_blocks": ["segmentation", "segmentation", "morphology_computation"],
+        "pixelsize": [0.65],
+        "segmentation_method": ["threshold"],  # single value, broadcast to both
+        "segmentation_channels": [[0], [1]],  # one per segmentation block
+        "morphology_computation_masks": ["ch1_seg"],
+    }
+
+    blocks = parse_building_blocks_config(config)
+
+    assert blocks[0]["name"] == "segmentation"
+    assert blocks[0]["segmentation_channels"] == [0]
+    assert blocks[1]["segmentation_channels"] == [1]
+    assert blocks[0]["segmentation_method"] == blocks[1]["segmentation_method"] == "threshold"
+    assert blocks[0]["rerun_segmentation"] is False  # from the block defaults
+    assert blocks[2]["name"] == "morphology_computation"
+    assert blocks[2]["morphology_computation_masks"] == "ch1_seg"
+    assert blocks[2]["morphological_features"] == ["volume", "length", "area"]
+
+
+# ---- output naming ----
+
+
+def _naming_config(tmp_path):
+    # The subset of config keys get_output_name reads.
+    analysis = tmp_path / "analysis"
+    report = analysis / "report"
+    report.mkdir(parents=True)
+    return {
+        "analysis_subdir": str(analysis),
+        "report_subdir": str(report),
+        "raw_dir_name": "raw",
+        "analysis_dir_name": "analysis",
+        "report_format": "csv",
+    }
+
+
+def test_get_output_name_channels_and_raw(tmp_path):
+    # Channels prefix as ch{n+1}; a raw input contributes no basename unless
+    # add_raw is set. A subdir output lives under the analysis dir and is created.
+    from towbintools_pipeline.utils import get_output_name
+
+    config = _naming_config(tmp_path)
+    seg = get_output_name(config, "raw", "seg", channels=[1, 0], add_raw=False)
+    assert os.path.basename(seg) == "ch2_ch1_seg"
+    assert seg == os.path.join(config["analysis_subdir"], "ch2_ch1_seg")
+    assert os.path.isdir(seg)
+
+    straight = get_output_name(config, "raw", "str", channels=[1], add_raw=True)
+    assert os.path.basename(straight) == "ch2_raw_str"
+
+
+def test_get_output_name_prefix_strip_and_report(tmp_path):
+    # An analysis-dir-prefixed input is reduced to its basename; return_subdir
+    # False yields a report file named with the report_format extension, with
+    # suffix appended.
+    from towbintools_pipeline.utils import get_output_name
+
+    config = _naming_config(tmp_path)
+    straight = get_output_name(config, "analysis/ch2_seg", "str", add_raw=True)
+    assert os.path.basename(straight) == "ch2_seg_str"
+
+    report = get_output_name(
+        config, "ch2_seg_str", "morphology", return_subdir=False, suffix="v2"
+    )
+    assert report == os.path.join(
+        config["report_subdir"], "ch2_seg_str_morphology_v2.csv"
     )
 
-    result = _run_pipeline(config_path, ["--temp_dir", str(tmp_path / "pipeline_temp")])
+
+# ---- folder references ----
+
+
+def test_resolve_ref():
+    # Directory refs normalize to `{analysis_dir_name}/{name}` whether or not they
+    # carry a prefix; raw and absolute paths pass through.
+    from towbintools_pipeline.utils import resolve_ref
+
+    assert resolve_ref("ch2_seg", {}) == "analysis/ch2_seg"
+    assert resolve_ref("analysis/ch2_seg", {}) == "analysis/ch2_seg"
+    assert resolve_ref("raw", {}) == "raw"
+    # a renamed analysis_dir_name re-homes both forms to the new prefix
+    assert resolve_ref("ch2_seg", {"analysis_dir_name": "output"}) == "output/ch2_seg"
     assert (
-        result.returncode == 0
-    ), f"pipeline failed:\n{result.stdout}\n{result.stderr}"
-    assert (tmp_path / "exp" / "output" / "report" / "ch1_seg_morphology.csv").exists()
+        resolve_ref("analysis/ch2_seg", {"analysis_dir_name": "output"})
+        == "output/ch2_seg"
+    )
+    # absolute paths are left alone
+    assert resolve_ref("/mnt/data/ch2_seg", {}) == "/mnt/data/ch2_seg"
+
+
+# ---- per-file input selection ----
+
+
+def test_process_input_output_files_rejects_bad_rows(tmp_path):
+    # An empty row, or one holding a None / blank / non-string entry, is dropped.
+    from towbintools_pipeline.utils import process_input_output_files
+
+    out = str(tmp_path)
+    assert process_input_output_files([], out, False) == (None, None)
+    assert process_input_output_files([None], out, False) == (None, None)
+    assert process_input_output_files([""], out, False) == (None, None)
+    assert process_input_output_files([123], out, False) == (None, None)
+
+
+def test_process_input_output_files_rerun_and_existing(tmp_path):
+    # A valid row maps to <output_dir>/<input basename>; an already-produced
+    # output is skipped unless rerun is set.
+    from towbintools_pipeline.utils import process_input_output_files
+
+    out_dir = tmp_path / "out"
+    out_dir.mkdir()
+    src = "/data/a.tiff"
+
+    files, output = process_input_output_files([src], str(out_dir), False)
+    assert files == [src]
+    assert output == os.path.join(str(out_dir), "a.tiff")
+
+    (out_dir / "a.tiff").write_text("x")  # the output now exists
+    assert process_input_output_files([src], str(out_dir), False) == (None, None)
+    files_again, _ = process_input_output_files([src], str(out_dir), True)
+    assert files_again == [src]
+
+
+# ---- slurm config resolution ----
 
 
 def test_merge_slurm_config_resolves_relative_sibling(tmp_path):
@@ -392,52 +394,6 @@ def test_resolve_init_slurm_drops_gpu():
     assert init["sbatch_extra_options"] == ["--account=gratis"]
 
 
-def test_get_python_command():
-    # python_command overrides both backends; otherwise local uses the active
-    # interpreter and slurm the default micromamba runner.
-    from towbintools_pipeline.utils import get_python_command
-
-    assert get_python_command({"backend": "local"}) == sys.executable
-    assert get_python_command({"backend": "slurm"}) == (
-        "~/.local/bin/micromamba run -n towbintools python3"
-    )
-    assert (
-        get_python_command({"backend": "slurm", "python_command": "conda run -n x python"})
-        == "conda run -n x python"
-    )
-    assert (
-        get_python_command({"backend": "local", "python_command": "conda run -n x python"})
-        == "conda run -n x python"
-    )
-
-
-def test_init_pipeline_importable_without_side_effects():
-    # The entry point requires the module to import without parsing args or
-    # running anything; main() is the callable it points at.
-    import towbintools_pipeline.init_pipeline as ip
-
-    assert callable(ip.main)
-    assert callable(ip.build_blocks_for_subdir)
-
-
-def test_resolve_ref():
-    # Directory refs normalize to `{analysis_dir_name}/{name}` whether or not they
-    # carry a prefix; raw and absolute paths pass through.
-    from towbintools_pipeline.utils import resolve_ref
-
-    assert resolve_ref("ch2_seg", {}) == "analysis/ch2_seg"
-    assert resolve_ref("analysis/ch2_seg", {}) == "analysis/ch2_seg"
-    assert resolve_ref("raw", {}) == "raw"
-    # a renamed analysis_dir_name re-homes both forms to the new prefix
-    assert resolve_ref("ch2_seg", {"analysis_dir_name": "output"}) == "output/ch2_seg"
-    assert (
-        resolve_ref("analysis/ch2_seg", {"analysis_dir_name": "output"})
-        == "output/ch2_seg"
-    )
-    # absolute paths are left alone
-    assert resolve_ref("/mnt/data/ch2_seg", {}) == "/mnt/data/ch2_seg"
-
-
 def test_slurm_extra_options_accumulate():
     # Scalar keys are replaced by a section, but sbatch_extra_options entries are
     # appended, so a cluster-wide option is never silently dropped.
@@ -504,87 +460,268 @@ def test_run_params_sbatch_init_flags():
     assert flags == ["-c 4", "-t 0-12:00:00", "--mem=8G", "--account=gratis"]
 
 
-def _valid_config():
-    # A minimal config that validate_config accepts.
-    return {
-        "experiment_dir": "/some/exp",
-        "pixelsize": [0.65],
-        "building_blocks": ["segmentation", "morphology_computation"],
-        "segmentation_method": ["threshold"],
-        "segmentation_channels": [[0]],
-        "morphology_computation_masks": ["ch1_seg"],
-    }
+# ---- python launcher ----
 
 
-def test_validate_config_accepts_valid():
-    from towbintools_pipeline.building_blocks import validate_config
+def test_get_python_command():
+    # python_command overrides both backends; otherwise local uses the active
+    # interpreter and slurm the default micromamba runner.
+    from towbintools_pipeline.utils import get_python_command
 
-    validate_config(_valid_config())  # must not raise
-
-
-def test_validate_config_missing_required_keys():
-    from towbintools_pipeline.building_blocks import validate_config
-
-    with pytest.raises(ValueError) as excinfo:
-        validate_config({})
-    message = str(excinfo.value)
-    assert "experiment_dir" in message
-    assert "building_blocks" in message
-
-
-def test_validate_config_unknown_block():
-    from towbintools_pipeline.building_blocks import validate_config
-
-    config = _valid_config()
-    config["building_blocks"] = ["segmentation", "not_a_block"]
-    with pytest.raises(ValueError, match="unknown building block 'not_a_block'"):
-        validate_config(config)
+    assert get_python_command({"backend": "local"}) == sys.executable
+    assert get_python_command({"backend": "slurm"}) == (
+        "~/.local/bin/micromamba run -n towbintools python3"
+    )
+    assert (
+        get_python_command({"backend": "slurm", "python_command": "conda run -n x python"})
+        == "conda run -n x python"
+    )
+    assert (
+        get_python_command({"backend": "local", "python_command": "conda run -n x python"})
+        == "conda run -n x python"
+    )
 
 
-def test_validate_config_classification_hint():
-    from towbintools_pipeline.building_blocks import validate_config
-
-    config = _valid_config()
-    config["building_blocks"] = ["classification"]
-    with pytest.raises(ValueError, match="'classification' was replaced by"):
-        validate_config(config)
+# ---- packaging / entry point ----
 
 
-def test_validate_config_list_length_mismatch():
-    from towbintools_pipeline.building_blocks import validate_config
+def test_init_pipeline_importable_without_side_effects():
+    # The entry point requires the module to import without parsing args or
+    # running anything; main() is the callable it points at.
+    import towbintools_pipeline.init_pipeline as ip
 
-    # Two segmentation blocks but only enough channels for one and not the two
-    # allowed lengths (1 or 2).
-    config = _valid_config()
-    config["building_blocks"] = ["segmentation", "segmentation"]
-    config["segmentation_channels"] = [[0], [1], [2]]
-    with pytest.raises(ValueError, match="segmentation_channels"):
-        validate_config(config)
+    assert callable(ip.main)
+    assert callable(ip.build_blocks_for_subdir)
 
 
-def test_validate_config_reports_all_errors_at_once():
-    from towbintools_pipeline.building_blocks import validate_config
-
-    config = _valid_config()
-    config["backend"] = "cluster"
-    config["report_format"] = "xlsx"
-    with pytest.raises(ValueError) as excinfo:
-        validate_config(config)
-    message = str(excinfo.value)
-    assert "backend" in message
-    assert "report_format" in message
+# ---- run directory, backup, cleanup ----
 
 
-def test_pipeline_rejects_invalid_config(tmp_path):
-    # An invalid config fails at startup, before any run dir is created.
+def test_run_config_and_version_info_backed_up(tmp_path):
+    # The config and a git_info.txt land in the backup, which sits beside the
+    # report (under the analysis dir), not inside it.
+    config_path = _build_experiment(tmp_path)
+
+    result = _run_pipeline(config_path, ["--temp_dir", str(tmp_path / "pipeline_temp")])
+    assert (
+        result.returncode == 0
+    ), f"pipeline failed:\n{result.stdout}\n{result.stderr}"
+
+    backups = list((tmp_path / "exp" / "analysis" / "pipeline_backup").glob("pipeline_*"))
+    assert len(backups) == 1
+    assert (backups[0] / "config.yaml").exists()
+    assert (backups[0] / "git_info.txt").exists()
+
+
+def test_repeated_runs_get_separate_backups(tmp_path):
+    # Two runs of the same experiment must not overwrite each other's backup;
+    # each gets its own run directory (slurm keys it on the job id instead).
+    config_path = _build_experiment(tmp_path)
+
+    for _ in range(2):
+        result = _run_pipeline(config_path, ["--temp_dir", str(tmp_path / "t")])
+        assert (
+            result.returncode == 0
+        ), f"pipeline failed:\n{result.stdout}\n{result.stderr}"
+
+    backups = list((tmp_path / "exp" / "analysis" / "pipeline_backup").glob("pipeline_*"))
+    assert len(backups) == 2
+
+
+def test_cleanup_on_success_removes_temp_dir(tmp_path):
+    # With cleanup_on_success, a finished run deletes its own temp dir; the
+    # backup and the outputs survive.
+    config_path = _build_experiment(tmp_path, extra_config={"cleanup_on_success": True})
+
+    result = _run_pipeline(config_path, cwd=str(tmp_path))
+    assert (
+        result.returncode == 0
+    ), f"pipeline failed:\n{result.stdout}\n{result.stderr}"
+
+    # the run's temp subdir is gone
+    assert list((tmp_path / "temp_files").glob("pipeline_*")) == []
+    # the durable backup remains
+    backups = list((tmp_path / "exp" / "analysis" / "pipeline_backup").glob("pipeline_*"))
+    assert len(backups) == 1
+    # the outputs remain
+    morph_csv = tmp_path / "exp" / "analysis" / "report" / "ch1_seg_morphology.csv"
+    assert morph_csv.exists()
+
+
+# ---- log concatenation ----
+
+
+def test_concatenate_sbatch_logs(tmp_path):
+    # Per-block logs are joined per stream in write order, headed by their file
+    # name, without touching the originals.
+    import os as _os
+
+    from towbintools_pipeline.utils import concatenate_sbatch_logs
+
+    temp_dir = tmp_path / "pipeline_4242"
+    log_dir = temp_dir / "sbatch_output"
+    log_dir.mkdir(parents=True)
+
+    # Written out of order on purpose; mtimes decide the order, not the names.
+    (log_dir / "straightening-3.out").write_text("third\n")
+    (log_dir / "init-1.out").write_text("first\n")
+    (log_dir / "segmentation-2.out").write_text("second\n")
+    (log_dir / "segmentation-2.err").write_text("a warning\n")
+    for name, stamp in (("init-1.out", 1000), ("segmentation-2.out", 2000),
+                        ("straightening-3.out", 3000)):
+        _os.utime(log_dir / name, (stamp, stamp))
+
+    concatenate_sbatch_logs(str(temp_dir), "PIPELINE FINISHED -- all 3 blocks completed")
+
+    combined = (temp_dir / "pipeline-4242.out").read_text()
+    assert combined.index("first") < combined.index("second") < combined.index("third")
+    assert "===== init-1.out =====" in combined
+    # the last line says whether the run got to the end
+    assert combined.rstrip().endswith("PIPELINE FINISHED -- all 3 blocks completed =====")
+    # each stream gets its own file, and the originals stay put
+    assert (temp_dir / "pipeline-4242.err").read_text().count("a warning") == 1
+    assert (log_dir / "init-1.out").read_text() == "first\n"
+
+    # Rebuilding is idempotent: the combined file lives outside the log dir, so
+    # it is never folded into itself.
+    concatenate_sbatch_logs(str(temp_dir), "PIPELINE FINISHED -- all 3 blocks completed")
+    assert (temp_dir / "pipeline-4242.out").read_text() == combined
+
+
+def test_concatenate_sbatch_logs_without_logs(tmp_path):
+    # A local run has no sbatch logs at all; that must be a quiet no-op.
+    from towbintools_pipeline.utils import concatenate_sbatch_logs
+
+    concatenate_sbatch_logs(str(tmp_path))  # no sbatch_output dir
+    (tmp_path / "sbatch_output").mkdir()
+    concatenate_sbatch_logs(str(tmp_path))  # empty sbatch_output dir
+    assert list(tmp_path.glob("pipeline-*")) == []
+
+
+# ---- end-to-end local pipeline ----
+
+
+def test_local_pipeline_segmentation_and_morphology(tmp_path):
+    config_path = _build_experiment(tmp_path)
+    temp_dir = tmp_path / "pipeline_temp"
+
+    result = _run_pipeline(config_path, ["--temp_dir", str(temp_dir)])
+    assert (
+        result.returncode == 0
+    ), f"pipeline failed:\n{result.stdout}\n{result.stderr}"
+
+    # segmentation produced one mask per input image
+    mask_dir = tmp_path / "exp" / "analysis" / "ch1_seg"
+    masks = sorted(mask_dir.glob("*.tiff"))
+    assert len(masks) == 2
+
+    # morphology produced one record per image with a positive area
+    morph_csv = tmp_path / "exp" / "analysis" / "report" / "ch1_seg_morphology.csv"
+    assert morph_csv.exists()
+    with open(morph_csv, newline="") as f:
+        rows = list(csv.DictReader(f))
+    assert len(rows) == 2
+    assert all(float(r["ch1_seg_area"]) > 0 for r in rows)
+
+
+def test_local_pipeline_default_temp_dir_in_cwd(tmp_path):
+    # Without --temp_dir (and no temp_dir config key), temp files default to
+    # ./temp_files in the working directory (matching the sbatch launcher).
+    config_path = _build_experiment(tmp_path)
+
+    result = _run_pipeline(config_path, cwd=str(tmp_path))
+    assert (
+        result.returncode == 0
+    ), f"pipeline failed:\n{result.stdout}\n{result.stderr}"
+
+    # each run gets its own subdirectory, named after its start time locally
+    runs = list((tmp_path / "temp_files").glob("pipeline_*"))
+    assert len(runs) == 1
+    assert (runs[0] / "pickles").is_dir()
+    # the slurm-only folders are not created for a local run
+    assert not (runs[0] / "batch").exists()
+    assert not (runs[0] / "sbatch_output").exists()
+    # the run still produced its outputs under the experiment dir
+    morph_csv = tmp_path / "exp" / "analysis" / "report" / "ch1_seg_morphology.csv"
+    assert morph_csv.exists()
+
+
+def test_block_progress_is_logged(tmp_path):
+    # Every block announces its start and its completion, numbered within the
+    # planned sequence, and the run ends with the closing line.
+    config_path = _build_experiment(tmp_path)
+
+    result = _run_pipeline(config_path, ["--temp_dir", str(tmp_path / "pipeline_temp")])
+    assert (
+        result.returncode == 0
+    ), f"pipeline failed:\n{result.stdout}\n{result.stderr}"
+
+    markers = [
+        line.strip()
+        for line in result.stdout.splitlines()
+        if line.startswith("###") or line.startswith("  1/") or line.startswith("  2/")
+    ]
+    assert markers == [
+        "### Initializing the pipeline for subdir None ###",
+        "### Pipeline plan: 2 blocks ###",
+        "1/2 segmentation",
+        "2/2 morphology_computation",
+        "### Starting block 1/2 segmentation ###",
+        "### Finished block 1/2 segmentation ###",
+        "### Starting block 2/2 morphology_computation ###",
+        "### Finished block 2/2 morphology_computation ###",
+        "### End of the pipeline! (2 blocks) ###",
+    ]
+
+
+def test_custom_analysis_dir_name(tmp_path):
+    # A non-default analysis_dir_name flows through: outputs land under it and
+    # the downstream morphology block resolves its mask input correctly.
+    config_path = _build_experiment(tmp_path, analysis_dir_name="results")
+
+    result = _run_pipeline(config_path, ["--temp_dir", str(tmp_path / "pipeline_temp")])
+    assert (
+        result.returncode == 0
+    ), f"pipeline failed:\n{result.stdout}\n{result.stderr}"
+
+    masks = sorted((tmp_path / "exp" / "results" / "ch1_seg").glob("*.tiff"))
+    assert len(masks) == 2
+    morph_csv = tmp_path / "exp" / "results" / "report" / "ch1_seg_morphology.csv"
+    assert morph_csv.exists()
+    with open(morph_csv, newline="") as f:
+        rows = list(csv.DictReader(f))
+    assert len(rows) == 2
+    assert all(float(r["ch1_seg_area"]) > 0 for r in rows)
+
+
+def test_prefix_free_folder_refs(tmp_path):
+    # A mask ref written WITHOUT the analysis-dir prefix resolves to the right
+    # column and the run completes.
     config_path = _build_experiment(
-        tmp_path, extra_config={"building_blocks": ["not_a_block"]}
+        tmp_path, extra_config={"morphology_computation_masks": ["ch1_seg"]}
     )
 
     result = _run_pipeline(config_path, ["--temp_dir", str(tmp_path / "pipeline_temp")])
-    assert result.returncode != 0
-    assert "unknown building block 'not_a_block'" in result.stderr
-    assert not (tmp_path / "pipeline_temp").exists()
+    assert (
+        result.returncode == 0
+    ), f"pipeline failed:\n{result.stdout}\n{result.stderr}"
+    assert (tmp_path / "exp" / "analysis" / "report" / "ch1_seg_morphology.csv").exists()
+
+
+def test_prefix_free_refs_survive_analysis_dir_rename(tmp_path):
+    # The same prefix-free ref works under a renamed analysis_dir_name, with no
+    # ref to rewrite -- the coupling this PR removes.
+    config_path = _build_experiment(
+        tmp_path,
+        analysis_dir_name="output",
+        extra_config={"morphology_computation_masks": ["ch1_seg"]},
+    )
+
+    result = _run_pipeline(config_path, ["--temp_dir", str(tmp_path / "pipeline_temp")])
+    assert (
+        result.returncode == 0
+    ), f"pipeline failed:\n{result.stdout}\n{result.stderr}"
+    assert (tmp_path / "exp" / "output" / "report" / "ch1_seg_morphology.csv").exists()
 
 
 def test_experiment_dir_cli_overrides_config(tmp_path):
