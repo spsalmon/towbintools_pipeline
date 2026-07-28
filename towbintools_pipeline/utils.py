@@ -9,14 +9,12 @@ from datetime import datetime
 import numpy as np
 import polars as pl
 import yaml
-from joblib import delayed
-from joblib import Parallel
-from joblib import parallel_config
-from towbintools.foundation.file_handling import read_filemap
-from towbintools.foundation.file_handling import write_filemap
+from joblib import delayed, Parallel, parallel_config
+from towbintools.foundation.file_handling import read_filemap, write_filemap
 from towbintools.foundation.image_handling import get_acquisition_date
 
-# ----BOILERPLATE CODE FOR FILE HANDLING----
+
+# ---- File handling ----
 
 
 def backup_file(file_path, destination_dir):
@@ -453,7 +451,7 @@ def get_experiment_time_from_filemap(experiment_filemap, config, recompute=False
     return experiment_filemap.select(pl.col("ExperimentTime")).to_series()
 
 
-# ----BOILERPLATE CODE FOR PICKLING----
+# ---- Pickling ----
 
 
 def load_pickles(*pickle_paths):
@@ -493,7 +491,7 @@ def cleanup_files(*filepaths):
             print(f"Error deleting file {filepath}: {e}")
 
 
-# ----BOILERPLATE CODE FOR SLURM----
+# ---- SLURM ----
 
 _PIPELINE_DIR = os.path.dirname(os.path.abspath(__file__))
 _REPO_DIR = os.path.dirname(_PIPELINE_DIR)
@@ -818,7 +816,7 @@ def create_sbatch_file(
     return script_path
 
 
-# ----BOILERPLATE CODE FOR COMMAND LINE INTERFACE----
+# ---- Command-line interface ----
 
 
 def basic_get_args() -> argparse.Namespace:
@@ -854,7 +852,7 @@ def basic_get_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
-# ----BOILERPLATE CODE FOR SAVING ----
+# ---- Saving ----
 
 
 def rename_merge_and_save_records(

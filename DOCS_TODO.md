@@ -148,6 +148,24 @@ Four tiers:
   instead. The prints it makes are flushed before the concatenation, so they do
   land in the combined log.
 
+## Code conventions (for the contributing/docs section)
+- Section dividers in a module are `# ---- Title ----` (capitalised, spaces around
+  the dashes), two blank lines before, two after.
+- Imports are grouped stdlib / third-party / first-party (`towbintools_pipeline`),
+  one blank line between groups. (`workers/straightening.py` keeps a `# noqa: E402`
+  block because it sets an OpenBLAS env var before importing.)
+- Multiple names from the same module go in one `from x import a, b, c` statement,
+  wrapped in parentheses (one name per line, trailing comma) when it exceeds the
+  line length -- the isort/black default, not one-import-per-line.
+- Two blank lines between top-level functions/classes, one between methods
+  (already holds package-wide; verified, no exceptions).
+- Module docstrings on the orchestration entry points (init_pipeline, block_linker,
+  building_blocks, run_params); the workers are short enough to read directly.
+- Scope: these conventions were applied to the core package `towbintools_pipeline/`
+  (incl. `workers/`) and the `tests/` suite. NOT yet applied to the extras --
+  `tools/`, `gui/`, `training/`, `examples/custom_scripts/` -- which are deferred
+  to the non-core PR (F); bring them in line then. (`scripts/` is bash, N/A.)
+
 ## Testing
 - `python -m pytest tests/ -v` runs the local-backend smoke test (synthetic
   images, no bundled data). Document how to add more tests.

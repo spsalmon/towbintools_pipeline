@@ -6,12 +6,9 @@ from threading import Thread
 import cv2
 import numpy as np
 import torch
-from towbintools_pipeline import utils
 from cellpose import models
 from cv2 import resize
-from joblib import delayed
-from joblib import Parallel
-from joblib import parallel_config
+from joblib import delayed, Parallel, parallel_config
 from tifffile import imwrite
 from torch.utils.data import DataLoader
 from towbintools.deep_learning.deep_learning_tools import (
@@ -20,9 +17,13 @@ from towbintools.deep_learning.deep_learning_tools import (
 from towbintools.deep_learning.utils.augmentation import (
     get_prediction_augmentation_from_model,
 )
-from towbintools.deep_learning.utils.dataset import SegmentationPredictionDataset
-from towbintools.deep_learning.utils.dataset import StackPredictionDataset
+from towbintools.deep_learning.utils.dataset import (
+    SegmentationPredictionDataset,
+    StackPredictionDataset,
+)
 from towbintools.foundation import image_handling
+
+from towbintools_pipeline import utils
 
 logging.basicConfig(level=logging.INFO)
 
@@ -121,7 +122,9 @@ def save_prediction(prediction, output_path, z_dim=None, t_dim=None):
         )
 
 
-# method functions
+# ---- Segmentation methods ----
+
+
 def deep_learning_segmentation(
     block_config,
     input_files,

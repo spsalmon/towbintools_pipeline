@@ -1,17 +1,23 @@
+"""Building blocks of the pipeline: one class per analysis step (segmentation,
+straightening, morphology, quality control, molt detection, fluorescence, and a
+user-supplied custom block). Validates the config, parses it into per-block
+configurations, and builds the block objects that init_pipeline runs.
+"""
 import os
-from abc import ABC
-from abc import abstractmethod
+from abc import ABC, abstractmethod
 
 import numpy as np
 from towbintools.foundation.file_handling import add_dir_to_experiment_filemap
 
-from towbintools_pipeline.utils import create_linker_command
-from towbintools_pipeline.utils import get_input_and_output_files
-from towbintools_pipeline.utils import get_output_name
-from towbintools_pipeline.utils import get_python_command
-from towbintools_pipeline.utils import pickle_objects
-from towbintools_pipeline.utils import resolve_ref
-from towbintools_pipeline.utils import run_command
+from towbintools_pipeline.utils import (
+    create_linker_command,
+    get_input_and_output_files,
+    get_output_name,
+    get_python_command,
+    pickle_objects,
+    resolve_ref,
+    run_command,
+)
 
 # Resolve bundled scripts/models relative to this package, so the pipeline
 # works regardless of the current working directory.

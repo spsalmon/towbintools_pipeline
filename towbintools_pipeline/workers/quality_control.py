@@ -3,14 +3,12 @@ import os
 import numpy as np
 import pandas as pd
 import polars as pl
-from towbintools_pipeline import utils
 import xgboost as xgb
-from joblib import delayed
-from joblib import load
-from joblib import Parallel
+from joblib import delayed, load, Parallel
 from towbintools.classification.qc_tools import compute_qc_features
-from towbintools.foundation.file_handling import extract_time_point
-from towbintools.foundation.file_handling import write_filemap
+from towbintools.foundation.file_handling import extract_time_point, write_filemap
+
+from towbintools_pipeline import utils
 
 
 def main(input_pickle, output_file, block_config, config, filemap, n_jobs=-1):

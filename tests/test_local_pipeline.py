@@ -87,7 +87,7 @@ def _run_pipeline(config_path, extra_args=(), cwd=REPO_ROOT):
     )
 
 
-# ---- config validation ----
+# ---- Config validation ----
 
 
 def _valid_config():
@@ -173,7 +173,7 @@ def test_pipeline_rejects_invalid_config(tmp_path):
     assert not (tmp_path / "pipeline_temp").exists()
 
 
-# ---- building-block config parsing ----
+# ---- Building-block config parsing ----
 
 
 def test_parse_building_blocks_broadcast_and_select():
@@ -201,7 +201,7 @@ def test_parse_building_blocks_broadcast_and_select():
     assert blocks[2]["morphological_features"] == ["volume", "length", "area"]
 
 
-# ---- output naming ----
+# ---- Output naming ----
 
 
 def _naming_config(tmp_path):
@@ -251,7 +251,7 @@ def test_get_output_name_prefix_strip_and_report(tmp_path):
     )
 
 
-# ---- folder references ----
+# ---- Folder references ----
 
 
 def test_resolve_ref():
@@ -272,7 +272,7 @@ def test_resolve_ref():
     assert resolve_ref("/mnt/data/ch2_seg", {}) == "/mnt/data/ch2_seg"
 
 
-# ---- per-file input selection ----
+# ---- Per-file input selection ----
 
 
 def test_process_input_output_files_rejects_bad_rows(tmp_path):
@@ -305,7 +305,7 @@ def test_process_input_output_files_rerun_and_existing(tmp_path):
     assert files_again == [src]
 
 
-# ---- slurm config resolution ----
+# ---- SLURM config resolution ----
 
 
 def test_merge_slurm_config_resolves_relative_sibling(tmp_path):
@@ -460,7 +460,7 @@ def test_run_params_sbatch_init_flags():
     assert flags == ["-c 4", "-t 0-12:00:00", "--mem=8G", "--account=gratis"]
 
 
-# ---- python launcher ----
+# ---- Python launcher ----
 
 
 def test_get_python_command():
@@ -482,7 +482,7 @@ def test_get_python_command():
     )
 
 
-# ---- packaging / entry point ----
+# ---- Packaging / entry point ----
 
 
 def test_init_pipeline_importable_without_side_effects():
@@ -494,7 +494,7 @@ def test_init_pipeline_importable_without_side_effects():
     assert callable(ip.build_blocks_for_subdir)
 
 
-# ---- run directory, backup, cleanup ----
+# ---- Run directory, backup, cleanup ----
 
 
 def test_run_config_and_version_info_backed_up(tmp_path):
@@ -548,7 +548,7 @@ def test_cleanup_on_success_removes_temp_dir(tmp_path):
     assert morph_csv.exists()
 
 
-# ---- log concatenation ----
+# ---- Log concatenation ----
 
 
 def test_concatenate_sbatch_logs(tmp_path):
@@ -598,7 +598,7 @@ def test_concatenate_sbatch_logs_without_logs(tmp_path):
     assert list(tmp_path.glob("pipeline-*")) == []
 
 
-# ---- end-to-end local pipeline ----
+# ---- End-to-end local pipeline ----
 
 
 def test_local_pipeline_segmentation_and_morphology(tmp_path):
