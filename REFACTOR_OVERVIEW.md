@@ -72,7 +72,7 @@ local installer that needs no micromamba.
 **Why —** teams can use conda, venv, micromamba — whatever they have — and new
 users get a much simpler setup.
 
-**Where —** [`…feature/launcher-decoupling`](https://github.com/quasar1357/towbintools_pipeline/compare/refactor/script-responsibilities...feature/launcher-decoupling)
+**Where —** [`…feature/launcher-decoupling`](https://github.com/quasar1357/towbintools_pipeline/compare/refactor/script-responsibilities...feature/launcher-decoupling) (the micromamba-free local install env first landed in [`feature/env-install`](https://github.com/quasar1357/towbintools_pipeline/compare/feature/local-backend...feature/env-install))
 
 ### 4. Adapt to a new cluster by editing config, not code
 
@@ -118,7 +118,7 @@ directory), can be provided by a CLI falg or a config entry.
 
 **Why —** clarity, reproducibility and flexibility in the outputs the pipeline generates.
 
-**Where —** [`…feature/externalize-io`](https://github.com/quasar1357/towbintools_pipeline/compare/feature/slurm-config...feature/externalize-io) (then [`fix/config-loading-and-backup`](https://github.com/quasar1357/towbintools_pipeline/compare/refactor/repo-structure...fix/config-loading-and-backup), [`feature/cleanup-on-success`](https://github.com/quasar1357/towbintools_pipeline/compare/feature/cluster-package-install...feature/cleanup-on-success))
+**Where —** [`…feature/externalize-io`](https://github.com/quasar1357/towbintools_pipeline/compare/feature/slurm-config...feature/externalize-io) (then [`chore/cleanup-and-temp-default`](https://github.com/quasar1357/towbintools_pipeline/compare/feature/slurm-outer-script...chore/cleanup-and-temp-default), [`fix/config-loading-and-backup`](https://github.com/quasar1357/towbintools_pipeline/compare/refactor/repo-structure...fix/config-loading-and-backup), [`feature/cleanup-on-success`](https://github.com/quasar1357/towbintools_pipeline/compare/feature/cluster-package-install...feature/cleanup-on-success))
 
 ### 8. Observability — know what ran and where it stopped
 
@@ -141,7 +141,7 @@ behaviour was replaced by an explicit update command.
 **Why —** a newcomer can tell what each part is for, and launching a run no longer
 silently changes your working copy.
 
-**Where —** [`…refactor/repo-structure`](https://github.com/quasar1357/towbintools_pipeline/compare/feature/externalize-io...refactor/repo-structure) (then [`refactor/deployment-layout`](https://github.com/quasar1357/towbintools_pipeline/compare/feature/packaging-entry-point...refactor/deployment-layout), [`chore/retire-git-self-update`](https://github.com/quasar1357/towbintools_pipeline/compare/feature/launcher-decoupling...chore/retire-git-self-update))
+**Where —** [`…refactor/repo-structure`](https://github.com/quasar1357/towbintools_pipeline/compare/feature/externalize-io...refactor/repo-structure) (the launcher/job/Python responsibility split came in [`refactor/script-responsibilities`](https://github.com/quasar1357/towbintools_pipeline/compare/feature/block-progress-logging...refactor/script-responsibilities); then [`refactor/deployment-layout`](https://github.com/quasar1357/towbintools_pipeline/compare/feature/packaging-entry-point...refactor/deployment-layout), [`chore/retire-git-self-update`](https://github.com/quasar1357/towbintools_pipeline/compare/feature/launcher-decoupling...chore/retire-git-self-update))
 
 ### 10. A safety net — tests and continuous integration
 
@@ -165,17 +165,17 @@ carried a real cost was written down (see `TRADEOFFS.md`).
 ## Status and what's next
 
 - **Verified on the cluster (UBELIX):** entire pipeline setup and mock analysis;
-notably packaging, the deployment-layout change, and the cluster package install,
-the config validation (surfaces its error and creates no folders), config defaults,
-slurm config adjustments, folder references (with the analysis-directory prefix
-left out the subfolders are still found), and the opt-in end-of-run cleanup.
+  notably packaging, the deployment-layout change, and the cluster package install,
+  the config validation (surfaces its error and creates no folders), config defaults,
+  slurm config adjustments, folder references (with the analysis-directory prefix
+  left out the subfolders are still found), and the opt-in end-of-run cleanup.
 - **Deliberately left for later:**
   - the **extras** (`tools/`, `gui/`, `training/`), yet to be adapted to the new
     layout and conventions;
   - the **user-facing documentation** (README + book) rewrite, to be done *after*
-  the overhaul of the core pipeline is agreed, driven from `DOCS_TODO.md`;
-  - **Optional**: Exhaustive **API enhancement**, for instance and object-oriented
-  approach allowing for stepwise procedure and opt-in linking of the blocks.
+    the overhaul of the core pipeline is agreed, driven from `DOCS_TODO.md`;
+  - **Optional**: Exhaustive **API enhancement**, for instance an object-oriented
+    approach allowing for stepwise procedure and opt-in linking of the blocks.
 
 ## The three documents, going forward
 
