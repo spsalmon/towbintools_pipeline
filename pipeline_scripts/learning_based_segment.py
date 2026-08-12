@@ -287,8 +287,8 @@ def cellpose_segmentation(
     ):
         masks, _, _ = model.eval(
             image,
-            z_axis=None,
-            channel_axis=None,
+            z_axis=(0 if z_dim > 1 else None),
+            channel_axis=-1,
             do_3D=False,
             batch_size=batch_size,
             stitch_threshold=(0.25 if stitch_3D else 0.0),

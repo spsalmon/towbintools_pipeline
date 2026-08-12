@@ -74,8 +74,14 @@ mask_files = [
 img_files = [
     os.path.join(img_dir, f)
     for f in os.listdir(img_dir)
-    if (f.endswith(".tif" or f.endswith(".tiff")))
+    if f.endswith(".tif") or f.endswith(".tiff")
 ]
+
+assert len(mask_files) == len(
+    img_files
+), f"Mismatch: {len(mask_files)} masks vs {len(img_files)} images"
+if not mask_files:
+    raise SystemExit(f"No mask files found in {mask_dir}")
 
 mask_files = sorted(mask_files)
 img_files = sorted(img_files)
