@@ -280,7 +280,18 @@ Four tiers:
   Checks: required keys (`experiment_dir`, `building_blocks`), known block names
   (with a hint that `classification` became `quality_control`), per-block option
   lists holding one value per block of that type (or a single broadcast value),
-  and the enumerated `backend` / `report_format` values.
+  the enumerated `backend` / `report_format` values, unknown/typo'd top-level
+  keys, and existence of the input paths given in the config.
+- Unknown-key check: any top-level key that is not a known global
+  (`GLOBAL_CONFIG_KEYS`), a per-block option (`OPTIONS_MAP`), or an `sbatch_*`
+  key is rejected — so `pixlesize`, `experimnt_dir`, etc. fail up front instead
+  of being silently ignored. `sbatch_*` keys pass by prefix (cluster-specific,
+  free-form). Runs on the raw config before any internal keys are injected.
+- Input-path existence: `experiment_dir` must be a directory, and the file
+  options (`model_path`, `qc_model_path`, `molt_detection_model_path`,
+  `custom_script_path`) must point at existing files. Only inputs the user
+  supplies — folders an earlier block produces are deliberately NOT checked (they
+  do not exist yet at validation time).
 - The per-block length rule mirrors the one `parse_building_blocks_config` still
   enforces later; validation front-loads it so the whole config fails fast and
   at once. See the TRADEOFFS entry on the small duplication.
@@ -290,15 +301,13 @@ Four tiers:
 - `building_blocks` rule is permissive by design — "every entry is a KNOWN type",
   NOT "one of each". No required block, no ordering/dependency check, duplicates
   are fine (several `segmentation` blocks is normal).
-- OPEN QUESTIONS for the product owner (currently NOT validated — confirm this is
-  intended before hardening):
+- Still NOT validated (confirm with the product owner before hardening further):
   - inter-block dependencies / order (e.g. a `morphology_computation` whose mask
     is produced by an earlier `segmentation`) — a wrong order just yields "no
     input files" at run time, not an upfront error.
-  - folder-ref existence — a mask/source ref pointing at a folder no earlier block
-    produces is not caught here.
-  - unknown/typo'd option keys (a param not in `OPTIONS_MAP`) are silently ignored,
-    not flagged.
+  - folder-ref existence for INTERMEDIATE refs — a mask/source ref pointing at a
+    folder no earlier block produces is not caught (it cannot be: the folder is
+    created during the run). Only user-supplied input paths are existence-checked.
 - Follow-up (nice-to-have): also run `validate_config` in the login-node pre-flight
   (`run_pipeline.sh` already loads the config there for `sbatch_init`), so a bad
   config fails BEFORE the sbatch submission with the error printed straight to the
@@ -334,3 +343,33 @@ Four tiers:
   passes sbatch CLI flags built from `sbatch_init`, overriding the minimal header
   in `_init_pipeline.sh`. The env launcher is now overridable too (see
   `TOWBINTOOLS_PYTHON` under "Which script does what").
+
+## Backlog / future work (roughly priority-ordered)
+Single index of what is still to come; details live in the sections above where
+noted. Higher items first. (DONE: config-validation of input paths + unknown-key
+rejection — see "Config validation".)
+1. **Default-config scaffolding command** — a command that copies the bundled
+   `defaults/config/*.yaml` into the cwd, so users get a starter config without
+   digging into the installed package (relevant once pip-installed from GitHub).
+   Configs only by default (models are large — flag or pointer instead);
+   non-destructive (no silent overwrite). Resolve the bundled files via
+   `importlib.resources`. Pairs later with an optional bundled-config fallback for `-c`.
+2. **Extras adaptation (PR F)** — bring `tools/`, `gui/`, `training/`,
+   `examples/custom_scripts/` onto the new layout + code conventions (see the
+   "Code conventions" scope note). Deferred until the core path is agreed.
+3. **Docs rewrite (PR G, last)** — README + `book/` overhaul, driven from this
+   whole file. Only after the core overhaul is agreed with the product owner.
+4. **"Real" API** — an object-oriented / stepwise outer orchestration in Python
+   (drive blocks one at a time, opt-in linking) alongside the current config-driven
+   run. Larger design effort; optional.
+5. **Publish to PyPI** — currently installed from the repo/checkout only; publishing
+   would make `pip install towbintools-pipeline` work directly. Easy later step.
+6. **Config validation, further** — optional warning-level "contents reasonable"
+   checks (e.g. `experiment_dir` contains a `raw/`), and running `validate_config`
+   in the login-node pre-flight (see the follow-up under "Config validation").
+7. **(lower) Warning-log volume** — some warnings can fire once per image and blow
+   up the `.out` file(s). Idea: keep a list of ignorable warnings in a repo file
+   (adjustable, but out of the user's config surface) and filter those when logging.
+8. **(lower) Output-filename suffix** — optional (bool, default off) suffix on output
+   names. Deferred/parked: the data handling / read-in is changing soon, so not worth
+   doing against the current scheme.

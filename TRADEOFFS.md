@@ -146,6 +146,16 @@ working code path.
 to one must be mirrored in the other.*
 Reversible: easy — the parser's asserts could later defer to `validate_config`.
 
+**Validation rejects unknown top-level keys against a hand-maintained allowlist.**
+`validate_config` flags any key that is not a known global (`GLOBAL_CONFIG_KEYS`),
+a per-block option (`OPTIONS_MAP`, derived automatically), or `sbatch_*` (prefix).
+This catches typos like `pixlesize` up front instead of silently ignoring them.
+*Cost: `GLOBAL_CONFIG_KEYS` is a manual list — adding a new global config key
+means registering it here too, or a valid config is rejected. `sbatch_*` keys are
+waved through by prefix, so a typo'd `sbatch_*` key is not caught. Hard rejection
+(not a warning), so a stray key blocks the run.*
+Reversible: easy — relax to a warning, or drop the check.
+
 ## Files and provenance
 
 **The pipeline reads its config from the original path; temp and backup are write-only.**
