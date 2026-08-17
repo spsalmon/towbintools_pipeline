@@ -132,6 +132,44 @@ DEFAULT_OPTIONS = {
     },
 }
 
+# User-settable top-level keys that are not per-block options. Keep this in sync
+# when adding a new config key: validate_config rejects any key that is neither
+# here, a per-block option (OPTIONS_MAP), nor an sbatch_* SLURM key.
+GLOBAL_CONFIG_KEYS = frozenset(
+    {
+        "experiment_dir",
+        "analysis_dir_name",
+        "raw_dir_name",
+        "temp_dir",
+        "cleanup_on_success",
+        "report_format",
+        "get_experiment_time",
+        "overwrite_annotated_filemap",
+        "time_regex",
+        "point_regex",
+        "n_jobs",
+        "backend",
+        "slurm_config",
+        "python_command",
+        "building_blocks",
+        "groups",
+    }
+)
+
+# Every per-block option name, flattened across block types.
+ALL_OPTION_KEYS = frozenset(
+    option for options in OPTIONS_MAP.values() for option in options
+)
+
+# Option keys whose values are input files/dirs that must exist before the run.
+# Only inputs the user supplies -- never a folder an earlier block produces.
+PATH_OPTIONS = (
+    "model_path",
+    "qc_model_path",
+    "molt_detection_model_path",
+    "custom_script_path",
+)
+
 
 class BuildingBlock(ABC):
     def __init__(
@@ -677,6 +715,17 @@ def validate_config(config):
         if key not in config:
             errors.append(f"missing required key '{key}'")
 
+    # Flag typo'd / unrecognised keys. sbatch_* keys (merged from the slurm
+    # config) are cluster-specific and free-form, so they pass by prefix.
+    for key in config:
+        if (
+            key in GLOBAL_CONFIG_KEYS
+            or key in ALL_OPTION_KEYS
+            or key.startswith("sbatch_")
+        ):
+            continue
+        errors.append(f"unknown config key '{key}'")
+
     blocks = config.get("building_blocks")
     if "building_blocks" in config and (not isinstance(blocks, list) or not blocks):
         errors.append("'building_blocks' must be a non-empty list")
@@ -712,6 +761,21 @@ def validate_config(config):
                         f"'{option}' has {len(value)} value(s) but there are "
                         f"{n} '{name}' block(s) (expected 1 or {n})"
                     )
+
+    # Input paths given in the config must already exist. experiment_dir is a
+    # directory; the model/script options are lists of files (skip None and any
+    # non-string entry). Folders produced by earlier blocks are NOT checked --
+    # they do not exist yet at validation time.
+    experiment_dir = config.get("experiment_dir")
+    if isinstance(experiment_dir, str) and not os.path.isdir(experiment_dir):
+        errors.append(f"'experiment_dir' does not exist: {experiment_dir}")
+    for option in PATH_OPTIONS:
+        values = config.get(option)
+        if not isinstance(values, list):
+            continue
+        for value in values:
+            if isinstance(value, str) and not os.path.isfile(value):
+                errors.append(f"'{option}' file does not exist: {value}")
 
     backend = config.get("backend", "slurm")
     if backend not in ("slurm", "local"):

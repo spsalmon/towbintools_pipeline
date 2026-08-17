@@ -90,10 +90,11 @@ def _run_pipeline(config_path, extra_args=(), cwd=REPO_ROOT):
 # ---- Config validation ----
 
 
-def _valid_config():
-    # A minimal config that validate_config accepts.
+def _valid_config(experiment_dir=REPO_ROOT):
+    # A minimal config that validate_config accepts. experiment_dir defaults to
+    # an existing directory so the path-existence check passes.
     return {
-        "experiment_dir": "/some/exp",
+        "experiment_dir": experiment_dir,
         "pixelsize": [0.65],
         "building_blocks": ["segmentation", "morphology_computation"],
         "segmentation_method": ["threshold"],
@@ -159,6 +160,48 @@ def test_validate_config_reports_all_errors_at_once():
     message = str(excinfo.value)
     assert "backend" in message
     assert "report_format" in message
+
+
+def test_validate_config_unknown_key():
+    from towbintools_pipeline.building_blocks import validate_config
+
+    config = _valid_config()
+    config["pixlesize"] = [0.65]  # typo of pixelsize
+    with pytest.raises(ValueError, match="unknown config key 'pixlesize'"):
+        validate_config(config)
+
+
+def test_validate_config_allows_sbatch_and_groups_keys():
+    from towbintools_pipeline.building_blocks import validate_config
+
+    # sbatch_* keys (merged from the slurm config) and groups are recognised.
+    config = _valid_config()
+    config["sbatch_memory"] = "8G"
+    config["groups"] = [["a", "b"]]
+    validate_config(config)  # must not raise
+
+
+def test_validate_config_experiment_dir_must_exist():
+    from towbintools_pipeline.building_blocks import validate_config
+
+    config = _valid_config(experiment_dir="/no/such/dir")
+    with pytest.raises(ValueError, match="'experiment_dir' does not exist"):
+        validate_config(config)
+
+
+def test_validate_config_model_path_must_exist(tmp_path):
+    from towbintools_pipeline.building_blocks import validate_config
+
+    # A model file that does not exist is rejected...
+    config = _valid_config()
+    config["model_path"] = [str(tmp_path / "missing.ckpt")]
+    with pytest.raises(ValueError, match="'model_path' file does not exist"):
+        validate_config(config)
+    # ...but an existing file passes.
+    model = tmp_path / "model.ckpt"
+    model.write_text("")
+    config["model_path"] = [str(model)]
+    validate_config(config)  # must not raise
 
 
 def test_pipeline_rejects_invalid_config(tmp_path):
