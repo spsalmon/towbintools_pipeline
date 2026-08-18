@@ -5,7 +5,8 @@ at the end of the refactor. Add to this as we change things; don't edit the
 docs piecemeal in the meantime.
 
 Decisions that cost something go in `TRADEOFFS.md` instead — that file is the
-list to hand to a reviewer, this one feeds the docs.
+list to hand to a reviewer, this one feeds the docs. Forward-looking engineering
+TODOs and the future-work index live in `OUTLOOK.md`.
 
 ## Repo structure
 - `towbintools_pipeline/` = core pipeline package (`python -m
@@ -66,15 +67,6 @@ Four tiers:
   1. pyproject.toml = what the pipeline needs (abstract deps, single source).
   2. environment*.yml = how to build an env (conda-vs-pip delivery choice).
   3. conda-lock.yml / conda-linux-64.lock = exact pinned solve (cluster).
-
-## Deferred cleanup (engineering, not just docs)
-- Cluster dep de-duplication was CONSIDERED and dropped: the cluster build is a
-  hash-pinned `--require-hashes --no-deps` install from `conda-linux-64.lock`, so
-  a `- .` (unhashable local path) does not fit, and `environment.yml` is a
-  superset of pyproject (gui/training/cellpose/bioio, conda-delivered). Instead
-  the package is installed separately, editable + `--no-deps`, by
-  `install_pipeline.sh`/`update_pipeline.sh` after the env build — lock untouched.
-  A future pyproject-extras approach (gui/training groups) could revisit de-dup.
 
 ## Running the pipeline
 - New `backend` config option: `slurm` (default, submits jobs) vs `local` (runs
@@ -317,15 +309,6 @@ Four tiers:
   easy to miss, and it still cost a job submission. Confirmed on the cluster:
   the error is there and no folders are created.
 
-## Deferred design / cleanup (later PRs)
-- Folder inputs, further: `resolve_ref` covers name-only refs (done). Still open
-  if needed: first-class (a) absolute and (c) relative external-directory refs
-  (today an absolute path passes through, but there is no relative-to-experiment
-  form) — add only if cross-experiment refs are actually wanted.
-- Naming: `analysis_dir_name` / `analysis_subdir` really denote the OUTPUT
-  directory. Renaming the KEY is a breaking config change, so it stays deferred
-  and separate from the (now-done) ref decoupling.
-
 ## CLI / commands
 - The installed command is a subcommand dispatcher (`towbintools_pipeline/cli.py`):
   - `towbintools-pipeline run [config] [-c CONFIG] [-e ...] [-t ...]` — run the
@@ -361,28 +344,3 @@ Four tiers:
   passes sbatch CLI flags built from `sbatch_init`, overriding the minimal header
   in `_init_pipeline.sh`. The env launcher is now overridable too (see
   `TOWBINTOOLS_PYTHON` under "Which script does what").
-
-## Backlog / future work (roughly priority-ordered)
-Single index of what is still to come; details live in the sections above where
-noted. Higher items first. (DONE: config-validation of input paths + unknown-key
-rejection — see "Config validation"; the `init-configs` scaffolding command and the
-subcommand dispatcher — see "CLI / commands".)
-1. **Extras adaptation (PR F)** — bring `tools/`, `gui/`, `training/`,
-   `examples/custom_scripts/` onto the new layout + code conventions (see the
-   "Code conventions" scope note). Deferred until the core path is agreed.
-2. **Docs rewrite (PR G, last)** — README + `book/` overhaul, driven from this
-   whole file. Only after the core overhaul is agreed with the product owner.
-3. **"Real" API** — an object-oriented / stepwise outer orchestration in Python
-   (drive blocks one at a time, opt-in linking) alongside the current config-driven
-   run. Larger design effort; optional.
-4. **Publish to PyPI** — currently installed from the repo/checkout only; publishing
-   would make `pip install towbintools-pipeline` work directly. Easy later step.
-5. **Config validation, further** — optional warning-level "contents reasonable"
-   checks (e.g. `experiment_dir` contains a `raw/`), and running `validate_config`
-   in the login-node pre-flight (see the follow-up under "Config validation").
-6. **(lower) Warning-log volume** — some warnings can fire once per image and blow
-   up the `.out` file(s). Idea: keep a list of ignorable warnings in a repo file
-   (adjustable, but out of the user's config surface) and filter those when logging.
-7. **(lower) Output-filename suffix** — optional (bool, default off) suffix on output
-   names. Deferred/parked: the data handling / read-in is changing soon, so not worth
-   doing against the current scheme.

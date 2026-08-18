@@ -10,7 +10,7 @@ import shutil
 import sys
 
 _PIPELINE_DIR = os.path.dirname(os.path.abspath(__file__))
-_DEFAULT_CONFIG_DIR = os.path.join(_PIPELINE_DIR, "defaults", "config")
+_DEFAULT_CONFIG_DIR = os.path.join(_PIPELINE_DIR, "defaults", "configs")
 _CONFIG_FILES = ("config.yaml", "slurm_config.yaml")
 
 

@@ -9,13 +9,13 @@ For convenience, I created a script that will do all operations explained in the
 
 ```bash
 cd ~/towbintools_pipeline #(or where you installed the pipeline)
-bash update_pipeline.sh
+bash scripts/update_pipeline.sh
 ```
 
 Optionally, you can run
 
 ```bash
-bash update_pipeline.sh --pipeline-only
+bash scripts/update_pipeline.sh --pipeline-only
 ```
 
 To update only the pipeline scripts and not the underlying packages
@@ -38,7 +38,7 @@ Then, you need to update the packages. For consistency's sake, the pipeline uses
 
 ```bash
 cd ~/towbintools_pipeline
-micromamba run -n towbintools conda-lock install --name towbintools ./requirements/conda-lock.yml
+micromamba run -n towbintools conda-lock install --name towbintools ./env/conda-lock.yml
 ```
 
 ## Troubleshooting
@@ -48,7 +48,7 @@ If for some weird reason, you end up with a broken environment, you can always d
 ```bash
 micromamba env remove -n towbintools
 cd ~/towbintools_pipeline
-bash install_pipeline.sh
+bash scripts/install_pipeline.sh
 ```
 
 You may also want to update the towbintools package itself manually. To do so, run:
