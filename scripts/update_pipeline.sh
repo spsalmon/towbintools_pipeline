@@ -27,4 +27,9 @@ if [[ "$PIPELINE_ONLY" == false ]]; then
     # env whenever micromamba cannot remove a busy file; building fresh + swapping
     # never has that problem. See env/build_env.sh.
     bash ./env/build_env.sh
+
+    # The fresh env has no pipeline package yet; register it (editable, --no-deps).
+    # A pipeline-only update skips this: the existing editable install already
+    # tracks this checkout, which the git reset above just updated.
+    ~/.local/bin/micromamba run -n towbintools pip install -e . --no-deps
 fi

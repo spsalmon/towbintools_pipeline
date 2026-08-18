@@ -72,12 +72,24 @@ so a non-editable `pip install` copies it into site-packages. Keeping only the
 configs bundled and the models external would avoid this.*
 Reversible: easy — `git mv` back and repoint two constants.
 
-**Dependencies are now declared in two places.**
-`pyproject.toml` was introduced as the single source for the local install, but
-the cluster `environment.yml` (symlink-flip + hash-pinned pip + conda-lock) is
-battle-tested and was left untouched rather than risk the working install.
-*Cost: the dependency list can drift between the two until consolidated.*
-Reversible: easy — planned, needs a cluster test.
+**Dependencies are declared in two places, and stay that way.**
+`pyproject.toml` is the single source for the local install; the cluster
+`environment.yml` is a battle-tested superset (it also carries gui/training/worker
+deps, conda-delivered). Sourcing it from pyproject with `- .` was rejected: the
+cluster build is a `--require-hashes` install and a local path has no hash.
+*Cost: a core dependency bumped in pyproject is not reflected on the cluster until
+`environment.yml` is bumped too; the two can drift.*
+Reversible: easy — a pyproject-extras approach could revisit de-dup later.
+
+**The pipeline package is installed editable + `--no-deps` on the cluster.**
+After the locked env is built, `install_pipeline.sh` runs `pip install -e .
+--no-deps` to register the package and its entry point, rather than adding it to
+`environment.yml`. Editable tracks the checkout the cluster already runs from;
+`--no-deps` keeps pip away from the hash-pinned dependency set.
+*Cost: a second install step outside the locked build; a fresh env rebuild must
+re-run it (handled in install/update), and a dep pyproject needs but the lock
+lacks would install nothing and only surface as an import error at runtime.*
+Reversible: easy.
 
 ## Configuration
 
