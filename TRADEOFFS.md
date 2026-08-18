@@ -221,7 +221,7 @@ Reversible: trivial (one line).
 ## Process
 
 **Comments are capped at ~2 lines and state what the code does, not why.**
-Rationale lives in commit messages, `DOCS_TODO.md` and this file.
+Rationale lives in commit messages and this file.
 *Cost: reading the source alone does not explain why a choice was made.*
 
 **Changes are stacked PRs merged bottom-up.**
