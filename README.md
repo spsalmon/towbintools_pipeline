@@ -125,7 +125,7 @@ bash scripts/run_pipeline.sh
 
 ### Using a custom config file
 
-If you don't specify anything, the config file used will be the bundled default "towbintools_pipeline/defaults/config/config.yaml" but you can specify one using
+If you don't specify anything, the config file used will be the bundled default "towbintools_pipeline/defaults/configs/config.yaml" but you can specify one using
 
 ```bash
 bash scripts/run_pipeline.sh -c path_to_config_file

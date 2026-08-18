@@ -503,7 +503,7 @@ def resolve_slurm_config_path(global_config, config_file):
     # the bundled default shipped alongside the example config.
     slurm_config_path = global_config.get("slurm_config")
     if slurm_config_path is None:
-        return os.path.join(_PIPELINE_DIR, "defaults", "config", "slurm_config.yaml")
+        return os.path.join(_PIPELINE_DIR, "defaults", "configs", "slurm_config.yaml")
     if not os.path.isabs(slurm_config_path):
         return os.path.join(
             os.path.dirname(os.path.abspath(config_file)), slurm_config_path
