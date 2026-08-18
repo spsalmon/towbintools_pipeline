@@ -499,10 +499,35 @@ def resolve_block_slurm(config, block_name):
 
 def resolve_init_slurm(config):
     # Effective SLURM resources for the outer/orchestrator job: the shared
-    # defaults overlaid with sbatch_init.
-    resolved = _slurm_defaults(config)
+    # defaults (minus the GPU, which the init job never needs) overlaid with
+    # sbatch_init.
+    resolved = {
+        key: value
+        for key, value in _slurm_defaults(config).items()
+        if key != "sbatch_gpus"
+    }
     resolved.update(config.get("sbatch_init", {}))
     return resolved
+
+
+def build_resource_directives(cores, time_limit, memory, gpus, extra_options):
+    # sbatch resource options (no job name/output), shared by the per-block
+    # script header and the outer job's CLI flags. Each standard directive is
+    # emitted only when set, so a cluster can drop one (e.g. omit --mem in favour
+    # of a --mem-per-cpu entry in extra_options); extra_options are raw sbatch
+    # option strings used verbatim (e.g. "--account=gratis").
+    directives = []
+    if cores is not None:
+        directives.append(f"-c {cores}")
+    if time_limit is not None:
+        directives.append(f"-t {time_limit}")
+    if memory is not None:
+        directives.append(f"--mem={memory}")
+    if gpus is not None:
+        directives.append(f"--gres=gpu:{gpus}")
+    for option in extra_options or []:
+        directives.append(str(option))
+    return directives
 
 
 def backup_run_config(global_config, config_file, temp_dir):
@@ -633,25 +658,15 @@ def create_sbatch_file(
     batch_dir = os.path.join(temp_dir, "batch")
     os.makedirs(batch_dir, exist_ok=True)
 
-    # Build SLURM header. Standard directives are emitted only when set, so a
-    # cluster can drop one (e.g. omit --mem in favour of a --mem-per-cpu entry
-    # in extra_options). extra_options are raw sbatch option strings, each
-    # rendered verbatim as a `#SBATCH <option>` line (e.g. "--account=gratis").
+    # Build SLURM header: job name + output paths, then the resource directives.
     directives = [
         f"-J {job_name}",
         f"-o {os.path.join(temp_dir, 'sbatch_output', job_name)}-%j.out",
         f"-e {os.path.join(temp_dir, 'sbatch_output', job_name)}-%j.err",
     ]
-    if cores is not None:
-        directives.append(f"-c {cores}")
-    if time_limit is not None:
-        directives.append(f"-t {time_limit}")
-    if memory is not None:
-        directives.append(f"--mem={memory}")
-    if gpus is not None:
-        directives.append(f"--gres=gpu:{gpus}")
-    for option in extra_options or []:
-        directives.append(str(option))
+    directives += build_resource_directives(
+        cores, time_limit, memory, gpus, extra_options
+    )
 
     header = "#!/bin/bash\n" + "".join(f"#SBATCH {d}\n" for d in directives)
 

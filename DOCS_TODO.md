@@ -74,9 +74,22 @@ docs piecemeal in the meantime.
   `sbatch_overrides` (keyed by block name, e.g. `segmentation`), merged over the
   default. The outer/orchestrator job's resources go under `sbatch_init`.
   Per-instance (a specific occurrence) overrides are still future work.
-- The outer sbatch header is not yet driven by `sbatch_init` — that wiring
-  (`run_pipeline.sh`/`_sbatch_pipeline.sh` passing sbatch CLI flags) is the next
-  PR; for now `sbatch_init` is resolved but only consumed once that lands.
+- The outer/orchestrator job's resources come from `sbatch_init`. `run_pipeline.sh`
+  turns them into sbatch CLI flags (via `python -m towbintools_pipeline.run_params
+  --sbatch-init`) which override `_sbatch_pipeline.sh`'s minimal header. So a new
+  cluster is adjusted entirely in the config now — cluster-specific outer
+  directives (`--account`, a custom `--gres` like the old `pipelinecapacity`
+  throttle, `--mem-per-cpu`) go under `sbatch_init.sbatch_extra_options`.
+- `run_pipeline.sh` forwards `-e/--experiment_dir` and `-t/--temp_dir` through to
+  the pipeline (previously only `-c`).
+- Still hardcoded in `_sbatch_pipeline.sh`: the `micromamba run -n towbintools`
+  env name (env-decoupling, separate milestone).
+- Temp working dir defaults to in-repo `./temp_files` (gitignored, transient,
+  cleared by cleanup_temp_files.sh). Decision: keep this default rather than
+  auto-placing it next to the experiment — the durable outputs and backup are
+  already external, and `-t <path>` covers the large-experiment / home-quota
+  case (e.g. put temp on the data storage). Not worth the bash complexity of
+  resolving the experiment dir before Python runs.
 
 ## Run backup / provenance
 - The pipeline snapshots the config(s) used and a `git_info.txt` (git

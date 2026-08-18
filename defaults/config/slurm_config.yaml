@@ -36,3 +36,5 @@ sbatch_gpus: "rtx6000:1"
 #   sbatch_cpus: 4
 #   sbatch_memory: 8G
 #   sbatch_time: 0-12:00:00
+#   sbatch_extra_options:
+#     - "--gres=pipelinecapacity:1"
