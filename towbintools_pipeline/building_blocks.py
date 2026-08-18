@@ -5,12 +5,12 @@ from abc import abstractmethod
 import numpy as np
 from towbintools.foundation.file_handling import add_dir_to_experiment_filemap
 
-from pipeline_scripts.utils import create_linker_command
-from pipeline_scripts.utils import get_input_and_output_files
-from pipeline_scripts.utils import get_output_name
-from pipeline_scripts.utils import get_python_command
-from pipeline_scripts.utils import pickle_objects
-from pipeline_scripts.utils import run_command
+from towbintools_pipeline.utils import create_linker_command
+from towbintools_pipeline.utils import get_input_and_output_files
+from towbintools_pipeline.utils import get_output_name
+from towbintools_pipeline.utils import get_python_command
+from towbintools_pipeline.utils import pickle_objects
+from towbintools_pipeline.utils import run_command
 
 # Resolve bundled scripts/models relative to this package, so the pipeline
 # works regardless of the current working directory.
@@ -109,7 +109,7 @@ DEFAULT_OPTIONS = {
         "rerun_molt_detection": [False],
         "molt_detection_method": ["deep_learning"],
         "molt_detection_model_path": [
-            os.path.join(_REPO_DIR, "models", "molt_detection_model.ckpt")
+            os.path.join(_REPO_DIR, "defaults", "models", "molt_detection_model.ckpt")
         ],
         "molt_detection_batch_size": [1],
         "molt_detection_volume": [
@@ -328,10 +328,10 @@ class SegmentationBuildingBlock(BuildingBlock):
 
         if block_config["segmentation_method"] in NON_LEARNING_METHODS:
             requires_gpu = False
-            script_path = "./pipeline_scripts/non_learning_segment.py"
+            script_path = "./towbintools_pipeline/non_learning_segment.py"
         elif block_config["segmentation_method"] in LEARNING_BASED_METHODS:
             requires_gpu = True
-            script_path = "./pipeline_scripts/learning_based_segment.py"
+            script_path = "./towbintools_pipeline/learning_based_segment.py"
         else:
             raise ValueError(
                 f"Segmentation method {block_config['segmentation_method']} not supported."
@@ -371,7 +371,7 @@ class SegmentationBuildingBlock(BuildingBlock):
 
 class StraighteningBuildingBlock(BuildingBlock):
     def __init__(self, block_config):
-        script_path = "./pipeline_scripts/straighten.py"
+        script_path = "./towbintools_pipeline/straighten.py"
         super().__init__(
             "straightening",
             OPTIONS_MAP["straightening"],
@@ -432,7 +432,7 @@ class StraighteningBuildingBlock(BuildingBlock):
 
 class QualityControlBuildingBlock(BuildingBlock):
     def __init__(self, block_config):
-        script_path = "./pipeline_scripts/quality_control.py"
+        script_path = "./towbintools_pipeline/quality_control.py"
         super().__init__(
             "quality_control",
             OPTIONS_MAP["quality_control"],
@@ -485,7 +485,7 @@ class QualityControlBuildingBlock(BuildingBlock):
 
 class MorphologyComputationBuildingBlock(BuildingBlock):
     def __init__(self, block_config):
-        script_path = "./pipeline_scripts/compute_morphology.py"
+        script_path = "./towbintools_pipeline/compute_morphology.py"
         super().__init__(
             "morphology_computation",
             OPTIONS_MAP["morphology_computation"],
@@ -522,7 +522,7 @@ class MorphologyComputationBuildingBlock(BuildingBlock):
 
 class MoltDetectionBuildingBlock(BuildingBlock):
     def __init__(self, block_config):
-        script_path = "./pipeline_scripts/detect_molts.py"
+        script_path = "./towbintools_pipeline/detect_molts.py"
         super().__init__(
             "molt_detection",
             OPTIONS_MAP["molt_detection"],
@@ -542,7 +542,7 @@ class MoltDetectionBuildingBlock(BuildingBlock):
 
 class FluorescenceQuantificationBuildingBlock(BuildingBlock):
     def __init__(self, block_config):
-        script_path = "./pipeline_scripts/quantify_fluorescence.py"
+        script_path = "./towbintools_pipeline/quantify_fluorescence.py"
         super().__init__(
             "fluorescence_quantification",
             OPTIONS_MAP["fluorescence_quantification"],

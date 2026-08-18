@@ -4,12 +4,23 @@ Running notes of things to include when the docs (README + book) are rewritten
 at the end of the refactor. Add to this as we change things; don't edit the
 docs piecemeal in the meantime.
 
+## Repo structure
+- `towbintools_pipeline/` = core pipeline package (`python -m
+  towbintools_pipeline...`). `defaults/` = bundled `config/` + `models/`
+  (fallbacks/examples). `scripts/` = automation bash. `tools/` = one-off
+  data-conversion helpers (auxiliary). `examples/custom_scripts/` = user
+  extension-point templates. `training/` and `gui/` are separate auxiliary
+  trees. Add a repo map to the README.
+- Run/install now via scripts/: `bash scripts/run_pipeline.sh`,
+  `bash scripts/install_pipeline.sh`.
+
 ## Installation / environment
 - Local install without micromamba, any OS: `conda env create -f
   requirements/environment_local.yml`, then `conda activate towbintools_local`.
 - `lxml` is needed to read OME-TIFF metadata cleanly (otherwise a warning).
 - Keep the existing cluster path documented too (micromamba + conda-lock +
-  `install_pipeline.sh`) — it is unchanged.
+  `scripts/install_pipeline.sh`) — install logic unchanged, only moved to
+  scripts/.
 - `pip install -e ".[dev]"` (via pyproject.toml) installs the pipeline as a
   package so it runs from anywhere (no repo-root / PYTHONPATH). Local install is
   two steps from the repo root: `conda env create -f
@@ -30,7 +41,7 @@ docs piecemeal in the meantime.
 - New `backend` config option: `slurm` (default, submits jobs) vs `local` (runs
   in-process, no slurm/micromamba).
 - Local run, from the repo root:
-  `python -m pipeline_scripts.init_pipeline -c <config> --temp_dir <dir>`.
+  `python -m towbintools_pipeline.init_pipeline -c <config> --temp_dir <dir>`.
 - For now the pipeline must be launched from the repo root (module invocation);
   this goes away once it is a proper installed package with an entry point.
 - `experiment_dir` can be given with `--experiment_dir` (overrides the config).
@@ -57,7 +68,7 @@ docs piecemeal in the meantime.
   `--mem-per-cpu` instead). `sbatch_extra_options` is a list of raw sbatch
   option strings rendered verbatim as `#SBATCH <option>` lines — cluster-specific
   directives (`--account`, `--mem-per-cpu`, `--partition`, custom gres) are now
-  config-only, no edits to `pipeline_scripts/utils.py`.
+  config-only, no edits to `towbintools_pipeline/utils.py`.
 - Per-block SLURM resources are still future work (currently one resource set
   for all worker jobs).
 

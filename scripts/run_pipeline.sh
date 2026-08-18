@@ -1,5 +1,8 @@
 #!/bin/bash
 
+# Run everything from the repo root, regardless of where this is called from.
+cd "$(dirname "$0")/.."
+
 # Function to check for git updates
 check_git_updates() {
     # Check if we're in a git repository
@@ -34,8 +37,8 @@ check_git_updates() {
 
         if [[ $REPLY =~ ^[Yy]$ ]]; then
             echo "Updating to the pipeline to the latest version..."
-            echo "This will not update the environment, for that, run the update_pipeline.sh script."
-            bash update_pipeline.sh --pipeline-only
+            echo "This will not update the environment, for that, run the scripts/update_pipeline.sh script."
+            bash scripts/update_pipeline.sh --pipeline-only
             echo "Pipeline updated successfully! Please restart the script."
         else
             echo "Continuing with current version..."
@@ -59,4 +62,4 @@ if [ ! -d "temp_files" ]; then
 fi
 
 # Pass command line arguments to the SBATCH script
-sbatch _sbatch_pipeline.sh "$@"
+sbatch scripts/_sbatch_pipeline.sh "$@"

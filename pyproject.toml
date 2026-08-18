@@ -27,4 +27,4 @@ dev = ["pytest"]
 
 [tool.setuptools]
 # Only the pipeline core; gui/ and training/ are packaged separately later.
-packages = ["pipeline_scripts"]
+packages = ["towbintools_pipeline"]
