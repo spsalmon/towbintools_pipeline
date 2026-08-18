@@ -106,7 +106,8 @@ def get_and_create_folders(config, subdir=None):
     os.makedirs(analysis_subdir, exist_ok=True)
     report_subdir = os.path.join(analysis_subdir, "report")
     os.makedirs(report_subdir, exist_ok=True)
-    pipeline_backup_dir = os.path.join(report_subdir, "pipeline_backup")
+    # Run provenance sits beside the report, not inside it (report holds results).
+    pipeline_backup_dir = os.path.join(analysis_subdir, "pipeline_backup")
     os.makedirs(pipeline_backup_dir, exist_ok=True)
 
     if subdir is not None:
@@ -177,9 +178,10 @@ def get_output_name(
     analysis_subdir = config["analysis_subdir"]
     report_subdir = config["report_subdir"]
     raw_dir_name = config.get("raw_dir_name", "raw")
+    analysis_dir_name = config.get("analysis_dir_name", "analysis")
 
     split = input_name.split("/")
-    if len(split) > 1 and "analysis" in split[0]:
+    if len(split) > 1 and analysis_dir_name in split[0]:
         input_name = split[1:]
         input_name = os.path.join(*input_name)
 
@@ -437,6 +439,20 @@ def cleanup_files(*filepaths):
 _REPO_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 
+def resolve_slurm_config_path(global_config, config_file):
+    # Where the SLURM resource file lives: an explicit slurm_config path
+    # (relative ones resolved against the main config file's directory), else
+    # the bundled default shipped alongside the example config.
+    slurm_config_path = global_config.get("slurm_config")
+    if slurm_config_path is None:
+        return os.path.join(_REPO_DIR, "defaults", "config", "slurm_config.yaml")
+    if not os.path.isabs(slurm_config_path):
+        return os.path.join(
+            os.path.dirname(os.path.abspath(config_file)), slurm_config_path
+        )
+    return slurm_config_path
+
+
 def merge_slurm_config(global_config, config_file):
     # SLURM resource requests live in a separate file for the cluster backend,
     # so the cluster knobs sit in one place. Merge them into the config at
@@ -445,16 +461,7 @@ def merge_slurm_config(global_config, config_file):
     if global_config.get("backend", "slurm") != "slurm":
         return global_config
 
-    slurm_config_path = global_config.get("slurm_config")
-    if slurm_config_path is None:
-        # Bundled default, shipped alongside the example config.
-        slurm_config_path = os.path.join(_REPO_DIR, "defaults", "config", "slurm_config.yaml")
-    elif not os.path.isabs(slurm_config_path):
-        # A relative path is resolved against the main config file's directory.
-        slurm_config_path = os.path.join(
-            os.path.dirname(os.path.abspath(config_file)), slurm_config_path
-        )
-
+    slurm_config_path = resolve_slurm_config_path(global_config, config_file)
     if not os.path.exists(slurm_config_path):
         print(f"SLURM config file not found, skipping: {slurm_config_path}")
         return global_config
@@ -466,6 +473,48 @@ def merge_slurm_config(global_config, config_file):
     for key, value in slurm_config.items():
         global_config.setdefault(key, value)
     return global_config
+
+
+def backup_run_config(global_config, config_file, temp_dir):
+    # Snapshot the config file(s) actually used into the run's temp dir (synced
+    # into the pipeline backup) as a write-only record of the run. Copies the
+    # main config, plus the resolved SLURM config for the cluster backend.
+    shutil.copy2(config_file, temp_dir)
+    if global_config.get("backend", "slurm") == "slurm":
+        slurm_config_path = resolve_slurm_config_path(global_config, config_file)
+        if os.path.exists(slurm_config_path):
+            shutil.copy2(slurm_config_path, temp_dir)
+
+
+def save_version_control_info(temp_dir):
+    # Record git branch/commit/status + interpreter/package versions into the
+    # run's temp dir (synced to the backup) so a run stays reproducible.
+    lines = []
+    try:
+        for label, rev in (("Git Branch", "--abbrev-ref"), ("Git Commit", "")):
+            out = subprocess.run(
+                ["git", "-C", _REPO_DIR, "rev-parse", *( [rev] if rev else [] ), "HEAD"],
+                capture_output=True,
+                text=True,
+            )
+            lines.append(f"{label}: {out.stdout.strip()}")
+        status = subprocess.run(
+            ["git", "-C", _REPO_DIR, "status"], capture_output=True, text=True
+        )
+        lines.append("Git Status:\n" + status.stdout.strip())
+    except Exception as e:
+        lines.append(f"Version control info unavailable: {e}")
+
+    lines.append(f"Python Version: {sys.version}")
+    try:
+        import towbintools
+
+        lines.append(f"towbintools Version: {towbintools.__version__}")
+    except Exception as e:
+        lines.append(f"towbintools Version unavailable: {e}")
+
+    with open(os.path.join(temp_dir, "git_info.txt"), "w") as f:
+        f.write("\n".join(lines) + "\n")
 
 
 def get_python_command(config):

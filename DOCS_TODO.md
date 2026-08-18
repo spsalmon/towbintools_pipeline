@@ -72,6 +72,34 @@ docs piecemeal in the meantime.
 - Per-block SLURM resources are still future work (currently one resource set
   for all worker jobs).
 
+## Run backup / provenance
+- The pipeline snapshots the config(s) used and a `git_info.txt` (git
+  branch/commit/status + interpreter/package versions) into the run's temp dir,
+  which syncs into the backup. Done in Python, so local runs are recorded too
+  (previously only the sbatch launcher did this, slurm-only).
+- The backup lives at `<experiment>/analysis/pipeline_backup/pipeline_<id>/`
+  (beside `report/`, not inside it — report holds results, backup holds
+  provenance).
+- Temp and backup are write-only records: the pipeline reads its config from the
+  original path given with `-c`, never from the temp copy. This is why a
+  relative `slurm_config:` resolves against the original config's directory. (The
+  old launcher copied the config into temp and ran that copy, so the sibling
+  `slurm_config.yaml` was silently not found.)
+
+## Config
+- `analysis_dir_name` (default `analysis`) is honored everywhere, including the
+  prefix-stripping in output naming. The `report/` subfolder name is currently
+  fixed (no config key).
+
+## Deferred design / cleanup (later PRs)
+- Folder inputs: decouple internal references from the analysis-dir name (today
+  the config repeats the prefix, so renaming `analysis_dir_name` forces
+  rewriting every reference). Aim to support: (a) absolute path, (b) name-only
+  (resolved under the experiment folder), (c) maybe relative. One place holds
+  the dir name.
+- Default config uses mixed single/double quotes for strings — make consistent
+  (or drop unnecessary quotes).
+
 ## Known cleanups to mention / finish before docs
 - `CustomBuildingBlock.create_command` was broken (missing `config` param) — fix
   and document custom blocks.
