@@ -185,6 +185,43 @@ def test_merge_slurm_config_missing_is_skipped(tmp_path):
     assert "sbatch_time" not in merged
 
 
+def test_resolve_block_slurm_default_and_override():
+    # A block with no override gets the shared defaults; an overridden type gets
+    # the defaults merged with its entry (the override winning per key).
+    from towbintools_pipeline.utils import resolve_block_slurm
+
+    config = {
+        "sbatch_cpus": 8,
+        "sbatch_memory": "16G",
+        "sbatch_time": "0-02:00:00",
+        "sbatch_overrides": {
+            "segmentation": {"sbatch_gpus": "rtx6000:1", "sbatch_memory": "32G"}
+        },
+    }
+
+    morph = resolve_block_slurm(config, "morphology_computation")
+    assert morph == {"sbatch_cpus": 8, "sbatch_memory": "16G", "sbatch_time": "0-02:00:00"}
+
+    seg = resolve_block_slurm(config, "segmentation")
+    assert seg["sbatch_gpus"] == "rtx6000:1"
+    assert seg["sbatch_memory"] == "32G"  # override wins
+    assert seg["sbatch_cpus"] == 8  # default kept
+
+
+def test_resolve_init_slurm():
+    # The outer job gets the defaults overlaid with sbatch_init.
+    from towbintools_pipeline.utils import resolve_init_slurm
+
+    config = {
+        "sbatch_cpus": 32,
+        "sbatch_memory": "64G",
+        "sbatch_init": {"sbatch_cpus": 4, "sbatch_memory": "8G"},
+    }
+
+    init = resolve_init_slurm(config)
+    assert init == {"sbatch_cpus": 4, "sbatch_memory": "8G"}
+
+
 def test_experiment_dir_cli_overrides_config(tmp_path):
     # The config records a wrong experiment_dir; --experiment_dir points at the
     # real data and must win, so the run finds the images and produces outputs.

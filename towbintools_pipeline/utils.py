@@ -475,6 +475,36 @@ def merge_slurm_config(global_config, config_file):
     return global_config
 
 
+_SBATCH_KEYS = (
+    "sbatch_cpus",
+    "sbatch_time",
+    "sbatch_memory",
+    "sbatch_gpus",
+    "sbatch_extra_options",
+)
+
+
+def _slurm_defaults(config):
+    # The shared resource default: the top-level sbatch_* keys.
+    return {key: config[key] for key in _SBATCH_KEYS if key in config}
+
+
+def resolve_block_slurm(config, block_name):
+    # Effective SLURM resources for a worker block: the shared defaults overlaid
+    # with any per-type entry under sbatch_overrides.
+    resolved = _slurm_defaults(config)
+    resolved.update(config.get("sbatch_overrides", {}).get(block_name, {}))
+    return resolved
+
+
+def resolve_init_slurm(config):
+    # Effective SLURM resources for the outer/orchestrator job: the shared
+    # defaults overlaid with sbatch_init.
+    resolved = _slurm_defaults(config)
+    resolved.update(config.get("sbatch_init", {}))
+    return resolved
+
+
 def backup_run_config(global_config, config_file, temp_dir):
     # Snapshot the config file(s) actually used into the run's temp dir (synced
     # into the pipeline backup) as a write-only record of the run. Copies the
@@ -560,23 +590,27 @@ def run_command(
         )
         return
 
+    # Per-block resources: shared defaults overlaid with this block type's
+    # sbatch_overrides entry.
+    block_slurm = resolve_block_slurm(config, script_name)
+
     # GPU directive only for blocks that need it and when a gpu is configured.
-    gpus = config.get("sbatch_gpus", None)
+    gpus = block_slurm.get("sbatch_gpus")
     if not requires_gpu:
         gpus = None
 
     # Cores requested follow n_jobs when sbatch_cpus is unset (and vice versa).
-    cores = config.get("sbatch_cpus", config.get("n_jobs"))
+    cores = block_slurm.get("sbatch_cpus", config.get("n_jobs"))
 
     script_path = create_sbatch_file(
         script_name,
         config["temp_dir"],
         cores,
-        config.get("sbatch_time"),
-        config.get("sbatch_memory"),
+        block_slurm.get("sbatch_time"),
+        block_slurm.get("sbatch_memory"),
         command,
         gpus=gpus,
-        extra_options=config.get("sbatch_extra_options"),
+        extra_options=block_slurm.get("sbatch_extra_options"),
         run_linker=run_linker,
         linker_command=linker_command,
     )
