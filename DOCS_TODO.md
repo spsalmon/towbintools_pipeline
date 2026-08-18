@@ -326,9 +326,26 @@ Four tiers:
   directory. Renaming the KEY is a breaking config change, so it stays deferred
   and separate from the (now-done) ref decoupling.
 
+## CLI / commands
+- The installed command is a subcommand dispatcher (`towbintools_pipeline/cli.py`):
+  - `towbintools-pipeline run [config] [-c CONFIG] [-e ...] [-t ...]` — run the
+    pipeline. The config may be positional or `-c` (`-c` wins if both are given).
+  - `towbintools-pipeline init-configs [DIR] [--force]` — copy the bundled default
+    `config.yaml` + `slurm_config.yaml` into DIR (default cwd), so a user can start
+    from them without digging into the installed package. Configs only (the bundled
+    models are large; it prints where they live); skips existing files unless
+    `--force`. Both files are copied because the main config references the slurm
+    one by a relative path.
+- Back-compat: with no recognised subcommand the arguments go straight to `run`,
+  so the old `towbintools-pipeline -c config.yaml` still works, as does
+  `python -m towbintools_pipeline.init_pipeline ...` (the cluster launcher path,
+  untouched). New extras (e.g. a `start-gui`) slot in as further subcommands, each
+  lazy-importing its module so `run` never pays for their dependencies.
+
 ## CLI flags — the rule
-- Precedence is uniform: CLI flag > config key > default. `-c/--config` is the
-  only flag with no config counterpart (by definition) and is required.
+- Precedence is uniform: CLI flag > config key > default. The config is the only
+  required input (positional or `-c/--config`) and has no config-key counterpart
+  (by definition).
 - Flags cover what varies per invocation or per machine (`-e/--experiment_dir`
   where the data is, `-t/--temp_dir` where scratch goes); everything scientific
   stays in the config. Deliberately no flag for `analysis_dir_name` — it is an
@@ -347,29 +364,24 @@ Four tiers:
 ## Backlog / future work (roughly priority-ordered)
 Single index of what is still to come; details live in the sections above where
 noted. Higher items first. (DONE: config-validation of input paths + unknown-key
-rejection — see "Config validation".)
-1. **Default-config scaffolding command** — a command that copies the bundled
-   `defaults/config/*.yaml` into the cwd, so users get a starter config without
-   digging into the installed package (relevant once pip-installed from GitHub).
-   Configs only by default (models are large — flag or pointer instead);
-   non-destructive (no silent overwrite). Resolve the bundled files via
-   `importlib.resources`. Pairs later with an optional bundled-config fallback for `-c`.
-2. **Extras adaptation (PR F)** — bring `tools/`, `gui/`, `training/`,
+rejection — see "Config validation"; the `init-configs` scaffolding command and the
+subcommand dispatcher — see "CLI / commands".)
+1. **Extras adaptation (PR F)** — bring `tools/`, `gui/`, `training/`,
    `examples/custom_scripts/` onto the new layout + code conventions (see the
    "Code conventions" scope note). Deferred until the core path is agreed.
-3. **Docs rewrite (PR G, last)** — README + `book/` overhaul, driven from this
+2. **Docs rewrite (PR G, last)** — README + `book/` overhaul, driven from this
    whole file. Only after the core overhaul is agreed with the product owner.
-4. **"Real" API** — an object-oriented / stepwise outer orchestration in Python
+3. **"Real" API** — an object-oriented / stepwise outer orchestration in Python
    (drive blocks one at a time, opt-in linking) alongside the current config-driven
    run. Larger design effort; optional.
-5. **Publish to PyPI** — currently installed from the repo/checkout only; publishing
+4. **Publish to PyPI** — currently installed from the repo/checkout only; publishing
    would make `pip install towbintools-pipeline` work directly. Easy later step.
-6. **Config validation, further** — optional warning-level "contents reasonable"
+5. **Config validation, further** — optional warning-level "contents reasonable"
    checks (e.g. `experiment_dir` contains a `raw/`), and running `validate_config`
    in the login-node pre-flight (see the follow-up under "Config validation").
-7. **(lower) Warning-log volume** — some warnings can fire once per image and blow
+6. **(lower) Warning-log volume** — some warnings can fire once per image and blow
    up the `.out` file(s). Idea: keep a list of ignorable warnings in a repo file
    (adjustable, but out of the user's config surface) and filter those when logging.
-8. **(lower) Output-filename suffix** — optional (bool, default off) suffix on output
+7. **(lower) Output-filename suffix** — optional (bool, default off) suffix on output
    names. Deferred/parked: the data handling / read-in is changing soon, so not worth
    doing against the current scheme.

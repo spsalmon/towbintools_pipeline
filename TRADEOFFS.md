@@ -91,6 +91,16 @@ re-run it (handled in install/update), and a dep pyproject needs but the lock
 lacks would install nothing and only surface as an import error at runtime.*
 Reversible: easy.
 
+**The installed command dispatches subcommands; an unknown first arg means `run`.**
+`towbintools-pipeline` routes `run` / `init-configs` and, for anything else, passes
+the arguments straight to the runner — so `towbintools-pipeline -c config.yaml`
+(and a bare positional config) keep working after subcommands were added, and
+extras can attach as further subcommands.
+*Cost: the first argument is matched against subcommand names before being treated
+as run args, so a config file literally named `run` or `init-configs` given
+positionally would be read as the subcommand. Use `-c` for such a path.*
+Reversible: easy.
+
 ## Configuration
 
 **Folder refs are resolved by basename to `{analysis_dir_name}/{name}`.**
