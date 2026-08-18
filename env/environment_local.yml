@@ -1,7 +1,7 @@
 # Cross-platform, micromamba-free base environment for running the pipeline
 # core locally (Windows/Linux/macOS). Two steps, from the repo root:
 #
-#   conda env create -f requirements/environment_local.yml
+#   conda env create -f env/environment_local.yml
 #   conda activate towbintools_local
 #   pip install -e ".[dev]"     # installs the pipeline + deps from pyproject.toml
 #

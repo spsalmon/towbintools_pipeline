@@ -18,9 +18,38 @@ list to hand to a reviewer, this one feeds the docs.
 - Run/install now via scripts/: `bash scripts/run_pipeline.sh`,
   `bash scripts/install_pipeline.sh`.
 
+## Repo map & deployment lifecycle (turn into a README diagram at the docs step)
+Four tiers:
+- PACKAGE: `towbintools_pipeline/` (core + `workers/` + `defaults/`) -- the
+  installable, self-contained pipeline.
+- DEPLOYMENT: `env/` and `scripts/`, which pair up. `env/` = define & build the
+  conda environment (spec + generated locks + `build_env.sh`/`generate_lock.sh`);
+  `scripts/` = operate the pipeline. Flow:
+    `env/environment.yml` --generate_lock.sh--> `env/conda-linux-64.lock`
+      --build_env.sh--> the `towbintools` env
+    `scripts/install_pipeline.sh` orchestrates that build (+ `pip install -e .
+      --no-deps` once PR C lands, to register the package + entry point)
+    `scripts/run_pipeline.sh` -> `scripts/_init_pipeline.sh` -> the package
+      (submits the self-propagating slurm chain)
+- EXTRAS: `tools/`, `training/`, `gui/` (each owns its own launch scripts),
+  `analysis_and_plots/`, `examples/`.
+- META: `README`, `pyproject.toml`, `book/` (docs), `tests/`, TRADEOFFS/DOCS_TODO.
+- `scripts/` by lifecycle: SETUP (`install_pipeline` cluster,
+  `install_pipeline_local` local, `update_pipeline`) | RUN (`run_pipeline` ->
+  `init_pipeline`) | MAINTAIN (`cleanup_temp_files`).
+
+## Doc path fixes for the rewrite (files moved/renamed in the layout PR)
+- `book/usage/UsingGUI.md`: `bash launch_gui.sh` -> `bash gui/launch_gui.sh`.
+- `book/getting_started/Update.md`: `./requirements/conda-lock.yml` ->
+  `./env/conda-lock.yml`.
+
 ## Installation / environment
-- Local install without micromamba, any OS: `conda env create -f
-  requirements/environment_local.yml`, then `conda activate towbintools_local`.
+- Local install without micromamba, any OS: run `bash scripts/install_pipeline_local.sh`
+  (creates the env + editable install via `conda run`), then `conda activate
+  towbintools_local`. Manual equivalent: `conda env create -f
+  env/environment_local.yml`, `conda activate towbintools_local`,
+  `pip install -e ".[dev]"`. Three install paths: cluster
+  (`install_pipeline.sh`), local (`install_pipeline_local.sh`), manual package.
 - `lxml` is needed to read OME-TIFF metadata cleanly (otherwise a warning).
 - Keep the existing cluster path documented too (micromamba + conda-lock +
   `scripts/install_pipeline.sh`) — install logic unchanged, only moved to
@@ -28,7 +57,7 @@ list to hand to a reviewer, this one feeds the docs.
 - `pip install -e ".[dev]"` (via pyproject.toml) installs the pipeline as a
   package so it runs from anywhere (no repo-root / PYTHONPATH). Local install is
   two steps from the repo root: `conda env create -f
-  requirements/environment_local.yml`, then `pip install -e ".[dev]"`. (conda
+  env/environment_local.yml`, then `pip install -e ".[dev]"`. (conda
   resolves a pip `-e .` relative to the yml's dir, so we don't put it in the yml.)
 - Explain the dependency layering:
   1. pyproject.toml = what the pipeline needs (abstract deps, single source).
@@ -55,7 +84,7 @@ list to hand to a reviewer, this one feeds the docs.
   default `<experiment_dir>/temp_files`. Nothing is written inside the repo by
   default (outputs already live under `experiment_dir`). Note the outer launch
   script still makes a repo-root `sbatch_output/` — part of the
-  `init_pipeline.sh` follow-up below.
+  `_init_pipeline.sh` follow-up below.
 
 ## Which script does what
 - `scripts/run_pipeline.sh` — the user entry point, runs on the login node:
@@ -63,9 +92,10 @@ list to hand to a reviewer, this one feeds the docs.
   arguments, resolves the python launcher, derives the outer job's sbatch flags
   from `sbatch_init`, submits. No longer auto-updates from git; to update, run
   `scripts/update_pipeline.sh` (`--pipeline-only` to skip the env rebuild).
-- `scripts/init_pipeline.sh` — the submitted job, named after the module it
-  launches: a `#SBATCH` header (which must live in a file for sbatch), the env
-  activation, and `"$@"` passed straight through. Nothing else belongs here.
+- `scripts/_init_pipeline.sh` — the submitted job, named after the module it
+  launches; the leading `_` marks it internal (run_pipeline.sh submits it, the
+  user never runs it). A `#SBATCH` header (which must live in a file for sbatch),
+  the env activation, and `"$@"` passed straight through. Nothing else belongs here.
 - Everything else is Python. `setup_run_dir()` resolves the per-run directory
   (`pipeline_<jobid>` under slurm, `pipeline_<timestamp>` otherwise) and, under
   slurm, moves the launcher's logs into it — so the temp path has a single
@@ -147,7 +177,7 @@ list to hand to a reviewer, this one feeds the docs.
   it would collide with the block-name namespace.
 - The outer/orchestrator job's resources come from `sbatch_init`. `run_pipeline.sh`
   turns them into sbatch CLI flags (via `python -m towbintools_pipeline.run_params
-  --sbatch-init`) which override `init_pipeline.sh`'s minimal header. So a new
+  --sbatch-init`) which override `_init_pipeline.sh`'s minimal header. So a new
   cluster is adjusted entirely in the config now — cluster-specific outer
   directives (`--account`, a custom `--gres` like the old `pipelinecapacity`
   throttle, `--mem-per-cpu`) go under `sbatch_init.sbatch_extra_options`.
@@ -220,5 +250,5 @@ list to hand to a reviewer, this one feeds the docs.
   when packaging.
 - The outer orchestrator job's resources are now config-driven: `run_pipeline.sh`
   passes sbatch CLI flags built from `sbatch_init`, overriding the minimal header
-  in `init_pipeline.sh`. The env launcher is now overridable too (see
+  in `_init_pipeline.sh`. The env launcher is now overridable too (see
   `TOWBINTOOLS_PYTHON` under "Which script does what").

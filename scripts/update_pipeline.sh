@@ -25,6 +25,6 @@ if [[ "$PIPELINE_ONLY" == false ]]; then
     # Build a fresh environment prefix and switch the `towbintools` symlink over to
     # it, instead of mutating the live env in place. An in-place update corrupts the
     # env whenever micromamba cannot remove a busy file; building fresh + swapping
-    # never has that problem. See requirements/build_env.sh.
-    bash ./requirements/build_env.sh
+    # never has that problem. See env/build_env.sh.
+    bash ./env/build_env.sh
 fi

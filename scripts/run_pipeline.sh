@@ -36,4 +36,4 @@ export TOWBINTOOLS_PYTHON="${TOWBINTOOLS_PYTHON:-${CONFIG_PYTHON:-$HOME/.local/b
 SBATCH_INIT_FLAGS=$($TOWBINTOOLS_PYTHON -m towbintools_pipeline.run_params --sbatch-init -c "$CONFIG_FILE" 2>/dev/null)
 
 # Pass the resource flags and the forwarded arguments to the SBATCH script.
-sbatch $SBATCH_INIT_FLAGS scripts/init_pipeline.sh "$@"
+sbatch $SBATCH_INIT_FLAGS scripts/_init_pipeline.sh "$@"
