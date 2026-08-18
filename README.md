@@ -1,5 +1,7 @@
 # TOWBINTOOLS PIPELINE
 
+[![tests](https://github.com/quasar1357/towbintools_pipeline/actions/workflows/tests.yml/badge.svg)](https://github.com/quasar1357/towbintools_pipeline/actions/workflows/tests.yml)
+
 This is still in early development, hopefully in the future it will replace all of the lab's dozens of different bash scripts laying around and give the opportunity to everyone to easily customize their image analysis pipeline.
 
 The documentation for the package used as a backbone for the pipeline can be found here : <https://towbintools.readthedocs.io/en/latest/towbintools.html>

@@ -148,9 +148,43 @@ Four tiers:
   instead. The prints it makes are flushed before the concatenation, so they do
   land in the combined log.
 
+## Code conventions (for the contributing/docs section)
+- Section dividers in a module are `# ---- Title ----` (capitalised, spaces around
+  the dashes), two blank lines before, two after.
+- Imports are grouped stdlib / third-party / first-party (`towbintools_pipeline`),
+  one blank line between groups. (`workers/straightening.py` keeps a `# noqa: E402`
+  block because it sets an OpenBLAS env var before importing.)
+- Multiple names from the same module go in one `from x import a, b, c` statement,
+  wrapped in parentheses (one name per line, trailing comma) when it exceeds the
+  line length -- the isort/black default, not one-import-per-line.
+- Two blank lines between top-level functions/classes, one between methods
+  (already holds package-wide; verified, no exceptions).
+- Module docstrings on the orchestration entry points (init_pipeline, block_linker,
+  building_blocks, run_params); the workers are short enough to read directly.
+- Scope: these conventions were applied to the core package `towbintools_pipeline/`
+  (incl. `workers/`) and the `tests/` suite. NOT yet applied to the extras --
+  `tools/`, `gui/`, `training/`, `examples/custom_scripts/` -- which are deferred
+  to the non-core PR (F); bring them in line then. (`scripts/` is bash, N/A.)
+
 ## Testing
 - `python -m pytest tests/ -v` runs the local-backend smoke test (synthetic
   images, no bundled data). Document how to add more tests.
+- Unit tests cover the pure helpers (config validation + parsing, output naming,
+  folder refs, input selection, slurm resolution, logging) alongside the local
+  e2e smoke test, and are grouped into labelled sections in the test file.
+- Known untested area: `get_experiment_time_from_filemap` (the T0 / incremental
+  ExperimentTime logic). The e2e test runs with `get_experiment_time=False`, so
+  this path has no coverage; a faithful test needs a filemap with acquisition
+  dates and exercises the recursive recompute branch. Worth adding later.
+- CI (`.github/workflows/tests.yml`): on every push and pull request, a GitHub
+  Actions job does `pip install -e ".[dev]"` + `pytest` on Ubuntu / Python 3.12
+  — the same pip path as the local install (`environment_local.yml`), so a red
+  build means a fresh local install would fail too. Deliberately NOT the cluster
+  micromamba/conda-lock build (that is a hash-pinned Linux artifact for
+  production, overkill for testing logic). pyproject deps are unpinned, so an
+  upstream release can turn CI red on its own; a version matrix and dependency
+  pinning are deferred (widen the workflow's single 3.12 to a matrix later if the
+  product owner wants multi-version support).
 
 ## Config
 - Document `backend` (`slurm` vs `local`).
@@ -239,6 +273,32 @@ Four tiers:
   `analysis_dir_name`. `raw` and absolute paths pass through. Applies to
   directory refs only, NOT report-column refs like `molt_detection_columns`. The
   shipped config now uses the prefix-free form.
+
+## Config validation
+- The config is checked once at startup (`validate_config`, before any run dir
+  or job is created) and every problem is reported together, not one at a time.
+  Checks: required keys (`experiment_dir`, `building_blocks`), known block names
+  (with a hint that `classification` became `quality_control`), per-block option
+  lists holding one value per block of that type (or a single broadcast value),
+  and the enumerated `backend` / `report_format` values.
+- The per-block length rule mirrors the one `parse_building_blocks_config` still
+  enforces later; validation front-loads it so the whole config fails fast and
+  at once. See the TRADEOFFS entry on the small duplication.
+- A bad config ABORTS the run: `validate_config` raises, nothing catches it, the
+  process exits non-zero before any run dir/backup/job exists (on slurm the outer
+  job fails and the block chain never starts).
+- `building_blocks` rule is permissive by design — "every entry is a KNOWN type",
+  NOT "one of each". No required block, no ordering/dependency check, duplicates
+  are fine (several `segmentation` blocks is normal).
+- OPEN QUESTIONS for the product owner (currently NOT validated — confirm this is
+  intended before hardening):
+  - inter-block dependencies / order (e.g. a `morphology_computation` whose mask
+    is produced by an earlier `segmentation`) — a wrong order just yields "no
+    input files" at run time, not an upfront error.
+  - folder-ref existence — a mask/source ref pointing at a folder no earlier block
+    produces is not caught here.
+  - unknown/typo'd option keys (a param not in `OPTIONS_MAP`) are silently ignored,
+    not flagged.
 
 ## Deferred design / cleanup (later PRs)
 - Folder inputs, further: `resolve_ref` covers name-only refs (done). Still open

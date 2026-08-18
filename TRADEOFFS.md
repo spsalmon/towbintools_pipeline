@@ -136,6 +136,16 @@ to the bare header. Mitigated by the pre-flight
 `python -m towbintools_pipeline.run_params --sbatch-init -c <config>`.*
 Reversible: easy.
 
+**Config validation re-checks per-block list lengths that the parser also checks.**
+`validate_config` runs at startup to fail fast and report every problem at once;
+its per-block length rule restates the one `parse_building_blocks_config` still
+enforces (as a backstop) deeper in the build. Kept as two places rather than
+routing the parser through the validator, which would be a larger change to a
+working code path.
+*Cost: the length/broadcast rule lives in two functions and could drift; a change
+to one must be mirrored in the other.*
+Reversible: easy — the parser's asserts could later defer to `validate_config`.
+
 ## Files and provenance
 
 **The pipeline reads its config from the original path; temp and backup are write-only.**
