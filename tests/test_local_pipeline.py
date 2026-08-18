@@ -537,6 +537,56 @@ def test_init_pipeline_importable_without_side_effects():
     assert callable(ip.build_blocks_for_subdir)
 
 
+# ---- CLI dispatch and scaffolding ----
+
+
+def test_get_args_positional_and_flag_config():
+    from towbintools_pipeline.init_pipeline import get_args
+
+    assert get_args(["exp.yaml"]).config == "exp.yaml"
+    assert get_args(["-c", "exp.yaml"]).config == "exp.yaml"
+    # -c wins if both are given.
+    assert get_args(["pos.yaml", "-c", "flag.yaml"]).config == "flag.yaml"
+
+
+def test_get_args_requires_config():
+    from towbintools_pipeline.init_pipeline import get_args
+
+    with pytest.raises(SystemExit):
+        get_args([])
+
+
+def test_cli_dispatch_routes_to_run(monkeypatch):
+    import towbintools_pipeline.cli as cli
+    import towbintools_pipeline.init_pipeline as ip
+
+    calls = []
+    monkeypatch.setattr(ip, "main", lambda argv=None: calls.append(argv))
+
+    cli.main(["run", "-c", "x.yaml"])
+    cli.main(["config.yaml"])  # no subcommand -> run (back-compat)
+    assert calls == [["-c", "x.yaml"], ["config.yaml"]]
+
+
+def test_cli_init_config_writes_configs(tmp_path):
+    import towbintools_pipeline.cli as cli
+
+    cli.main(["init-configs", str(tmp_path)])
+    for name in ("config.yaml", "slurm_config.yaml"):
+        assert (tmp_path / name).is_file()
+
+
+def test_cli_init_config_non_destructive(tmp_path):
+    import towbintools_pipeline.cli as cli
+
+    sentinel = tmp_path / "config.yaml"
+    sentinel.write_text("keep me")
+    cli.main(["init-configs", str(tmp_path)])
+    assert sentinel.read_text() == "keep me"  # existing file preserved
+    cli.main(["init-configs", str(tmp_path), "--force"])
+    assert sentinel.read_text() != "keep me"  # --force overwrites
+
+
 # ---- Run directory, backup, cleanup ----
 
 
