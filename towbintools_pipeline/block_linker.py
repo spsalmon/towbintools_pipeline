@@ -6,7 +6,9 @@ from towbintools.foundation.file_handling import add_dir_to_experiment_filemap
 from towbintools.foundation.file_handling import read_filemap
 from towbintools.foundation.file_handling import write_filemap
 
+from towbintools_pipeline.utils import block_label
 from towbintools_pipeline.utils import cleanup_files
+from towbintools_pipeline.utils import concatenate_sbatch_logs
 from towbintools_pipeline.utils import load_pickles
 from towbintools_pipeline.utils import merge_and_save_records
 from towbintools_pipeline.utils import pickle_objects
@@ -104,6 +106,12 @@ def main():
 
     # Update experiment_filemap with previous block's result
     if current_block_index > 0:
+        # The linker runs right after the block it follows, so this is where a
+        # block's completion is reported.
+        print(
+            f"### Finished block {block_label(building_blocks, current_block_index - 1)} ###",
+            flush=True,
+        )
         previous = building_blocks[current_block_index - 1]
         previous_block, previous_subdir, previous_config = (
             previous["block"],
@@ -143,12 +151,32 @@ def main():
             current["config"],
         )
         experiment_filemap = read_filemap(current_config["filemap_path"])
-        print(f"Running {current_building_block} ...")
+        print(
+            f"### Starting block {block_label(building_blocks, current_block_index)} ###"
+        )
+        print(f"Running {current_building_block} ...", flush=True)
         result = current_building_block.run(
             experiment_filemap, current_config, subdir=current_subdir
         )
+        # The count of finished blocks doubles as a progress marker while the
+        # combined log is only a snapshot of a run still going.
+        closing = (
+            f"pipeline still running -- {current_block_index}"
+            f"/{len(building_blocks)} blocks done so far"
+        )
     else:
-        print("End of the pipeline!")
+        print(f"### End of the pipeline! ({len(building_blocks)} blocks) ###", flush=True)
+        closing = (
+            f"PIPELINE FINISHED -- all {len(building_blocks)} blocks completed, "
+            "the run reached its end"
+        )
+
+    # Refresh the combined logs last, once the block above has been submitted, so
+    # they hold everything written up to this link. Sync again to carry them (and
+    # the filemap updated above) into the backup.
+    concatenate_sbatch_logs(temp_dir, closing)
+    if current_block_index > 0:
+        sync_backup_folder(temp_dir, pipeline_backup_dir)
 
 
 if __name__ == "__main__":

@@ -51,6 +51,34 @@ docs piecemeal in the meantime.
   script still makes a repo-root `sbatch_output/` — part of the
   `_sbatch_pipeline.sh` follow-up below.
 
+## Log output
+- The run prints a numbered plan of the blocks up front, then a
+  `### Starting block 3/12 straightening ###` / `### Finished block ... ###` pair
+  around each one, and a closing line. Same on both backends: on slurm the
+  linker is appended to the worker's job script, so the finish line and the next
+  block's submission land in that block's sbatch `.out` file. A
+  `Submitting <block> to slurm ...` line precedes sbatch's own
+  "Submitted batch job <id>" so the job id has context.
+- Prints that precede a subprocess are flushed, otherwise Python's block
+  buffering (stdout redirected to a file under slurm) reorders them after the
+  worker's output.
+- Slurm log layout: every job writes into `<temp>/pipeline_<id>/sbatch_output/`,
+  the outer one as `init-<id>.out/.err` (so it sorts first), each block as
+  `<block>-<id>.out/.err`. The linker joins them per stream into
+  `<temp>/pipeline_<id>/pipeline-<id>.out` (and `.err`) — one file to read the
+  whole chain — with a `===== <file> =====` header per section. Originals are
+  kept, and the combined files sync into the run backup.
+- The combined files are rebuilt at every link, not just at the end, so a run
+  that dies mid-chain still leaves a readable log. Their last line says which:
+  `PIPELINE FINISHED -- all N blocks completed` only ever gets written by the
+  link that found no next block, so anything else (`pipeline still running --
+  k/N blocks done so far`) means the run stopped without reaching the end.
+- Deliberately NOT a separate end-of-run slurm job: it would sit in the queue,
+  so the completion marker could arrive long after the run actually ended, and
+  a failed submission would lose the marker entirely. The final link writes it
+  instead. The prints it makes are flushed before the concatenation, so they do
+  land in the combined log.
+
 ## Testing
 - `python -m pytest tests/ -v` runs the local-backend smoke test (synthetic
   images, no bundled data). Document how to add more tests.
