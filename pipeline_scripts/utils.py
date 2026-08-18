@@ -3,6 +3,7 @@ import os
 import pickle
 import shutil
 import subprocess
+import sys
 
 import numpy as np
 import polars as pl
@@ -433,13 +434,32 @@ def cleanup_files(*filepaths):
 # ----BOILERPLATE CODE FOR SLURM----
 
 
+def get_python_command(config):
+    # Command prefix used to launch python workers. Slurm/micromamba setups keep
+    # the micromamba runner; local runs use the active python interpreter.
+    if config.get("backend", "slurm") == "local":
+        return config.get("python_command", sys.executable)
+    micromamba_path = config.get("micromamba_path", "~/.local/bin/micromamba")
+    return f"{micromamba_path} run -n towbintools python3"
+
+
 def create_linker_command(
-    micromamba_path,
+    python_command,
     temp_dir,
     result,
 ):
-    linker_command = f"{micromamba_path} run -n towbintools python3 -m pipeline_scripts.block_linker --temp_dir {temp_dir} --result {result}"
+    linker_command = f"{python_command} -m pipeline_scripts.block_linker --temp_dir {temp_dir} --result {result}"
     return linker_command
+
+
+def run_command_local(command, run_linker=True, linker_command=None):
+    # Run a block's command synchronously, then chain to the linker (next block).
+    # Skip empty / commented-out commands (a block with no input files to process).
+    stripped = command.strip()
+    if stripped and not stripped.startswith("#"):
+        subprocess.run(command, shell=True, check=True)
+    if run_linker and linker_command is not None:
+        subprocess.run(linker_command, shell=True, check=True)
 
 
 def run_command(
@@ -450,6 +470,13 @@ def run_command(
     linker_command=None,
     requires_gpu=False,
 ):
+    # Local backend: run the worker (and linker) directly instead of submitting to slurm.
+    if config.get("backend", "slurm") == "local":
+        run_command_local(
+            command, run_linker=run_linker, linker_command=linker_command
+        )
+        return
+
     gpus = config.get("sbatch_gpus", None)
     if requires_gpu and gpus is not None:
         script_path = create_sbatch_file(
