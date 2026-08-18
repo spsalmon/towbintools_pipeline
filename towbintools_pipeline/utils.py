@@ -4,6 +4,7 @@ import pickle
 import shutil
 import subprocess
 import sys
+from datetime import datetime
 
 import numpy as np
 import polars as pl
@@ -212,11 +213,47 @@ def get_output_name(
     return output_name
 
 
-def create_temp_folders(temp_dir):
-    os.makedirs(temp_dir, exist_ok=True)
-    os.makedirs(os.path.join(temp_dir, "pickles"), exist_ok=True)
-    os.makedirs(os.path.join(temp_dir, "batch"), exist_ok=True)
-    os.makedirs(os.path.join(temp_dir, "sbatch_output"), exist_ok=True)
+def setup_run_dir(temp_dir, backend="slurm"):
+    # Give the run its own directory under temp_dir (slurm job id, or start time
+    # without slurm), create its folder structure and, on slurm, move the
+    # launcher's logs in. Returns the run directory.
+    job_id = os.environ.get("SLURM_JOB_ID")
+    if not job_id:
+        run_dir = os.path.join(temp_dir, datetime.now().strftime("pipeline_%Y%m%d-%H%M%S"))
+    else:
+        run_dir = os.path.join(temp_dir, f"pipeline_{job_id}")
+
+    # batch/ and sbatch_output/ only hold generated job scripts and their slurm
+    # logs, so they are pointless for a local run.
+    os.makedirs(os.path.join(run_dir, "pickles"), exist_ok=True)
+    if backend == "slurm":
+        os.makedirs(os.path.join(run_dir, "batch"), exist_ok=True)
+        os.makedirs(os.path.join(run_dir, "sbatch_output"), exist_ok=True)
+
+    if not job_id:
+        return run_dir
+
+    log_dir = os.path.join(run_dir, "sbatch_output")
+    try:
+        # The launcher's -o/-e land next to the submit directory; bring them in
+        # with the block logs and point slurm at their new home.
+        moved = {}
+        for stream, suffix in (("StdOut", "out"), ("StdErr", "err")):
+            target = os.path.join(log_dir, f"init_pipeline-{job_id}.{suffix}")
+            source = os.path.join("sbatch_output", f"pipeline-{job_id}.{suffix}")
+            if os.path.exists(source):
+                shutil.move(source, target)
+            moved[stream] = target
+        subprocess.run(
+            ["scontrol", "update", f"JobId={job_id}"]
+            + [f"{stream}={path}" for stream, path in moved.items()],
+            check=False,
+        )
+    except Exception as e:
+        print(f"Warning: could not move the launcher logs into {log_dir}: {e}")
+    # The launcher's repo-root sbatch_output/ is now an empty landing zone. A
+    # future post-run cleanup script could remove it (optionally).
+    return run_dir
 
 
 def process_input_output_files(input_files, output_dir, rerun):

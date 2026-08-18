@@ -4,6 +4,9 @@ Running notes of things to include when the docs (README + book) are rewritten
 at the end of the refactor. Add to this as we change things; don't edit the
 docs piecemeal in the meantime.
 
+Decisions that cost something go in `TRADEOFFS.md` instead — that file is the
+list to hand to a reviewer, this one feeds the docs.
+
 ## Repo structure
 - `towbintools_pipeline/` = core pipeline package (`python -m
   towbintools_pipeline...`). `defaults/` = bundled `config/` + `models/`
@@ -49,7 +52,24 @@ docs piecemeal in the meantime.
   default `<experiment_dir>/temp_files`. Nothing is written inside the repo by
   default (outputs already live under `experiment_dir`). Note the outer launch
   script still makes a repo-root `sbatch_output/` — part of the
-  `_sbatch_pipeline.sh` follow-up below.
+  `init_pipeline.sh` follow-up below.
+
+## Which script does what
+- `scripts/run_pipeline.sh` — the user entry point, runs on the login node:
+  update check, creates the repo-root `sbatch_output/` landing zone, finds the
+  config among the arguments, derives the outer job's sbatch flags from
+  `sbatch_init`, submits.
+- `scripts/init_pipeline.sh` — the submitted job, named after the module it
+  launches: a `#SBATCH` header (which must live in a file for sbatch), the env
+  activation, and `"$@"` passed straight through. Nothing else belongs here.
+- Everything else is Python. `setup_run_dir()` resolves the per-run directory
+  (`pipeline_<jobid>` under slurm, `pipeline_<timestamp>` otherwise) and, under
+  slurm, moves the launcher's logs into it — so the temp path has a single
+  definition instead of one in bash and one in argparse. Tradeoff: if the env is
+  broken and Python never starts, those logs stay in the repo-root
+  `sbatch_output/` instead of moving into the run dir.
+- Only `batch/` and `sbatch_output/` are slurm-specific; every other write
+  (outputs, report, backup, provenance, pickles) happens on both backends.
 
 ## Log output
 - The run prints a numbered plan of the blocks up front, then a
@@ -63,7 +83,7 @@ docs piecemeal in the meantime.
   buffering (stdout redirected to a file under slurm) reorders them after the
   worker's output.
 - Slurm log layout: every job writes into `<temp>/pipeline_<id>/sbatch_output/`,
-  the outer one as `init-<id>.out/.err` (so it sorts first), each block as
+  the outer one as `init_pipeline-<id>.out/.err` (so it sorts first), each block as
   `<block>-<id>.out/.err`. The linker joins them per stream into
   `<temp>/pipeline_<id>/pipeline-<id>.out` (and `.err`) — one file to read the
   whole chain — with a `===== <file> =====` header per section. Originals are
@@ -114,13 +134,13 @@ docs piecemeal in the meantime.
   it would collide with the block-name namespace.
 - The outer/orchestrator job's resources come from `sbatch_init`. `run_pipeline.sh`
   turns them into sbatch CLI flags (via `python -m towbintools_pipeline.run_params
-  --sbatch-init`) which override `_sbatch_pipeline.sh`'s minimal header. So a new
+  --sbatch-init`) which override `init_pipeline.sh`'s minimal header. So a new
   cluster is adjusted entirely in the config now — cluster-specific outer
   directives (`--account`, a custom `--gres` like the old `pipelinecapacity`
   throttle, `--mem-per-cpu`) go under `sbatch_init.sbatch_extra_options`.
 - `run_pipeline.sh` forwards `-e/--experiment_dir` and `-t/--temp_dir` through to
   the pipeline (previously only `-c`).
-- Still hardcoded in `_sbatch_pipeline.sh`: the `micromamba run -n towbintools`
+- Still hardcoded in `init_pipeline.sh`: the `micromamba run -n towbintools`
   env name (env-decoupling, separate milestone).
 - Temp working dir defaults to in-repo `./temp_files` (gitignored, transient,
   cleared by cleanup_temp_files.sh). Decision: keep this default rather than
@@ -149,6 +169,12 @@ docs piecemeal in the meantime.
   fixed (no config key).
 
 ## Deferred design / cleanup (later PRs)
+- Post-run cleanup script (pendant to `init_pipeline`, called by the final
+  linker when there is no next block): repurpose `cleanup_temp_files.sh` into a
+  configurable protocol. Candidate tasks to move there: remove the launcher's
+  now-empty repo-root `sbatch_output/` landing zone (flagged in
+  `setup_run_dir`), optional temp-dir clearing. Weighed against a separate
+  end-of-run slurm job and rejected (queue latency) — see the log-output notes.
 - Folder inputs: decouple internal references from the analysis-dir name (today
   the config repeats the prefix, so renaming `analysis_dir_name` forces
   rewriting every reference). Aim to support: (a) absolute path, (b) name-only
@@ -163,6 +189,16 @@ docs piecemeal in the meantime.
   leaving the core (`init_pipeline`, `building_blocks`, `block_linker`, `utils`,
   `run_params`) at the top. Do it in the packaging milestone: the workers are
   resolved by path and use a bare `import utils`, which packaging rewrites anyway.
+- In the same move, rename each worker to start with the block it serves, so a
+  1:1 block/worker pair ends up identically named: `straighten.py` ->
+  `straightening.py`, `compute_morphology.py` -> `morphology_computation.py`,
+  `detect_molts.py` -> `molt_detection.py`, `quantify_fluorescence.py` ->
+  `fluorescence_quantification.py` (`quality_control.py` already matches), and
+  the two segmentation variants -> `segmentation_non_learning.py` /
+  `segmentation_learning_based.py`. Touches the 7 hardcoded `script_path`
+  literals in `building_blocks.py`. Generated job scripts and logs stay named
+  after the BLOCK (that is what `sbatch_overrides` keys on and what the progress
+  log prints); a block can map to several workers, so they cannot always match.
 
 ## CLI flags — the rule
 - Precedence is uniform: CLI flag > config key > default. `-c/--config` is the
@@ -181,5 +217,5 @@ docs piecemeal in the meantime.
   when packaging.
 - The outer orchestrator job's resources are now config-driven: `run_pipeline.sh`
   passes sbatch CLI flags built from `sbatch_init`, overriding the minimal header
-  in `_sbatch_pipeline.sh`. Only the `micromamba run -n towbintools` env name
+  in `init_pipeline.sh`. Only the `micromamba run -n towbintools` env name
   remains hardcoded there — part of the separate env-decoupling milestone.

@@ -48,18 +48,12 @@ check_git_updates() {
 # Check for updates
 check_git_updates
 
-# if the folder sbatch_output does not exist, create it
-if [ ! -d "sbatch_output" ]; then
-    mkdir sbatch_output
-fi
+# Landing zone for the outer job's #SBATCH -o/-e, which sbatch resolves at submit
+# time and will not create. The pipeline moves the logs into its run dir.
+mkdir -p sbatch_output
 
-# if the folder temp_files does not exist, create it
-if [ ! -d "temp_files" ]; then
-    mkdir temp_files
-fi
-
-# Find the config among the forwarded arguments (same default as the sbatch
-# script), so we can derive the outer job's sbatch resources from it. Read by
+# Find the config among the forwarded arguments (same default as the pipeline),
+# so we can derive the outer job's sbatch resources from it. Read by
 # index rather than shift, so "$@" stays intact for forwarding below.
 CONFIG_FILE="./defaults/config/config.yaml"
 args=("$@")
@@ -80,4 +74,4 @@ done
 SBATCH_INIT_FLAGS=$(~/.local/bin/micromamba run -n towbintools python3 -m towbintools_pipeline.run_params --sbatch-init -c "$CONFIG_FILE" 2>/dev/null)
 
 # Pass the resource flags and the forwarded arguments to the SBATCH script.
-sbatch $SBATCH_INIT_FLAGS scripts/_sbatch_pipeline.sh "$@"
+sbatch $SBATCH_INIT_FLAGS scripts/init_pipeline.sh "$@"
