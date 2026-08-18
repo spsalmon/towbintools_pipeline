@@ -151,6 +151,14 @@ Reversible: easy.
 migration.*
 Reversible: easy.
 
+**`cleanup_on_success` deletes a finished run's temp dir (opt-in, default off).**
+When set, the final linker removes the run's temp dir after mirroring it into the
+backup, to reclaim scratch; it never fires mid-run or on failure.
+*Cost: after a cleaned run the raw scratch (per-block logs, pickles) survives only
+in the backup, not in temp; on slurm the final linker's own live log is discarded
+(its content is already in the combined log).*
+Reversible: easy.
+
 **The run directory and log relocation moved from bash into Python.**
 Gives the temp path a single definition instead of one in bash and one in argparse.
 *Cost: if the environment is broken and Python never starts, the outer job's logs

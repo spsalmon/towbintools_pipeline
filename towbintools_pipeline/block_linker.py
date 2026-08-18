@@ -8,6 +8,7 @@ from towbintools.foundation.file_handling import write_filemap
 
 from towbintools_pipeline.utils import block_label
 from towbintools_pipeline.utils import cleanup_files
+from towbintools_pipeline.utils import cleanup_run
 from towbintools_pipeline.utils import concatenate_sbatch_logs
 from towbintools_pipeline.utils import load_pickles
 from towbintools_pipeline.utils import merge_and_save_records
@@ -177,6 +178,12 @@ def main():
     concatenate_sbatch_logs(temp_dir, closing)
     if current_block_index > 0:
         sync_backup_folder(temp_dir, pipeline_backup_dir)
+
+    # On successful completion, optionally reclaim this run's scratch. Runs after
+    # the backup sync above, so nothing durable is lost.
+    finished = current_block_index >= len(building_blocks)
+    if finished and previous_config.get("cleanup_on_success", False):
+        cleanup_run(temp_dir)
 
 
 if __name__ == "__main__":
