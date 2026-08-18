@@ -27,26 +27,40 @@ def get_args():
         help="Path to the directory storing temporary files",
         required=False,
     )
+    parser.add_argument(
+        "-e",
+        "--experiment_dir",
+        help="Path to the experiment directory (overrides the config)",
+        required=False,
+    )
     args = parser.parse_args()
     return args
 
 
-config_file = get_args().config
-temp_dir = get_args().temp_dir
+args = get_args()
+config_file = args.config
+temp_dir = args.temp_dir
 
 with open(config_file) as f:
     global_config = yaml.load(f, Loader=yaml.FullLoader)
 
+# A CLI experiment_dir overrides the one in the config.
+if args.experiment_dir:
+    global_config["experiment_dir"] = os.path.abspath(args.experiment_dir)
+
 # Pull SLURM resources in from their separate file (cluster backend only).
 global_config = merge_slurm_config(global_config, config_file)
 
+# Temp files: --temp_dir, else a temp_dir config key, else next to the
+# experiment data (keeps outputs out of the repo, runnable from any directory).
 if temp_dir:
     temp_dir = os.path.abspath(temp_dir)
+elif global_config.get("temp_dir"):
+    temp_dir = os.path.abspath(global_config["temp_dir"])
 else:
-    temp_dir = os.path.abspath(os.path.join(os.getcwd(), "temp_files"))
-    # if the temp_dir does not exist, create it
-    if not os.path.exists(temp_dir):
-        os.makedirs(temp_dir)
+    temp_dir = os.path.abspath(
+        os.path.join(global_config["experiment_dir"], "temp_files")
+    )
 
 temp_dir_basename = os.path.basename(temp_dir)
 create_temp_folders(temp_dir)
