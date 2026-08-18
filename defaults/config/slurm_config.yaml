@@ -15,23 +15,29 @@ sbatch_gpus: "rtx6000:1"
 # verbatim as a `#SBATCH <entry>` line, so any directive works. A standard key
 # above can be omitted to replace it (e.g. drop sbatch_memory and request
 # memory per cpu here instead).
+# Put cluster-wide invariants here: the sections below ADD to this list rather
+# than replacing it, so an entry set here always applies (but cannot be dropped
+# by a section either).
 # sbatch_extra_options:
 #   - "--account=gratis"
 #   - "--mem-per-cpu=4G"
-#   - "--partition=gpu"
 
 # Per-block-type overrides, merged over the defaults above (only list what
-# differs). Keyed by block name (segmentation, straightening, ...).
+# differs). Keyed by block name (segmentation, straightening, ...). Scalar keys
+# replace the default; sbatch_extra_options entries are appended to it.
 # sbatch_overrides:
 #   segmentation:
 #     sbatch_gpus: "rtx6000:1"
 #     sbatch_memory: 32G
+#     sbatch_extra_options:
+#       - "--partition=gpu"
 #   morphology_computation:
 #     sbatch_gpus: null
 #     sbatch_cpus: 8
 
 # The outer/orchestrator job (runs init_pipeline, submits the first block),
-# merged over the defaults above.
+# merged over the defaults above (it never gets a GPU). A throttle limiting how
+# many pipelines run at once belongs here.
 # sbatch_init:
 #   sbatch_cpus: 4
 #   sbatch_memory: 8G
