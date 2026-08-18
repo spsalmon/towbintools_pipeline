@@ -336,6 +336,7 @@ Four tiers:
     models are large; it prints where they live); skips existing files unless
     `--force`. Both files are copied because the main config references the slurm
     one by a relative path.
+- Aliases: `tt-pipeline` and `ttp` are shorter console names for the same command.
 - Back-compat: with no recognised subcommand the arguments go straight to `run`,
   so the old `towbintools-pipeline -c config.yaml` still works, as does
   `python -m towbintools_pipeline.init_pipeline ...` (the cluster launcher path,
