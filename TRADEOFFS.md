@@ -156,6 +156,13 @@ Keeps each step reviewable in isolation.
 Scope control — core pipeline first.
 *Cost: they may not work against the new layout until adapted.*
 
+**The auto git-update prompt was removed from the launcher.**
+`run_pipeline.sh` no longer fetches and offers to hard-reset the working tree to
+the remote before each run; updating is now the explicit
+`scripts/update_pipeline.sh`.
+*Cost: a user on an out-of-date checkout is no longer told so at launch.*
+Reversible: easy.
+
 ---
 
 # B. Inherited and consciously kept
@@ -201,12 +208,6 @@ Reversible: easy — scheduled for the packaging milestone.
 and an inconsistent pair produces a missing-column crash mid-run rather than an
 error at start-up.*
 Reversible: moderate; deferred as config-breaking.
-
-**The pipeline updates itself from git.**
-`run_pipeline.sh` fetches and offers to update before each run.
-*Cost: superseded by a proper package install, and it mutates the working tree
-from inside a run.*
-Reversible: easy — scheduled for removal.
 
 **Generated job scripts carry commented-out lock-file and thread-pinning experiments.**
 Left verbatim in `create_sbatch_file` rather than deleted, since they record

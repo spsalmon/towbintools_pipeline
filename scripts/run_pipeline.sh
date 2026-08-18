@@ -3,51 +3,6 @@
 # Run everything from the repo root, regardless of where this is called from.
 cd "$(dirname "$0")/.."
 
-# Function to check for git updates
-check_git_updates() {
-    # Check if we're in a git repository
-    if ! git rev-parse --git-dir > /dev/null 2>&1; then
-        echo "Not in a git repository. Skipping update check."
-        return 0
-    fi
-
-    # Fetch latest changes from remote without merging
-    echo "Checking for updates..."
-    git fetch --quiet
-
-    # Get current and remote commit hashes; no upstream means nothing to compare
-    local_commit=$(git rev-parse HEAD)
-    if ! remote_commit=$(git rev-parse @{u} 2>/dev/null); then
-        echo "No remote tracking branch found. Skipping update check."
-        return 0
-    fi
-
-    # Compare commits
-    if [ "$local_commit" != "$remote_commit" ]; then
-        echo "A newer version is available!"
-        echo "Current commit: ${local_commit:0:8}"
-        echo "Latest commit:  ${remote_commit:0:8}"
-        echo
-
-        read -p "Would you like to update to the latest version? (y/n): " -n 1 -r
-        echo
-
-        if [[ $REPLY =~ ^[Yy]$ ]]; then
-            echo "Updating to the pipeline to the latest version..."
-            echo "This will not update the environment, for that, run the scripts/update_pipeline.sh script."
-            bash scripts/update_pipeline.sh --pipeline-only
-            echo "Pipeline updated successfully! Please restart the script."
-        else
-            echo "Continuing with current version..."
-        fi
-    else
-        echo "Already up to date!"
-    fi
-}
-
-# Check for updates
-check_git_updates
-
 # Landing zone for the outer job's #SBATCH -o/-e, which sbatch resolves at submit
 # time and will not create. The pipeline moves the logs into its run dir.
 mkdir -p sbatch_output
