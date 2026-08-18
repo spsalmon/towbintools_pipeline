@@ -87,10 +87,10 @@ Four tiers:
   cluster launcher uses until the package is installed there (env consolidation).
 - `experiment_dir` can be given with `--experiment_dir` (overrides the config).
 - Temp/output location precedence: `--temp_dir` flag > `temp_dir` config key >
-  default `<experiment_dir>/temp_files`. Nothing is written inside the repo by
-  default (outputs already live under `experiment_dir`). Note the outer launch
-  script still makes a repo-root `sbatch_output/` — part of the
-  `_init_pipeline.sh` follow-up below.
+  default `./temp_files` (in-repo, gitignored). Durable outputs and the backup
+  live under `experiment_dir`; the outer launcher makes a repo-root
+  `sbatch_output/` landing zone that the pipeline relocates into the run dir (and
+  `cleanup_on_success` can remove).
 
 ## Which script does what
 - `scripts/run_pipeline.sh` — the user entry point, runs on the login node:
@@ -231,17 +231,23 @@ Four tiers:
 - `analysis_dir_name` (default `analysis`) is honored everywhere, including the
   prefix-stripping in output naming. The `report/` subfolder name is currently
   fixed (no config key).
+- `backend`: `slurm` (default) vs `local`. Config-only (no CLI flag); a commented
+  hint is in the default config.
+- Folder references (masks/sources) are resolved by `resolve_ref`: a directory
+  ref normalizes to `{analysis_dir_name}/{name}` whether written with or without
+  the prefix, so `ch2_seg` == `analysis/ch2_seg` and refs survive renaming
+  `analysis_dir_name`. `raw` and absolute paths pass through. Applies to
+  directory refs only, NOT report-column refs like `molt_detection_columns`. The
+  shipped config now uses the prefix-free form.
 
 ## Deferred design / cleanup (later PRs)
-- Folder inputs: decouple internal references from the analysis-dir name (today
-  the config repeats the prefix, so renaming `analysis_dir_name` forces
-  rewriting every reference). Aim to support: (a) absolute path, (b) name-only
-  (resolved under the experiment folder), (c) maybe relative. One place holds
-  the dir name.
+- Folder inputs, further: `resolve_ref` covers name-only refs (done). Still open
+  if needed: first-class (a) absolute and (c) relative external-directory refs
+  (today an absolute path passes through, but there is no relative-to-experiment
+  form) — add only if cross-experiment refs are actually wanted.
 - Naming: `analysis_dir_name` / `analysis_subdir` really denote the OUTPUT
-  directory. Renaming only the variables would desync them from the config key,
-  and renaming the key is a breaking config change — so settle the naming as
-  part of the folder-decoupling work above, not separately.
+  directory. Renaming the KEY is a breaking config change, so it stays deferred
+  and separate from the (now-done) ref decoupling.
 
 ## CLI flags — the rule
 - Precedence is uniform: CLI flag > config key > default. `-c/--config` is the
@@ -256,8 +262,6 @@ Four tiers:
 - Document custom blocks. The `CustomBuildingBlock.create_command` bug (missing
   `config` param, plus a doubled `run -n towbintools python3` launcher) is fixed;
   custom blocks now work on both backends.
-- Workers use a bare `import utils` (rely on script dir on sys.path) — revisit
-  when packaging.
 - The outer orchestrator job's resources are now config-driven: `run_pipeline.sh`
   passes sbatch CLI flags built from `sbatch_init`, overriding the minimal header
   in `_init_pipeline.sh`. The env launcher is now overridable too (see

@@ -10,6 +10,7 @@ from towbintools_pipeline.utils import get_input_and_output_files
 from towbintools_pipeline.utils import get_output_name
 from towbintools_pipeline.utils import get_python_command
 from towbintools_pipeline.utils import pickle_objects
+from towbintools_pipeline.utils import resolve_ref
 from towbintools_pipeline.utils import run_command
 
 # Resolve bundled scripts/models relative to this package, so the pipeline
@@ -353,7 +354,7 @@ class SegmentationBuildingBlock(BuildingBlock):
     def get_input_and_output_files(self, config, experiment_filemap, subdir):
         input_files, output_files = get_input_and_output_files(
             experiment_filemap,
-            [self.block_config["segmentation_column"]],
+            [resolve_ref(self.block_config["segmentation_column"], config)],
             subdir,
             rerun=self.block_config["rerun_segmentation"],
         )
@@ -386,8 +387,8 @@ class StraighteningBuildingBlock(BuildingBlock):
     def get_input_and_output_files(self, config, experiment_filemap, subdir):
         block_config = self.block_config
         columns = [
-            block_config["straightening_source"][0],
-            block_config["straightening_masks"],
+            resolve_ref(block_config["straightening_source"][0], config),
+            resolve_ref(block_config["straightening_masks"], config),
         ]
 
         for column in columns:
@@ -450,9 +451,12 @@ class QualityControlBuildingBlock(BuildingBlock):
     def get_input_and_output_files(self, config, experiment_filemap, subdir):
         block_config = self.block_config
         if self.mask_only:
-            columns = [block_config["qc_masks"]]
+            columns = [resolve_ref(block_config["qc_masks"], config)]
         else:
-            columns = [block_config["qc_images"][0], block_config["qc_masks"]]
+            columns = [
+                resolve_ref(block_config["qc_images"][0], config),
+                resolve_ref(block_config["qc_masks"], config),
+            ]
 
         input_files, _ = get_input_and_output_files(
             experiment_filemap,
@@ -497,7 +501,7 @@ class MorphologyComputationBuildingBlock(BuildingBlock):
 
     def get_input_and_output_files(self, config, experiment_filemap, subdir):
         morphology_computation_masks = [
-            self.block_config["morphology_computation_masks"]
+            resolve_ref(self.block_config["morphology_computation_masks"], config)
         ]
         analysis_subdir = config["analysis_subdir"]
 
@@ -574,8 +578,8 @@ class FluorescenceQuantificationBuildingBlock(BuildingBlock):
         ][0]
 
         columns = [
-            fluorescence_quantification_source,
-            self.block_config["fluorescence_quantification_masks"],
+            resolve_ref(fluorescence_quantification_source, config),
+            resolve_ref(self.block_config["fluorescence_quantification_masks"], config),
         ]
 
         input_files, _ = get_input_and_output_files(experiment_filemap, columns, subdir)

@@ -93,6 +93,15 @@ Reversible: easy.
 
 ## Configuration
 
+**Folder refs are resolved by basename to `{analysis_dir_name}/{name}`.**
+Lets a mask/source ref be written with or without the analysis-dir prefix and
+survive renaming `analysis_dir_name`, instead of repeating the prefix in every
+ref. Backward-compatible: the old prefixed form still resolves.
+*Cost: `resolve_ref` keys on the basename, so a multi-level ref under the analysis
+dir would collapse to its last segment (not used today); first-class absolute /
+relative-to-experiment external refs are not modelled.*
+Reversible: easy.
+
 **`sbatch_extra_options` accumulate; scalar `sbatch_*` keys replace.**
 Prevents a per-block or init section from silently dropping a cluster-wide entry
 such as `--account`.
@@ -232,19 +241,6 @@ Two `segmentation` blocks both write `batch/segmentation.sh`.
 but `batch/` only ever shows the last version of each type, so it cannot be used
 to reconstruct what a specific block instance ran.*
 Reversible: easy.
-
-**Workers use a bare `import utils`, relying on their own directory being on `sys.path`.**
-*Cost: not package-clean; breaks if a worker is ever imported rather than
-executed.*
-Reversible: easy — scheduled for the packaging milestone.
-
-**Internal folder references repeat the analysis-dir prefix.**
-`analysis_dir_name` is now honored everywhere, but the config still writes
-`analysis/ch2_seg` in every reference.
-*Cost: renaming the analysis dir means rewriting every reference in the config,
-and an inconsistent pair produces a missing-column crash mid-run rather than an
-error at start-up.*
-Reversible: moderate; deferred as config-breaking.
 
 **Generated job scripts carry commented-out lock-file and thread-pinning experiments.**
 Left verbatim in `create_sbatch_file` rather than deleted, since they record

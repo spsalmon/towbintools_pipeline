@@ -23,6 +23,10 @@ point_regex: 'Point(\d+)'
 # Compute parallelism for the workers (all backends): joblib --n_jobs.
 n_jobs: 32
 
+# Execution backend: "slurm" (default, submits cluster jobs) or "local" (runs
+# in-process, no slurm/micromamba).
+# backend: "slurm"
+
 # SLURM resources for the cluster backend are kept in a separate file, merged
 # in at startup (only when backend is slurm). Path is relative to this file.
 slurm_config: "slurm_config.yaml"
@@ -68,17 +72,21 @@ segmentation_channels: [ [ 1 ], [ 0 ] ]
 model_path: [ "/mnt/towbin.data/shared/spsalmon/towbinlab_segmentation_database/models/paper/body/towbintools_medium/best_light.ckpt", "/mnt/towbin.data/shared/spsalmon/towbinlab_segmentation_database/models/paper/pharynx/towbintools_medium/best_light.ckpt" ]
 batch_size: [ 4 ]
 
+# Folder references below name a directory produced under the analysis dir; the
+# analysis_dir_name prefix is optional (e.g. "ch2_seg" == "analysis/ch2_seg").
+# "raw" is the raw input; an absolute path is used as-is.
+
 # straightening parameters
-straightening_source: [ [ "analysis/ch2_seg", null ], [ "analysis/ch1_seg", null ], [ "raw", [ 1 ] ], [ "raw", [ 0 ] ] ]
-straightening_masks: [ "analysis/ch2_seg", "analysis/ch1_seg", "analysis/ch2_seg", "analysis/ch1_seg" ]
+straightening_source: [ [ "ch2_seg", null ], [ "ch1_seg", null ], [ "raw", [ 1 ] ], [ "raw", [ 0 ] ] ]
+straightening_masks: [ "ch2_seg", "ch1_seg", "ch2_seg", "ch1_seg" ]
 
 # morphology computation parameters
-morphology_computation_masks: [ "analysis/ch2_seg_str", "analysis/ch1_seg_str" ]
+morphology_computation_masks: [ "ch2_seg_str", "ch1_seg_str" ]
 morphological_features: [ [ "length", "area", "volume", "width_mean" ] ]
 
 # quality control parameters
-qc_masks: [ "analysis/ch2_seg_str", "analysis/ch1_seg_str" ]
-qc_images: [ [ "analysis/ch2_raw_str", null ], [ "analysis/ch1_raw_str", null ] ]
+qc_masks: [ "ch2_seg_str", "ch1_seg_str" ]
+qc_images: [ [ "ch2_raw_str", null ], [ "ch1_raw_str", null ] ]
 qc_model_path: [ "/mnt/towbin.data/shared/spsalmon/towbinlab_classification_database/models/10x_body_qc/qc_xgb_model.pkl", "/mnt/towbin.data/shared/spsalmon/towbinlab_classification_database/models/10x_pharynx_qc/qc_xgb_model.pkl" ]
 qc_import_eggs_from: [ null, "ch2_seg_str_qc" ]
 
@@ -89,6 +97,6 @@ molt_detection_columns: [ [ "ch2_seg_str_volume" ] ]
 
 # fluo quantification parameters
 fluorescence_quantification_source: [ [ "raw", 0 ] ]
-fluorescence_quantification_masks: [ "analysis/ch2_seg" ]
+fluorescence_quantification_masks: [ "ch2_seg" ]
 fluorescence_quantification_aggregations: [ [ "sum", "std", "mean" ] ]
 fluorescence_background_aggregation: [ "median" ]

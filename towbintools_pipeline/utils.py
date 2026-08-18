@@ -295,6 +295,17 @@ def process_input_output_files(input_files, output_dir, rerun):
         return None, None
 
 
+def resolve_ref(ref, config):
+    # Normalize a directory reference to the `{analysis_dir_name}/{name}` column,
+    # so it can be written with or without the analysis-dir prefix (and survives
+    # renaming analysis_dir_name). raw and absolute paths pass through unchanged.
+    raw_dir_name = config.get("raw_dir_name", "raw")
+    analysis_dir_name = config.get("analysis_dir_name", "analysis")
+    if os.path.isabs(ref) or ref == raw_dir_name:
+        return ref
+    return f"{analysis_dir_name}/{os.path.basename(os.path.normpath(ref))}"
+
+
 def get_input_and_output_files(experiment_filemap, columns, output_dir, rerun=True):
     all_input_files = [
         experiment_filemap.select(pl.col(column)).to_series().to_list()
