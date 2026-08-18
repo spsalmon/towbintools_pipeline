@@ -94,7 +94,7 @@ source ~/.bashrc
 - Run the installation script :
 
 ```bash
-chmod +x ~/towbintools_pipeline/install_pipeline.sh
+chmod +x ~/towbintools_pipeline/scripts/install_pipeline.sh
 ```
 
 ```bash
@@ -102,7 +102,7 @@ cd ~/towbintools_pipeline
 ```
 
 ```bash
-~/towbintools_pipeline/install_pipeline.sh
+~/towbintools_pipeline/scripts/install_pipeline.sh
 ```
 
 For some reason, the script doesn't really work for some people. In case it doesn't work for you, just run every line of the installation script manually.
@@ -120,21 +120,21 @@ cd ~/towbintools_pipeline
 ```
 
 ```bash
-bash run_pipeline.sh
+bash scripts/run_pipeline.sh
 ```
 
 ### Using a custom config file
 
-If you don't specify anything, the config file used will be "./config.yaml" but you can specify one using
+If you don't specify anything, the config file used will be the bundled default "towbintools_pipeline/defaults/config/config.yaml" but you can specify one using
 
 ```bash
-bash run_pipeline.sh -c path_to_config_file
+bash scripts/run_pipeline.sh -c path_to_config_file
 ```
 
 or
 
 ```bash
-bash run_pipeline.sh --config path_to_config_file
+bash scripts/run_pipeline.sh --config path_to_config_file
 ```
 
 ## Updating the pipeline
@@ -144,7 +144,7 @@ I will update the pipeline frequently, so please try to keep up to date by runni
 Running the following script will update both the pipeline and the underlying towbintools python package
 
 ```bash
-bash update_pipeline.sh
+bash scripts/update_pipeline.sh
 ```
 
 ### If you want to reset the folder completely (manually)
