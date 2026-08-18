@@ -1,0 +1,30 @@
+# Minimal packaging for the pipeline core. Makes the repo pip-installable
+# (`pip install -e .`) so it can run from anywhere, and declares the core
+# runtime dependencies in one place. Fuller packaging (entry points, bundled
+# models as package data, worker import cleanup) is a later milestone.
+[build-system]
+requires = ["setuptools>=64"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "towbintools_pipeline"
+version = "0.1.0"
+description = "Configurable image-analysis pipeline built on towbintools."
+requires-python = ">=3.11"
+dependencies = [
+    "towbintools",
+    "numpy",
+    "polars",
+    "pyarrow",
+    "joblib",
+    "tifffile",
+    "pyyaml",
+    "lxml",
+]
+
+[project.optional-dependencies]
+dev = ["pytest"]
+
+[tool.setuptools]
+# Only the pipeline core; gui/ and training/ are packaged separately later.
+packages = ["pipeline_scripts"]

@@ -173,6 +173,7 @@ sbatch_output/*
 
 configs/*
 !configs/config.yaml
+!configs/slurm_config.yaml
 training/*.yaml
 training/segmentation/configs/*
 !training/segmentation/configs/segmentation_training_config.yaml

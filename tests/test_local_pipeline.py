@@ -41,7 +41,7 @@ def test_local_pipeline_segmentation_and_morphology(tmp_path):
         "pixelsize": [0.65],
         "backend": "local",
         "get_experiment_time": False,
-        "sbatch_cpus": 1,
+        "n_jobs": 1,
         "building_blocks": ["segmentation", "morphology_computation"],
         "segmentation_column": ["raw"],
         "segmentation_method": ["threshold"],

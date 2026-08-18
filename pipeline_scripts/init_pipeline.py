@@ -13,6 +13,7 @@ from pipeline_scripts.utils import create_temp_folders
 from pipeline_scripts.utils import get_and_create_folders
 from pipeline_scripts.utils import get_experiment_subdirs
 from pipeline_scripts.utils import get_experiment_time_from_filemap
+from pipeline_scripts.utils import merge_slurm_config
 from pipeline_scripts.utils import pickle_objects
 from pipeline_scripts.utils import sync_backup_folder
 
@@ -35,6 +36,9 @@ temp_dir = get_args().temp_dir
 
 with open(config_file) as f:
     global_config = yaml.load(f, Loader=yaml.FullLoader)
+
+# Pull SLURM resources in from their separate file (cluster backend only).
+global_config = merge_slurm_config(global_config, config_file)
 
 if temp_dir:
     temp_dir = os.path.abspath(temp_dir)
