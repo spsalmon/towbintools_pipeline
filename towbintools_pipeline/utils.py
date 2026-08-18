@@ -623,12 +623,14 @@ def save_version_control_info(temp_dir):
 
 
 def get_python_command(config):
-    # Command prefix used to launch python workers. Slurm/micromamba setups keep
-    # the micromamba runner; local runs use the active python interpreter.
+    # Prefix to launch python workers: `python_command` if set, else the active
+    # interpreter (local) or the default micromamba runner (slurm).
+    python_command = config.get("python_command")
+    if python_command:
+        return python_command
     if config.get("backend", "slurm") == "local":
-        return config.get("python_command", sys.executable)
-    micromamba_path = config.get("micromamba_path", "~/.local/bin/micromamba")
-    return f"{micromamba_path} run -n towbintools python3"
+        return sys.executable
+    return "~/.local/bin/micromamba run -n towbintools python3"
 
 
 def create_linker_command(

@@ -71,6 +71,19 @@ such as `--account`.
 everywhere has to be moved down into the sections instead.*
 Reversible: easy.
 
+**The python launcher is one config key, bridged to the outer job by a bash grep.**
+`python_command` in the main config drives both the workers (via
+`get_python_command`) and the outer slurm job: `run_pipeline.sh` greps the key
+out of the YAML in pure bash and exports it, because it runs before python (the
+thing it is resolving) can parse the config. `TOWBINTOOLS_PYTHON` overrides it
+for the bootstrap case where the default can't start python at all. The earlier
+`micromamba_path` / `slurm_env_name` slot keys were dropped — `python_command`
+is a strict superset, so one full string replaces the template.
+*Cost: the outer job's launcher comes from a fragile one-line YAML grep, not a
+real parse; an exotic quoted/colon'd value could parse differently there than in
+python, diverging outer from inner.*
+Reversible: easy.
+
 **`sbatch_init` is a separate section, not a key inside `sbatch_overrides`.**
 The outer job is not a building block and is resolved by a different program at a
 different time (`run_params.py`, from bash, before the pipeline starts).
@@ -200,8 +213,3 @@ Left verbatim in `create_sbatch_file` rather than deleted, since they record
 something the original author tried.
 *Cost: every generated script contains several lines of dead commented code.*
 Reversible: trivial.
-
-**The env name and micromamba path are hardcoded in the shell scripts.**
-*Cost: the cluster path is tied to one specific environment manager and one
-environment name.*
-Reversible: easy — next PR.

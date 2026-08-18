@@ -140,8 +140,13 @@ list to hand to a reviewer, this one feeds the docs.
   throttle, `--mem-per-cpu`) go under `sbatch_init.sbatch_extra_options`.
 - `run_pipeline.sh` forwards `-e/--experiment_dir` and `-t/--temp_dir` through to
   the pipeline (previously only `-c`).
-- Still hardcoded in `init_pipeline.sh`: the `micromamba run -n towbintools`
-  env name (env-decoupling, separate milestone).
+- Env launcher is decoupled, one knob: `python_command` in the main config sets
+  the command that launches python everywhere. `run_pipeline.sh` greps it from
+  the config (pure bash — python is what it is resolving) and exports it as
+  `TOWBINTOOLS_PYTHON` for the pre-flight and the submitted job; the workers read
+  it via `get_python_command`. Exporting `TOWBINTOOLS_PYTHON` directly still wins
+  (bootstrap escape hatch when the default can't even start python). Unset
+  everywhere = the micromamba default, so behaviour is unchanged.
 - Temp working dir defaults to in-repo `./temp_files` (gitignored, transient,
   cleared by cleanup_temp_files.sh). Decision: keep this default rather than
   auto-placing it next to the experiment — the durable outputs and backup are
@@ -217,5 +222,5 @@ list to hand to a reviewer, this one feeds the docs.
   when packaging.
 - The outer orchestrator job's resources are now config-driven: `run_pipeline.sh`
   passes sbatch CLI flags built from `sbatch_init`, overriding the minimal header
-  in `init_pipeline.sh`. Only the `micromamba run -n towbintools` env name
-  remains hardcoded there — part of the separate env-decoupling milestone.
+  in `init_pipeline.sh`. The env launcher is now overridable too (see
+  `TOWBINTOOLS_PYTHON` under "Which script does what").
