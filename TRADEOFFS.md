@@ -49,11 +49,28 @@ coupling every cluster invocation to a correct install. Flat keeps
 installed copy — the class of bug `src/` exists to prevent.*
 Reversible: moderate; touches every invocation path.
 
-**Worker scripts are resolved to absolute paths via the repo root.**
-Makes workers independent of the working directory, which the restructure needed.
-*Cost: ties worker resolution to a repo-root constant rather than to package
-resources — to be replaced when the pipeline becomes a proper installed package.*
-Reversible: easy.
+**Workers are invoked as modules, not by absolute file path.**
+`create_command` runs `python -m towbintools_pipeline.workers.<name>`, so workers
+resolve by import and use package-clean imports (`from towbintools_pipeline
+import utils`) instead of relying on their own directory being on `sys.path`.
+*Cost: the worker's environment must have the package importable — installed, or
+launched from the repo root. The outer job already required this, so it is not
+new, but a run started from elsewhere without an install would now fail to find
+the workers.*
+Reversible: easy — `create_command` is the single place.
+
+**Bundled `defaults/` (configs + models) live inside the package, resolved by `__file__`.**
+`defaults/` moved from the repo root into `towbintools_pipeline/`, is declared as
+package data, and is looked up via `_PIPELINE_DIR` (the package dir from
+`__file__`) rather than `importlib.resources`. The flat layout means the package
+is always real files on disk (editable, checkout, or a normal wheel), so a plain
+path works and keeps model paths as filesystem strings for loaders/subprocess —
+`importlib.resources` would only matter for a zipped install, which this project
+does not use.
+*Cost: the 47 MB default molt-detection checkpoint now ships inside the package,
+so a non-editable `pip install` copies it into site-packages. Keeping only the
+configs bundled and the models external would avoid this.*
+Reversible: easy — `git mv` back and repoint two constants.
 
 **Dependencies are now declared in two places.**
 `pyproject.toml` was introduced as the single source for the local install, but
@@ -181,12 +198,12 @@ Reversible: hard.
 
 **Generated job scripts, `-J` names and logs are named after the block, not the worker.**
 Kept deliberately: a block can map to several workers (`segmentation` →
-`learning_based_segment.py` or `non_learning_segment.py`), `sbatch_overrides` is
-keyed by block name, and the progress log prints block names. The new logging was
-made consistent with this rather than against it.
-*Cost: `batch/segmentation.sh` does not match `learning_based_segment.py`, so the
-filename alone does not reveal which implementation ran — the command inside the
-file does.*
+`segmentation_non_learning` or `segmentation_learning_based`), `sbatch_overrides`
+is keyed by block name, and the progress log prints block names. The new logging
+was made consistent with this rather than against it.
+*Cost: `batch/segmentation.sh` does not match `segmentation_learning_based`, so
+the filename alone does not reveal which implementation ran — the command inside
+the file does.*
 Reversible: easy.
 
 **Blocks of the same type overwrite each other's generated script.**

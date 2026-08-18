@@ -473,7 +473,8 @@ def cleanup_files(*filepaths):
 
 # ----BOILERPLATE CODE FOR SLURM----
 
-_REPO_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+_PIPELINE_DIR = os.path.dirname(os.path.abspath(__file__))
+_REPO_DIR = os.path.dirname(_PIPELINE_DIR)
 
 
 def resolve_slurm_config_path(global_config, config_file):
@@ -482,7 +483,7 @@ def resolve_slurm_config_path(global_config, config_file):
     # the bundled default shipped alongside the example config.
     slurm_config_path = global_config.get("slurm_config")
     if slurm_config_path is None:
-        return os.path.join(_REPO_DIR, "defaults", "config", "slurm_config.yaml")
+        return os.path.join(_PIPELINE_DIR, "defaults", "config", "slurm_config.yaml")
     if not os.path.isabs(slurm_config_path):
         return os.path.join(
             os.path.dirname(os.path.abspath(config_file)), slurm_config_path

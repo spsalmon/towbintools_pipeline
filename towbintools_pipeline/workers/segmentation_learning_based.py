@@ -6,7 +6,7 @@ from threading import Thread
 import cv2
 import numpy as np
 import torch
-import utils
+from towbintools_pipeline import utils
 from cellpose import models
 from cv2 import resize
 from joblib import delayed

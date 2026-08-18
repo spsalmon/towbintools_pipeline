@@ -40,41 +40,7 @@ def get_args():
     return args
 
 
-args = get_args()
-config_file = args.config
-temp_dir = args.temp_dir
-
-with open(config_file) as f:
-    global_config = yaml.load(f, Loader=yaml.FullLoader)
-
-# A CLI experiment_dir overrides the one in the config.
-if args.experiment_dir:
-    global_config["experiment_dir"] = os.path.abspath(args.experiment_dir)
-
-# Pull SLURM resources in from their separate file (cluster backend only).
-global_config = merge_slurm_config(global_config, config_file)
-
-# Temp files: --temp_dir, else a temp_dir config key, else ./temp_files in the
-# working directory (transient, gitignored; matches the sbatch launcher).
-if temp_dir:
-    temp_dir = os.path.abspath(temp_dir)
-elif global_config.get("temp_dir"):
-    temp_dir = os.path.abspath(global_config["temp_dir"])
-else:
-    temp_dir = os.path.abspath("temp_files")
-
-# Each run gets its own subdirectory, so repeated runs never overwrite one
-# another's temp files or their backup.
-temp_dir = setup_run_dir(temp_dir, global_config.get("backend", "slurm"))
-temp_dir_basename = os.path.basename(temp_dir)
-
-# Snapshot the config(s) and version info into the run's temp dir (synced to
-# the backup) as a write-only record of the run.
-backup_run_config(global_config, config_file, temp_dir)
-save_version_control_info(temp_dir)
-
-
-def main(global_config, temp_dir_basename, temp_dir, subdir=None):
+def build_blocks_for_subdir(global_config, temp_dir_basename, temp_dir, subdir=None):
     print(f"### Initializing the pipeline for subdir {subdir} ###")
 
     (
@@ -236,35 +202,79 @@ def main(global_config, temp_dir_basename, temp_dir, subdir=None):
     return building_blocks
 
 
-subdirs = get_experiment_subdirs(global_config)
-building_blocks = []
-print(f"Running the pipeline for subdirs: {subdirs}")
-if not subdirs:
-    building_blocks.extend(main(global_config, temp_dir_basename, temp_dir))
-else:
-    for subdir in subdirs:
-        building_blocks.extend(main(global_config, temp_dir_basename, temp_dir, subdir))
+def main():
+    args = get_args()
+    config_file = args.config
+    temp_dir = args.temp_dir
 
-# initialize on 1 as we're gonna run the first block immediately
-progress_tracker = {"current_block_index": 1, "building_blocks": building_blocks}
-progress_tracker_pickle = {"path": "progress_tracker", "obj": progress_tracker}
+    with open(config_file) as f:
+        global_config = yaml.load(f, Loader=yaml.FullLoader)
 
-_ = pickle_objects(temp_dir, progress_tracker_pickle)
+    # A CLI experiment_dir overrides the one in the config.
+    if args.experiment_dir:
+        global_config["experiment_dir"] = os.path.abspath(args.experiment_dir)
 
-# The planned sequence, so the per-block logs further down can be placed.
-print(f"### Pipeline plan: {len(building_blocks)} blocks ###")
-for index in range(len(building_blocks)):
-    print(f"  {block_label(building_blocks, index)}")
+    # Pull SLURM resources in from their separate file (cluster backend only).
+    global_config = merge_slurm_config(global_config, config_file)
 
-# Run the first building block
-current = building_blocks[0]
-current_building_block, current_subdir, current_config = (
-    current["block"],
-    current["subdir"],
-    current["config"],
-)
+    # Temp files: --temp_dir, else a temp_dir config key, else ./temp_files in the
+    # working directory (transient, gitignored; matches the sbatch launcher).
+    if temp_dir:
+        temp_dir = os.path.abspath(temp_dir)
+    elif global_config.get("temp_dir"):
+        temp_dir = os.path.abspath(global_config["temp_dir"])
+    else:
+        temp_dir = os.path.abspath("temp_files")
 
-experiment_filemap = read_filemap(current_config["filemap_path"])
-print(f"### Starting block {block_label(building_blocks, 0)} ###")
-print(f"Running {current_building_block} ...", flush=True)
-current_building_block.run(experiment_filemap, current_config, subdir=current_subdir)
+    # Each run gets its own subdirectory, so repeated runs never overwrite one
+    # another's temp files or their backup.
+    temp_dir = setup_run_dir(temp_dir, global_config.get("backend", "slurm"))
+    temp_dir_basename = os.path.basename(temp_dir)
+
+    # Snapshot the config(s) and version info into the run's temp dir (synced to
+    # the backup) as a write-only record of the run.
+    backup_run_config(global_config, config_file, temp_dir)
+    save_version_control_info(temp_dir)
+
+    subdirs = get_experiment_subdirs(global_config)
+    building_blocks = []
+    print(f"Running the pipeline for subdirs: {subdirs}")
+    if not subdirs:
+        building_blocks.extend(
+            build_blocks_for_subdir(global_config, temp_dir_basename, temp_dir)
+        )
+    else:
+        for subdir in subdirs:
+            building_blocks.extend(
+                build_blocks_for_subdir(
+                    global_config, temp_dir_basename, temp_dir, subdir
+                )
+            )
+
+    # initialize on 1 as we're gonna run the first block immediately
+    progress_tracker = {"current_block_index": 1, "building_blocks": building_blocks}
+    progress_tracker_pickle = {"path": "progress_tracker", "obj": progress_tracker}
+
+    _ = pickle_objects(temp_dir, progress_tracker_pickle)
+
+    # The planned sequence, so the per-block logs further down can be placed.
+    print(f"### Pipeline plan: {len(building_blocks)} blocks ###")
+    for index in range(len(building_blocks)):
+        print(f"  {block_label(building_blocks, index)}")
+
+    # Run the first building block
+    current = building_blocks[0]
+    current_building_block, current_subdir, current_config = (
+        current["block"],
+        current["subdir"],
+        current["config"],
+    )
+
+    experiment_filemap = read_filemap(current_config["filemap_path"])
+    print(f"### Starting block {block_label(building_blocks, 0)} ###")
+    print(f"Running {current_building_block} ...", flush=True)
+    current_building_block.run(experiment_filemap, current_config, subdir=current_subdir)
+
+
+if __name__ == "__main__":
+    main()

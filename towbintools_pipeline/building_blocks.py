@@ -15,7 +15,6 @@ from towbintools_pipeline.utils import run_command
 # Resolve bundled scripts/models relative to this package, so the pipeline
 # works regardless of the current working directory.
 _PIPELINE_DIR = os.path.dirname(os.path.abspath(__file__))
-_REPO_DIR = os.path.dirname(_PIPELINE_DIR)
 
 OPTIONS_MAP = {
     "segmentation": [
@@ -109,7 +108,7 @@ DEFAULT_OPTIONS = {
         "rerun_molt_detection": [False],
         "molt_detection_method": ["deep_learning"],
         "molt_detection_model_path": [
-            os.path.join(_REPO_DIR, "defaults", "models", "molt_detection_model.ckpt")
+            os.path.join(_PIPELINE_DIR, "defaults", "models", "molt_detection_model.ckpt")
         ],
         "molt_detection_batch_size": [1],
         "molt_detection_volume": [
@@ -134,7 +133,7 @@ class BuildingBlock(ABC):
         options,
         block_config,
         return_type,
-        script_path,
+        worker_module,
         requires_gpu=False,
         requires_filemap=False,
     ):
@@ -142,7 +141,7 @@ class BuildingBlock(ABC):
         self.options = options
         self.block_config = block_config
         self.return_type = return_type
-        self.script_path = script_path
+        self.worker_module = worker_module
         self.requires_gpu = requires_gpu
         self.requires_filemap = requires_filemap
 
@@ -167,25 +166,18 @@ class BuildingBlock(ABC):
         config,
         pickled_filemap_path=None,
     ):
-        script_path = self.script_path
-        # Resolve bundled (relative) worker scripts against the repo root so the
-        # command works regardless of the current working directory.
-        if not os.path.isabs(script_path):
-            script_path = os.path.normpath(os.path.join(_REPO_DIR, script_path))
-
         # Worker compute parallelism (joblib --n_jobs), needed by every backend.
         # Falls back to the SLURM cpu request so configs that only set
         # sbatch_cpus keep working.
         n_jobs = config.get("n_jobs", config.get("sbatch_cpus", 1))
 
-        if script_path.endswith(".sh"):
-            command = f"bash {script_path} --input {input_pickle_path} -output {output_pickle_path} --block_config {pickled_block_config} --config {pickled_config}"
-        elif script_path.endswith(".py"):
-            command = f"{python_command} {script_path} --input {input_pickle_path} --output {output_pickle_path} --block_config {pickled_block_config} --config {pickled_config} --n_jobs {n_jobs}"
-        else:
-            raise ValueError(
-                f"Script type of {script_path} is not supported. The pipeline only supports bash or python scripts."
-            )
+        # Run the worker as a module, so it resolves by import rather than by a
+        # working-directory-relative path.
+        command = (
+            f"{python_command} -m {self.worker_module} --input {input_pickle_path} "
+            f"--output {output_pickle_path} --block_config {pickled_block_config} "
+            f"--config {pickled_config} --n_jobs {n_jobs}"
+        )
 
         if pickled_filemap_path is not None:
             command += f" -f {pickled_filemap_path}"
@@ -328,10 +320,10 @@ class SegmentationBuildingBlock(BuildingBlock):
 
         if block_config["segmentation_method"] in NON_LEARNING_METHODS:
             requires_gpu = False
-            script_path = "./towbintools_pipeline/non_learning_segment.py"
+            worker_module = "towbintools_pipeline.workers.segmentation_non_learning"
         elif block_config["segmentation_method"] in LEARNING_BASED_METHODS:
             requires_gpu = True
-            script_path = "./towbintools_pipeline/learning_based_segment.py"
+            worker_module = "towbintools_pipeline.workers.segmentation_learning_based"
         else:
             raise ValueError(
                 f"Segmentation method {block_config['segmentation_method']} not supported."
@@ -342,7 +334,7 @@ class SegmentationBuildingBlock(BuildingBlock):
             OPTIONS_MAP["segmentation"],
             block_config,
             "subdir",
-            script_path,
+            worker_module,
             requires_gpu,
         )
 
@@ -371,13 +363,13 @@ class SegmentationBuildingBlock(BuildingBlock):
 
 class StraighteningBuildingBlock(BuildingBlock):
     def __init__(self, block_config):
-        script_path = "./towbintools_pipeline/straighten.py"
+        worker_module = "towbintools_pipeline.workers.straightening"
         super().__init__(
             "straightening",
             OPTIONS_MAP["straightening"],
             block_config,
             "subdir",
-            script_path,
+            worker_module,
         )
 
     def get_output_name(self, config, subdir):
@@ -432,13 +424,13 @@ class StraighteningBuildingBlock(BuildingBlock):
 
 class QualityControlBuildingBlock(BuildingBlock):
     def __init__(self, block_config):
-        script_path = "./towbintools_pipeline/quality_control.py"
+        worker_module = "towbintools_pipeline.workers.quality_control"
         super().__init__(
             "quality_control",
             OPTIONS_MAP["quality_control"],
             block_config,
             "csv",
-            script_path,
+            worker_module,
             requires_filemap=True,
         )
         self.mask_only = (
@@ -485,13 +477,13 @@ class QualityControlBuildingBlock(BuildingBlock):
 
 class MorphologyComputationBuildingBlock(BuildingBlock):
     def __init__(self, block_config):
-        script_path = "./towbintools_pipeline/compute_morphology.py"
+        worker_module = "towbintools_pipeline.workers.morphology_computation"
         super().__init__(
             "morphology_computation",
             OPTIONS_MAP["morphology_computation"],
             block_config,
             "csv",
-            script_path,
+            worker_module,
         )
 
     def get_output_name(self, config, subdir):
@@ -522,13 +514,13 @@ class MorphologyComputationBuildingBlock(BuildingBlock):
 
 class MoltDetectionBuildingBlock(BuildingBlock):
     def __init__(self, block_config):
-        script_path = "./towbintools_pipeline/detect_molts.py"
+        worker_module = "towbintools_pipeline.workers.molt_detection"
         super().__init__(
             "molt_detection",
             OPTIONS_MAP["molt_detection"],
             block_config,
             "csv",
-            script_path,
+            worker_module,
         )
 
     def get_output_name(self, config, subdir):
@@ -542,13 +534,13 @@ class MoltDetectionBuildingBlock(BuildingBlock):
 
 class FluorescenceQuantificationBuildingBlock(BuildingBlock):
     def __init__(self, block_config):
-        script_path = "./towbintools_pipeline/quantify_fluorescence.py"
+        worker_module = "towbintools_pipeline.workers.fluorescence_quantification"
         super().__init__(
             "fluorescence_quantification",
             OPTIONS_MAP["fluorescence_quantification"],
             block_config,
             "csv",
-            script_path,
+            worker_module,
         )
 
     def get_output_name(self, config, subdir):
@@ -599,13 +591,14 @@ class FluorescenceQuantificationBuildingBlock(BuildingBlock):
 
 class CustomBuildingBlock(BuildingBlock):
     def __init__(self, block_config):
-        script_path = block_config["custom_script_path"]
+        # No worker module: custom blocks run a user-supplied script and override
+        # create_command below.
         super().__init__(
             "custom",
             OPTIONS_MAP["custom"],
             block_config,
             block_config["custom_script_return_type"],
-            script_path,
+            None,
             requires_gpu=block_config.get("custom_script_requires_gpu", False),
             requires_filemap=False,
         )

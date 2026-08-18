@@ -2,7 +2,7 @@ import logging
 import os
 
 import polars as pl
-import utils
+from towbintools_pipeline import utils
 from joblib import delayed
 from joblib import Parallel
 from joblib import parallel_config

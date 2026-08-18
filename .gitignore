@@ -174,9 +174,9 @@ tests/*_analysis/
 *.err
 *.out
 
-defaults/config/*
-!defaults/config/config.yaml
-!defaults/config/slurm_config.yaml
+towbintools_pipeline/defaults/config/*
+!towbintools_pipeline/defaults/config/config.yaml
+!towbintools_pipeline/defaults/config/slurm_config.yaml
 training/*.yaml
 training/segmentation/configs/*
 !training/segmentation/configs/segmentation_training_config.yaml

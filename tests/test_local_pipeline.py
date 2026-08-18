@@ -356,6 +356,15 @@ def test_get_python_command():
     )
 
 
+def test_init_pipeline_importable_without_side_effects():
+    # The entry point requires the module to import without parsing args or
+    # running anything; main() is the callable it points at.
+    import towbintools_pipeline.init_pipeline as ip
+
+    assert callable(ip.main)
+    assert callable(ip.build_blocks_for_subdir)
+
+
 def test_slurm_extra_options_accumulate():
     # Scalar keys are replaced by a section, but sbatch_extra_options entries are
     # appended, so a cluster-wide option is never silently dropped.
