@@ -177,12 +177,13 @@ carried a real cost was written down (see `TRADEOFFS.md`).
   - **Optional**: Exhaustive **API enhancement**, for instance an object-oriented
     approach allowing for stepwise procedure and opt-in linking of the blocks.
 
-## The three documents, going forward
+## The documents, going forward
 
 - **`REFACTOR_OVERVIEW.md`** (this file) — what changed and why.
 - **`TRADEOFFS.md`** — the decision ledger: every change that cost something,
   split into *introduced by this refactor* and *inherited and consciously kept*.
   For asking questions like "why did we do X, and what did it cost?"
 - **`DOCS_TODO.md`** — the working feedstock for the eventual user-docs rewrite,
-  plus deferred engineering TODOs and the agreed code conventions. Drives the docs
-  step and the non-core follow-up.
+  plus the agreed code conventions. Drives the docs step.
+- **`OUTLOOK.md`** — forward-looking notes: the future-work index and the
+  engineering/design cleanups consciously deferred.
