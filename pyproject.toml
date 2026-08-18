@@ -25,8 +25,13 @@ dependencies = [
 dev = ["pytest"]
 
 [project.scripts]
-# Installed command equivalent to `python -m towbintools_pipeline.init_pipeline`.
-towbintools-pipeline = "towbintools_pipeline.init_pipeline:main"
+# Subcommand dispatcher: `towbintools-pipeline run|init-configs`. With no known
+# subcommand it forwards to `run`, so `towbintools-pipeline -c config.yaml` and
+# `python -m towbintools_pipeline.init_pipeline` both still work.
+# `tt-pipeline` and `ttp` are shorter aliases for the same command.
+towbintools-pipeline = "towbintools_pipeline.cli:main"
+tt-pipeline = "towbintools_pipeline.cli:main"
+ttp = "towbintools_pipeline.cli:main"
 
 [tool.setuptools]
 # The pipeline core and its workers; gui/ and training/ are not part of it.

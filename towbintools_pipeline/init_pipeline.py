@@ -32,9 +32,11 @@ from towbintools_pipeline.utils import (
 )
 
 
-def get_args():
+def get_args(argv=None):
     parser = argparse.ArgumentParser()
-    parser.add_argument("-c", "--config", help="Path to the config file", required=True)
+    # The config can be given positionally or with -c; -c wins if both are set.
+    parser.add_argument("config_positional", nargs="?", help="Path to the config file")
+    parser.add_argument("-c", "--config", help="Path to the config file")
     parser.add_argument(
         "-t",
         "--temp_dir",
@@ -47,7 +49,10 @@ def get_args():
         help="Path to the experiment directory (overrides the config)",
         required=False,
     )
-    args = parser.parse_args()
+    args = parser.parse_args(argv)
+    args.config = args.config or args.config_positional
+    if not args.config:
+        parser.error("a config file is required (positional or -c/--config)")
     return args
 
 
@@ -213,8 +218,8 @@ def build_blocks_for_subdir(global_config, temp_dir_basename, temp_dir, subdir=N
     return building_blocks
 
 
-def main():
-    args = get_args()
+def main(argv=None):
+    args = get_args(argv)
     config_file = args.config
     temp_dir = args.temp_dir
 
