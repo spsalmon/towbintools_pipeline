@@ -19,7 +19,7 @@ You will find a detailed explanation on how to run the pipeline here : <https://
 
 You will find a detailed explanation on how to update the pipeline here : <https://spsalmon.github.io/towbintools_pipeline/getting-started/update/>
 
-## How to set up Visual Studio Code ?
+## How to set up Visual Studio Code ? (for members of the IZB)
 
 1. Download VS Code : <https://code.visualstudio.com/download>
 2. Install it like you would install any software.
