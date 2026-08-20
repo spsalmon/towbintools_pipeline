@@ -627,6 +627,7 @@ class CustomBuildingBlock(BuildingBlock):
         output_pickle_path,
         pickled_block_config,
         pickled_config,
+        config,
         pickled_filemap_path=None,
     ):
         custom_script_path = self.block_config["custom_script_path"]

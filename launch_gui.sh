@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 # --- Configuration: edit these ---
-FILEMAP_PATH="/mnt/towbin.data/shared/spsalmon/20260609_163634_517_ZIVA_60x_307_405_yap_dynamics/analysis/report/analysis_filemap.parquet"
+FILEMAP_PATH="/mnt/towbin.data/shared/spsalmon/20260807_134551_682_ZIVA_60x_col10_reporter/analysis/report/analysis_filemap.parquet"
 OPEN_ANNOTATED=1      # 1 = open annotated if exists, 0 = always open original
 RECOMPUTE_VALUES_AT_MOLT=0            # 1 = recompute features at molt, 0 = skip if already computed
 PORT=0             # 0 = random available port

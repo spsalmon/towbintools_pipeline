@@ -7,7 +7,7 @@ from joblib import Parallel
 from tqdm import tqdm
 
 experiment_dir = (
-    "/mnt/towbin.data/shared/spsalmon/20260609_163634_517_ZIVA_60x_307_405_yap_dynamics"
+    "/mnt/towbin.data/shared/spsalmon/20260807_134551_682_ZIVA_60x_col10_reporter"
 )
 image_dir = os.path.join(experiment_dir, "raw")
 
