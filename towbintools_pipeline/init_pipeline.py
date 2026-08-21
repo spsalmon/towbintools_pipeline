@@ -1,0 +1,290 @@
+"""Pipeline entry point: load the config, build the sequence of building blocks
+for the experiment (per raw subdir), and launch the first one. The block linker
+chains the rest. Exposed as the `towbintools-pipeline` command via main().
+"""
+
+import argparse
+import os
+
+import numpy as np
+import polars as pl
+import yaml
+from towbintools.foundation.file_handling import get_dir_filemap
+from towbintools.foundation.file_handling import read_filemap
+from towbintools.foundation.file_handling import write_filemap
+
+from towbintools_pipeline.building_blocks import parse_and_create_building_blocks
+from towbintools_pipeline.building_blocks import validate_config
+from towbintools_pipeline.utils import backup_run_config
+from towbintools_pipeline.utils import block_label
+from towbintools_pipeline.utils import get_and_create_folders
+from towbintools_pipeline.utils import get_experiment_subdirs
+from towbintools_pipeline.utils import get_experiment_time_from_filemap
+from towbintools_pipeline.utils import merge_slurm_config
+from towbintools_pipeline.utils import pickle_objects
+from towbintools_pipeline.utils import save_version_control_info
+from towbintools_pipeline.utils import setup_run_dir
+from towbintools_pipeline.utils import sync_backup_folder
+
+
+def get_args(argv=None):
+    parser = argparse.ArgumentParser()
+    # The config can be given positionally or with -c; -c wins if both are set.
+    parser.add_argument("config_positional", nargs="?", help="Path to the config file")
+    parser.add_argument("-c", "--config", help="Path to the config file")
+    parser.add_argument(
+        "-t",
+        "--temp_dir",
+        help="Path to the directory storing temporary files (overrides the config)",
+        required=False,
+    )
+    parser.add_argument(
+        "-e",
+        "--experiment_dir",
+        help="Path to the experiment directory (overrides the config)",
+        required=False,
+    )
+    args = parser.parse_args(argv)
+    args.config = args.config or args.config_positional
+    if not args.config:
+        parser.error("a config file is required (positional or -c/--config)")
+    return args
+
+
+def build_blocks_for_subdir(global_config, temp_dir_basename, temp_dir, subdir=None):
+    print(f"### Initializing the pipeline for subdir {subdir} ###")
+
+    (
+        experiment_dir,
+        raw_subdir,
+        analysis_subdir,
+        report_subdir,
+        pipeline_backup_dir,
+    ) = get_and_create_folders(global_config, subdir)
+
+    pipeline_backup_dir = os.path.join(pipeline_backup_dir, temp_dir_basename)
+    os.makedirs(pipeline_backup_dir, exist_ok=True)
+
+    config = global_config.copy()
+
+    config["raw_subdir"] = raw_subdir
+    if subdir is None:
+        raw_dir_name = os.path.basename(os.path.normpath(raw_subdir))
+    else:
+        # instead, get the name from the parent directory
+        raw_dir_name = os.path.basename(os.path.normpath(os.path.dirname(raw_subdir)))
+
+    config["raw_dir_name"] = raw_dir_name
+    config["analysis_subdir"] = analysis_subdir
+    config["report_subdir"] = report_subdir
+    config["pipeline_backup_dir"] = pipeline_backup_dir
+    config["temp_dir"] = temp_dir
+
+    report_format = config.get("report_format", "csv")
+    config["report_format"] = report_format
+
+    time_regex = config.get("time_regex", r"Time(\d+)")
+    point_regex = config.get("point_regex", r"Point(\d+)")
+
+    sync_backup_folder(temp_dir, pipeline_backup_dir)
+
+    extract_experiment_time = config.get("get_experiment_time", True)
+    overwrite_annotated = config.get("overwrite_annotated_filemap", False)
+
+    # if the filemap does not exist, create it from the raw directory
+    if not os.path.exists(
+        os.path.join(report_subdir, f"analysis_filemap.{report_format}")
+    ):
+        try:
+            experiment_filemap = get_dir_filemap(raw_subdir, time_regex, point_regex)
+        except Exception as e:
+            print(f"Error generating filemap from directory: {e}")
+            experiment_filemap = pl.DataFrame()
+
+        # if the filemap is empty, it's probably because they do not follow the Time, Point structure
+        if experiment_filemap.is_empty():
+            image_paths = sorted(
+                [os.path.join(raw_subdir, f) for f in os.listdir(raw_subdir)]
+            )
+            experiment_filemap = pl.DataFrame({"ImagePath": image_paths})
+            config["no_timepoints"] = True
+
+        experiment_filemap = experiment_filemap.rename({"ImagePath": raw_dir_name})
+        filemap_path = os.path.join(report_subdir, f"analysis_filemap.{report_format}")
+        experiment_filemap = experiment_filemap.fill_nan("").fill_null("")
+        write_filemap(experiment_filemap, filemap_path)
+
+    # select the right filemap
+    if overwrite_annotated and os.path.exists(
+        os.path.join(report_subdir, f"analysis_filemap_annotated.{report_format}")
+    ):
+        filemap_path = os.path.join(
+            report_subdir, f"analysis_filemap_annotated.{report_format}"
+        )
+    else:
+        filemap_path = os.path.join(report_subdir, f"analysis_filemap.{report_format}")
+
+    experiment_filemap = read_filemap(filemap_path)
+    experiment_filemap = experiment_filemap.fill_nan("").fill_null("")
+
+    # Check for new files added to the raw directory since the filemap was created
+    if "Time" in experiment_filemap.columns and "Point" in experiment_filemap.columns:
+        try:
+            current_dir_filemap = get_dir_filemap(raw_subdir, time_regex, point_regex)
+            if not current_dir_filemap.is_empty():
+                current_dir_filemap = current_dir_filemap.rename(
+                    {"ImagePath": raw_dir_name}
+                )
+                new_rows = current_dir_filemap.join(
+                    experiment_filemap.select(["Time", "Point"]),
+                    on=["Time", "Point"],
+                    how="anti",
+                )
+                if not new_rows.is_empty():
+                    print(
+                        f"### Found {len(new_rows)} new file(s) in {raw_subdir}, adding to filemap ###"
+                    )
+                    for col in experiment_filemap.columns:
+                        if col not in new_rows.columns:
+                            new_rows = new_rows.with_columns(
+                                pl.lit(None)
+                                .cast(experiment_filemap[col].dtype)
+                                .alias(col)
+                            )
+                    new_rows = new_rows.select(experiment_filemap.columns)
+                    experiment_filemap = pl.concat([experiment_filemap, new_rows]).sort(
+                        ["Time", "Point"]
+                    )
+                    # Fill string columns with ""; numeric nulls (ExperimentTime)
+                    # stay null and are computed below.
+                    experiment_filemap = experiment_filemap.with_columns(
+                        pl.col(c).fill_null("")
+                        for c, dt in zip(
+                            experiment_filemap.columns, experiment_filemap.dtypes
+                        )
+                        if dt in (pl.Utf8, pl.String, pl.Categorical)
+                    )
+                    write_filemap(experiment_filemap, filemap_path)
+        except Exception as e:
+            print(f"Warning: could not check for new files in raw directory: {e}")
+
+    config["filemap_path"] = filemap_path
+
+    # Compute ExperimentTime if missing. When rows already have it (e.g. existing
+    # filemap), only compute for the new rows that lack it (recompute=False).
+    has_missing_exp_time = (
+        "ExperimentTime" in experiment_filemap.columns
+        and "Time" in experiment_filemap.columns
+        and experiment_filemap["ExperimentTime"].is_null().any()
+    )
+    if "ExperimentTime" not in experiment_filemap.columns or has_missing_exp_time:
+        if extract_experiment_time:
+            print("### Calculating ExperimentTime ###")
+            experiment_filemap = experiment_filemap.with_columns(
+                pl.lit(
+                    get_experiment_time_from_filemap(
+                        experiment_filemap, config, recompute=not has_missing_exp_time
+                    )
+                ).alias("ExperimentTime")
+            )
+            write_filemap(experiment_filemap, filemap_path)
+        else:
+            experiment_filemap = experiment_filemap.with_columns(
+                pl.lit(np.nan).alias("ExperimentTime")
+            )
+            write_filemap(experiment_filemap, filemap_path)
+
+    print("Building the config of the building blocks ...")
+
+    building_blocks = parse_and_create_building_blocks(config)
+
+    building_blocks = [
+        {"block": block, "subdir": subdir, "config": config}
+        for block in building_blocks
+    ]
+    print(f"Building blocks created: {len(building_blocks)}")
+
+    return building_blocks
+
+
+def main(argv=None):
+    args = get_args(argv)
+    config_file = args.config
+    temp_dir = args.temp_dir
+
+    with open(config_file) as f:
+        global_config = yaml.load(f, Loader=yaml.FullLoader)
+
+    # A CLI experiment_dir overrides the one in the config.
+    if args.experiment_dir:
+        global_config["experiment_dir"] = os.path.abspath(args.experiment_dir)
+
+    # Pull SLURM resources in from their separate file (cluster backend only).
+    global_config = merge_slurm_config(global_config, config_file)
+
+    # Fail fast on a bad config, before any run dir or job is created.
+    validate_config(global_config)
+
+    # Temp files: --temp_dir, else a temp_dir config key, else ./temp_files in the
+    # working directory (transient, gitignored; matches the sbatch launcher).
+    if temp_dir:
+        temp_dir = os.path.abspath(temp_dir)
+    elif global_config.get("temp_dir"):
+        temp_dir = os.path.abspath(global_config["temp_dir"])
+    else:
+        temp_dir = os.path.abspath("temp_files")
+
+    # Each run gets its own subdirectory, so repeated runs never overwrite one
+    # another's temp files or their backup.
+    temp_dir = setup_run_dir(temp_dir, global_config.get("backend", "slurm"))
+    temp_dir_basename = os.path.basename(temp_dir)
+
+    # Snapshot the config(s) and version info into the run's temp dir (synced to
+    # the backup) as a write-only record of the run.
+    backup_run_config(global_config, config_file, temp_dir)
+    save_version_control_info(temp_dir)
+
+    subdirs = get_experiment_subdirs(global_config)
+    building_blocks = []
+    print(f"Running the pipeline for subdirs: {subdirs}")
+    if not subdirs:
+        building_blocks.extend(
+            build_blocks_for_subdir(global_config, temp_dir_basename, temp_dir)
+        )
+    else:
+        for subdir in subdirs:
+            building_blocks.extend(
+                build_blocks_for_subdir(
+                    global_config, temp_dir_basename, temp_dir, subdir
+                )
+            )
+
+    # initialize on 1 as we're gonna run the first block immediately
+    progress_tracker = {"current_block_index": 1, "building_blocks": building_blocks}
+    progress_tracker_pickle = {"path": "progress_tracker", "obj": progress_tracker}
+
+    _ = pickle_objects(temp_dir, progress_tracker_pickle)
+
+    # The planned sequence, so the per-block logs further down can be placed.
+    print(f"### Pipeline plan: {len(building_blocks)} blocks ###")
+    for index in range(len(building_blocks)):
+        print(f"  {block_label(building_blocks, index)}")
+
+    # Run the first building block
+    current = building_blocks[0]
+    current_building_block, current_subdir, current_config = (
+        current["block"],
+        current["subdir"],
+        current["config"],
+    )
+
+    experiment_filemap = read_filemap(current_config["filemap_path"])
+    print(f"### Starting block {block_label(building_blocks, 0)} ###")
+    print(f"Running {current_building_block} ...", flush=True)
+    current_building_block.run(
+        experiment_filemap, current_config, subdir=current_subdir
+    )
+
+
+if __name__ == "__main__":
+    main()

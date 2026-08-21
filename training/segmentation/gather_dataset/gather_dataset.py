@@ -5,8 +5,8 @@ import shutil
 import numpy as np
 import polars as pl
 import yaml
-from joblib import delayed
 from joblib import Parallel
+from joblib import delayed
 from tifffile import imwrite
 from towbintools.foundation.image_handling import read_tiff_file
 from tqdm import tqdm
@@ -165,7 +165,6 @@ def get_images_from_filemap(
     extra_adulthood_time=40,
     n_picks=10,
 ):
-    global variation_to_unified_scope_name
     experiment_name = filemap_path.split("/")[-4]
     filemap_df = pl.read_csv(filemap_path)
 
@@ -228,7 +227,7 @@ def get_images_from_filemap(
         ):
             # handle experiments where all larval stages are annotated
 
-            (hatch_time, m1, m2, m3, m4) = filemap.select(
+            hatch_time, m1, m2, m3, m4 = filemap.select(
                 pl.cols(["HatchTime", "M1", "M2", "M3", "M4"])
             ).row(0)
 

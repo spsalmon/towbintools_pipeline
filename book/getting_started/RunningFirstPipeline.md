@@ -8,7 +8,7 @@ the unique identifier for the position (individual worm if each position contain
 
 The pipeline works using atomic [building blocks](https://spsalmon.github.io/towbintools_pipeline/building-blocks/buildingblock/), head to the **Building Block** section to learn more about them.
 
-After installing the pipeline you will find an example of a working configuration for measuring organ and body size over  in the 'configs/' directory. The default configuration in 'configs/config.yaml' will be reset to its upstream version every time you update.
+After installing the pipeline you will find an example of a working configuration for measuring organ and body size over  in the 'towbintools_pipeline/defaults/configs/' directory. The default configuration in 'towbintools_pipeline/defaults/configs/config.yaml' will be reset to its upstream version every time you update.
 
 Let's break it down!
 
@@ -35,7 +35,7 @@ point_regex: 'Point(\d+)'
 If you have different imaging modalities during your timelapse (let's say you acquire a picture of each worm every 10 minutes but also take a Z-stack every hour), you should split them in different raw directories (e.g. raw and raw_stack). You can then run a pipeline for each of those directories and merge them at the end simply by joining the two dataframes.
 
 ```yaml
-use_slurm: True
+backend: "slurm"
 sbatch_memory: 64G
 sbatch_time: 0-48:00:00
 sbatch_cpus: 32
@@ -43,7 +43,7 @@ sbatch_gpus: "rtx6000:1"
 ```
 
 Those options control the amount of RAM, CPU cores, and GPU allocated to each building block, as well as their time limit. GPUs will only get allocated to jobs that can make use of them (segmentation, molt detection, or
-custom script requiring GPU). If you don't have access to a cluster and want to run the pipeline on your local machine, simply set **use_slurm** to False and the building blocks will be run sequentially (NOT IMPLEMENTED YET).
+custom script requiring GPU). If you don't have access to a cluster and want to run the pipeline on your local machine, simply set **backend** to "local" and the building blocks will be run sequentially.
 
 ```yaml
 building_blocks:
@@ -88,13 +88,13 @@ batch_size: [ 4 ]
 ```
 ## Running the pipeline
 
-An example configuration will always be available in the 'configs/' directory of your pipeline installation. You can use it as a template to build your own configuration. This configuration file will automatically be updated to the latest version when you update the pipeline. You should therefore not use it as your working configuration, but rather copy it and give it a different name. You can then modify it to fit your needs. This copied version will not be overwritten when we update the original configuration file.
+An example configuration will always be available in the 'towbintools_pipeline/defaults/configs/' directory of your pipeline installation. You can use it as a template to build your own configuration. This configuration file will automatically be updated to the latest version when you update the pipeline. You should therefore not use it as your working configuration, but rather copy it and give it a different name. You can then modify it to fit your needs. This copied version will not be overwritten when we update the original configuration file.
 
 Once your configuration is finished, you can save it anywhere. Let's assume you saved it in ~/towbintools_pipeline/configs/my_configuration.yaml. I recommend picking a folder where you will centralize all your configuration. The configuration you run on an experiment will always be backed up in the analysis/report folder of said experiment. To run this specific configuration :
 
 ```bash
 cd ~/towbintools_pipeline # or wherever you chose to put the pipeline folder
-bash run_pipeline.sh -c configs/my_configuration.yaml
+bash scripts/run_pipeline.sh -c configs/my_configuration.yaml
 ```
 
 The -c argument is used to specify the path to the configuration to be run.

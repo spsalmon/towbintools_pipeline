@@ -1,0 +1,56 @@
+# Packaging for the pipeline core: makes the repo pip-installable
+# (`pip install -e .`) so it runs from any cwd, declares the core runtime
+# dependencies, and exposes the `towbintools-pipeline` command.
+[build-system]
+requires = ["setuptools>=64"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "towbintools_pipeline"
+version = "0.1.0"
+description = "Configurable image-analysis pipeline built on towbintools."
+requires-python = ">=3.11"
+dependencies = [
+    "towbintools",
+    "numpy",
+    "polars",
+    "pyarrow",
+    "joblib",
+    "tifffile",
+    "pyyaml",
+    "lxml",
+]
+
+[project.optional-dependencies]
+dev = ["pytest"]
+
+[project.scripts]
+# Subcommand dispatcher: `towbintools-pipeline run|init-configs`. With no known
+# subcommand it forwards to `run`, so `towbintools-pipeline -c config.yaml` and
+# `python -m towbintools_pipeline.init_pipeline` both still work.
+# `tt-pipeline` and `ttp` are shorter aliases for the same command.
+towbintools-pipeline = "towbintools_pipeline.cli:main"
+tt-pipeline = "towbintools_pipeline.cli:main"
+ttp = "towbintools_pipeline.cli:main"
+
+[tool.setuptools]
+# The pipeline core and its workers; gui/ and training/ are not part of it.
+packages = ["towbintools_pipeline", "towbintools_pipeline.workers"]
+
+[tool.setuptools.package-data]
+# Ship the bundled example configs and default models with the package.
+towbintools_pipeline = ["defaults/**/*.yaml", "defaults/**/*.ckpt", "defaults/**/*.json"]
+
+[tool.black]
+# Pin the target explicitly. Left unset, Black infers targets from
+# requires-python (">=3.11") and includes every future version it knows about
+# (py314), then fails its AST safety check when run under an older interpreter.
+# The floor of requires-python is the correct target: output must parse on 3.11.
+target-version = ["py311"]
+
+[tool.isort]
+# black-compatible import sorting. force_single_line keeps the one-import-per-line
+# style the repo already used under reorder-python-imports, which was dropped
+# because it strips the blank line after a module docstring that Black re-adds.
+profile = "black"
+force_single_line = true

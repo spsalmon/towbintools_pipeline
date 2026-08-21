@@ -7,9 +7,9 @@ import pandas as pd
 import xgboost as xgb
 import yaml
 from bayes_opt import BayesianOptimization
+from joblib import Parallel
 from joblib import delayed
 from joblib import dump
-from joblib import Parallel
 from sklearn.metrics import classification_report
 from sklearn.metrics import f1_score
 from sklearn.model_selection import train_test_split
