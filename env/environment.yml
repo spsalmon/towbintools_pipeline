@@ -26,7 +26,8 @@ dependencies:
   - tox
 
   - pip:
-    - nvidia-cublas-cu12 < 12.8
+    - torch<2.8
+    - torchvision
     - bioio
     - bioio-nd2
     - bioio-ome-tiff

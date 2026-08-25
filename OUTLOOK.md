@@ -9,11 +9,13 @@ top three below. Decisions that cost something are in
 sections.
 
 ## Future work (roughly priority-ordered)
+
 Single index of what is still to come; details live in DOCS_TODO where noted.
 Higher items first; the top three are the overview's major follow-ups, the rest
 are smaller. (DONE: config-validation of input paths + unknown-key rejection —
 see "Config validation"; the `init-configs` scaffolding command and the
 subcommand dispatcher — see "CLI / commands".)
+
 1. **Extras adaptation (PR F)** — bring `tools/`, `gui/`, `training/`,
    `examples/custom_scripts/` onto the new layout + code conventions (see the
    "Code conventions" scope note). Deferred until the core path is agreed.
@@ -35,6 +37,7 @@ subcommand dispatcher — see "CLI / commands".)
    doing against the current scheme.
 
 ## Deferred engineering cleanup
+
 - Cluster dep de-duplication was CONSIDERED and dropped: the cluster build is a
   hash-pinned `--require-hashes --no-deps` install from `conda-linux-64.lock`, so
   a `- .` (unhashable local path) does not fit, and `environment.yml` is a
@@ -44,6 +47,7 @@ subcommand dispatcher — see "CLI / commands".)
   A future pyproject-extras approach (gui/training groups) could revisit de-dup.
 
 ## Deferred design / cleanup (later PRs)
+
 - Folder inputs, further: `resolve_ref` covers name-only refs (done). Still open
   if needed: first-class (a) absolute and (c) relative external-directory refs
   (today an absolute path passes through, but there is no relative-to-experiment
@@ -51,3 +55,46 @@ subcommand dispatcher — see "CLI / commands".)
 - Naming: `analysis_dir_name` / `analysis_subdir` really denote the OUTPUT
   directory. Renaming the KEY is a breaking config change, so it stays deferred
   and separate from the (now-done) ref decoupling.
+
+## Robustness findings from a local end-to-end run (found 2026-08-25)
+
+Surfaced while validating the fork with a local pip install + smoke test. None
+block the merge (several confirmed pre-existing in the original); all are
+robustness / UX / packaging improvements. Handling principle: prefer fixing the
+CODE to be version-robust over pinning; reserve version constraints for genuinely
+external API breaks, and use loose caps — never an exact pin just because a newer
+version exists.
+
+1. **no_timepoints + get_experiment_time crash (PRE-EXISTING).** When raw
+   filenames don't match `time_regex`/`point_regex`, the filemap falls back to a
+   no-timepoints frame (`config["no_timepoints"]=True`), but the guard in
+   `init_pipeline.py` checks only `get_experiment_time`, not `no_timepoints`, so
+   it still calls `get_experiment_time_from_filemap`, which needs a `Time` column
+   → `ColumnNotFoundError`. Fix: skip experiment-time extraction (or return null
+   ExperimentTime) when `no_timepoints`.
+2. **Poisoned filemap cache.** The filemap is regenerated only if absent, but it
+   is written before the experiment-time step can crash — so a mid-init crash
+   leaves a stale/broken filemap that survives config/regex fixes until the
+   analysis output dir is deleted. Fix: don't persist until valid, or invalidate
+   on crash.
+3. **Raw column named after the folder; block refs hardcode `"raw"`.** The raw
+   column is `raw_dir_name`; `resolve_ref` passes a ref through only if it equals
+   `raw_dir_name` (or is absolute), else prefixes `analysis_dir_name/`. So when
+   `raw_dir_name != "raw"`, every `"raw"` block ref breaks. Fix: treat literal
+   `"raw"` as always the raw input, regardless of `raw_dir_name`.
+4. **cellpose imported at module scope.** `workers/segmentation_learning_based.py`
+   does `from cellpose import models` at import time, so the module fails without
+   cellpose even for `deep_learning`. Fix: lazy-import cellpose inside the cellpose
+   path; same idea for other heavy method-specific imports.
+5. **pyproject under-declares deps (overlaps the PyPI item above).** The pipeline
+   directly imports cv2/scipy/torch/xgboost/pandas/tqdm but declares none — they
+   arrive transitively via towbintools, so the set is fragile (an unpinned
+   cellpose install pulled `opencv-python-headless` over the `opencv-contrib`
+   towbintools needs → straightening crashed). Fix: declare the direct imports;
+   put heavy backends (cellpose, segment_anything) behind extras; add loose caps
+   for known-bad combos (e.g. opencv-contrib 4.x).
+6. **quality_control crashes when all samples are eggs.** If the egg
+   pre-classifier labels every sample egg, `non_egg_indices` is empty → empty
+   xgboost DMatrix → `np.argmax(..., axis=1)` raises. Whether it crashes is
+   xgboost-version-dependent (3.4.1 raises, 3.3.0 tolerated). Fix
+   (version-independent): short-circuit when there are no non-egg samples.

@@ -8,11 +8,14 @@ import scipy.io as sio
 from app_components.backend import build_single_values_df
 from app_components.backend import check_use_experiment_time
 from app_components.backend import ECDYSIS_COLUMNS
+from app_components.backend import get_molt_interval_bands
 from app_components.backend import get_points_for_value_at_molts
 from app_components.backend import KEY_CONVERSION_MAP
+from app_components.backend import MOLT_ENTRY_COLUMNS
 from app_components.backend import populate_column_choices
 from app_components.backend import process_feature_at_molt_columns
 from app_components.backend import set_marker_shape
+from app_components.backend import VALUE_AT_COLUMNS
 from app_components.image_cache import array_to_data_url
 from app_components.image_cache import BackgroundLoader
 from app_components.image_cache import compose_display_image
@@ -110,6 +113,14 @@ def main_server(
         reactive.Value("") for _ in range(5)
     )
 
+    m1_entry, m2_entry, m3_entry, m4_entry = (reactive.Value("") for _ in range(4))
+    (
+        value_at_m1_entry,
+        value_at_m2_entry,
+        value_at_m3_entry,
+        value_at_m4_entry,
+    ) = (reactive.Value("") for _ in range(4))
+
     ignore_start = reactive.Value("")
     death = reactive.Value("")
     arrest = reactive.Value("")
@@ -150,6 +161,31 @@ def main_server(
             ECDYSIS_COLUMNS,
             [hatch, m1, m2, m3, m4],
             [value_at_hatch, value_at_m1, value_at_m2, value_at_m3, value_at_m4],
+        )
+    ]
+
+    [
+        molt_annotation_buttons_server(
+            molt_name,
+            current_point_filemap,
+            single_values_of_point,
+            column_to_plot,
+            current_time,
+            current_time_index,
+            molt_time,
+            value_at_molt,
+            molt_name=molt_name,
+            use_experiment_time=use_experiment_time,
+        )
+        for molt_name, molt_time, value_at_molt in zip(
+            MOLT_ENTRY_COLUMNS,
+            [m1_entry, m2_entry, m3_entry, m4_entry],
+            [
+                value_at_m1_entry,
+                value_at_m2_entry,
+                value_at_m3_entry,
+                value_at_m4_entry,
+            ],
         )
     ]
 
@@ -263,6 +299,17 @@ def main_server(
                             col
                         )
                     )
+
+            # Always classify frames using the qc of the filemap currently open in
+            # the GUI, never the qc the imported file happens to carry. Drop any
+            # imported qc so values-at-molt are computed against the GUI's qc only.
+            imported_df = imported_df.drop(
+                [col for col in imported_df.columns if "qc" in col]
+            )
+            for col in [col for col in filemap.columns if "qc" in col]:
+                imported_df = imported_df.with_columns(
+                    pl.lit(filemap.select(pl.col(col)).to_numpy().squeeze()).alias(col)
+                )
 
             imported_df = process_feature_at_molt_columns(
                 imported_df, feature_columns, recompute_features_at_molt=False
@@ -431,7 +478,7 @@ def main_server(
         work_df_columns.remove("Point")
         work_df_columns.remove("Time")
 
-        columns_to_drop = [c for c in work_df_columns if c in filemap.columns]
+        columns_to_drop = [c for c in work_df_columns if c in filemap_to_save.columns]
         if len(columns_to_drop) > 0:
             filemap_to_save = filemap_to_save.drop(columns_to_drop)
 
@@ -472,6 +519,11 @@ def main_server(
         for i, molt_value in enumerate(molt_values):
             molt_value.set(hatch_and_molts[i])
 
+        entry_times = sv.select(pl.col(MOLT_ENTRY_COLUMNS)).to_numpy().squeeze()
+        entry_values = [m1_entry, m2_entry, m3_entry, m4_entry]
+        for i, entry_value in enumerate(entry_values):
+            entry_value.set(entry_times[i])
+
         # Get values at each molt
         try:
             column = input.column_to_plot()
@@ -481,11 +533,13 @@ def main_server(
                 value_at_m2,
                 value_at_m3,
                 value_at_m4,
+                value_at_m1_entry,
+                value_at_m2_entry,
+                value_at_m3_entry,
+                value_at_m4_entry,
             ]
 
-            for i, (molt_value, molt_name) in enumerate(
-                zip(molt_feature_values, ECDYSIS_COLUMNS)
-            ):
+            for molt_value, molt_name in zip(molt_feature_values, VALUE_AT_COLUMNS):
                 molt_value.set(
                     single_values_of_point()
                     .select(pl.col(f"{column}_at_{molt_name}"))
@@ -914,6 +968,10 @@ def main_server(
             m4(),
             custom_annotations=custom_column_values(),
             dark_mode=dark_mode,
+            m1_entry=m1_entry(),
+            m2_entry=m2_entry(),
+            m3_entry=m3_entry(),
+            m4_entry=m4_entry(),
         )
 
         # molt scatter
@@ -935,6 +993,14 @@ def main_server(
             value_at_m2(),
             value_at_m3(),
             value_at_m4(),
+            m1_entry=m1_entry(),
+            m2_entry=m2_entry(),
+            m3_entry=m3_entry(),
+            m4_entry=m4_entry(),
+            value_at_m1_entry=value_at_m1_entry(),
+            value_at_m2_entry=value_at_m2_entry(),
+            value_at_m3_entry=value_at_m3_entry(),
+            value_at_m4_entry=value_at_m4_entry(),
         )
 
         # shapes (ignore region, death line, arrest overlay)
@@ -987,6 +1053,12 @@ def main_server(
                 )
             )
 
+        band_shapes = get_molt_interval_bands(
+            [m1_entry(), m2_entry(), m3_entry(), m4_entry()],
+            [m1(), m2(), m3(), m4()],
+            ["orange", "yellow", "green", "blue"],
+        )
+
         with _fig.batch_update():
             _fig.layout.shapes = []  # clear first
             _fig.data[0].x = times_of_point
@@ -1008,7 +1080,7 @@ def main_server(
             margin=dict(l=20, r=20, t=50, b=50),
             showlegend=False,
             yaxis_type="log" if input.log_scale() else "linear",
-            shapes=shapes + arrest_shapes,
+            shapes=shapes + arrest_shapes + band_shapes,
         )
 
     def save_on_session_end():

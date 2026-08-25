@@ -19,10 +19,9 @@ from towbintools.foundation import image_handling
 from towbintools.foundation.image_handling import read_tiff_file
 from tqdm import tqdm
 
-
 device = "cuda" if torch.cuda.is_available() else "cpu"
 
-model_dir = "/mnt/towbin.data/shared/spsalmon/towbinlab_segmentation_database/models/paper/body/towbintools_medium"
+model_dir = "/mnt/towbin.data/shared/spsalmon/towbinlab_segmentation_database/models/paper/body_bf/towbintools_light"
 
 model_name = "best_light.ckpt"
 model_path = os.path.join(model_dir, model_name)
@@ -42,7 +41,7 @@ model = load_segmentation_model_from_checkpoint(model_path).to(device)
 preprocessing_fn = get_prediction_augmentation_from_model(model)
 
 # Create the dataloader
-batch_size = 12
+batch_size = 4
 df = pd.read_csv(test_dataframe_path)
 image_paths = df["image"].values
 
@@ -91,8 +90,7 @@ with torch.no_grad():
     )
 
     for i, batch in enumerate(dataloader):
-        img_paths, images, image_shapes = batch
-        images = torch.from_numpy(images)
+        img_paths, images, image_shapes, invalid_indices = batch
         images = images.to(device)
         predictions = model(images)
         predictions = predictions.cpu().numpy()
@@ -102,6 +100,18 @@ with torch.no_grad():
         predictions = reshape_images_to_original_shape(
             predictions, image_shapes, padded_or_cropped="pad"
         )
+
+        # insert black masks for any images that failed to load
+        if len(invalid_indices) > 0:
+            predictions = np.array(predictions)
+            for j in invalid_indices:
+                predictions = np.insert(
+                    predictions,
+                    j,
+                    np.zeros_like(predictions[0]),
+                    axis=0,
+                )
+            predictions = list(predictions)
 
         Parallel(n_jobs=16, prefer="threads")(
             delayed(save_prediction)(prediction, image_path, output_path)

@@ -7,14 +7,14 @@ from joblib import Parallel
 from tqdm import tqdm
 
 experiment_dir = (
-    "/mnt/towbin.data/shared/spsalmon/20240524_161257_273_LIPSI_40x_397_405_no_crash"
+    "/mnt/towbin.data/shared/spsalmon/20260807_134551_682_ZIVA_60x_col10_reporter"
 )
 image_dir = os.path.join(experiment_dir, "raw")
 
 re_template = r"Channel\s*([A-Za-z0-9_,\s]+?)\s*_Seq"
 pattern_to_output = {
-    "DIA,DIA": "raw",
-    "mCherry,GFP": "raw_stacks",
+    "DIA,DIA,GFP,mCherry": "raw",
+    "GFP,mCherry": "raw_stacks",
 }
 
 # re_template = r"\.(\w+)$"

@@ -1,12 +1,12 @@
 #!/bin/bash
 
 #SBATCH -J train
-#SBATCH -o ../sbatch_output/train-%j.out
-#SBATCH -e ../sbatch_output/train-%j.err
+#SBATCH -o ../../sbatch_output/train-%j.out
+#SBATCH -e ../../sbatch_output/train-%j.err
 #SBATCH -c 64
 #SBATCH -t 72:00:00
 #SBATCH --mem=64GB
-#SBATCH --gres=gpu:rtx6000:1
+#SBATCH --gres=gpu:rtx4090:1
 
 # Default configuration file
 DEFAULT_CONFIG_FILE="./configs/segmentation_training_config.yaml"

@@ -189,3 +189,5 @@ CLAUDE.md
 .claude
 docs
 .superpowers
+*.pickle
+training/molt_detection/model_checkpoints/

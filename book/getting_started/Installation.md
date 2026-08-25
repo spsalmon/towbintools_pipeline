@@ -43,4 +43,4 @@ wsl --set-default-version 2
 wsl
 ```
 
-3. Follow Linux instructions inside of WSL.
+3. Follow the Linux instructions for pipeline installation while inside of WSL.

@@ -1,0 +1,28 @@
+# Configuration for gathering the molt detection training dataset.
+# Run with:
+#   ~/.local/bin/micromamba run -n towbintools python3 get_molt_detection_data.py -c configs/molt_dataset_config.yaml
+
+# Where to look for annotated experiments on the storage cluster.
+storage_cluster_path: "/mnt/towbin.data/shared"
+experimentalists: ["kstojanovski", "plenart", "igheor", "spsalmon"]
+scopes: ["ti2", "orca", "lipsi", "crest", "squid"]
+
+# Only keep experiments whose directory name starts with a year >= min_year and
+# contains one of the listed magnifications.
+min_year: 2024
+magnifications: ["10x", "10X"]
+
+# Columns read from each experiment's annotated filemap.
+worm_type_column: "ch2_seg_str_worm_type"
+volume_column: "ch2_seg_str_volume"
+
+# Ground-truth heatmap generation.
+sigma_frames: 2.0
+keymap_type: "gaussian"
+
+# Only keep time series whose length falls within these bounds.
+min_series_length: 200
+max_series_length: 1000
+
+# Where to write the generated dataset pickles.
+output_dir: "./molt_detection_dataset"

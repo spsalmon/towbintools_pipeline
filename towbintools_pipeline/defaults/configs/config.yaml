@@ -14,6 +14,9 @@ raw_dir_name: "raw"
 report_format: "parquet"
 pixelsize: [ 0.65 ]
 
+# When an annotated filemap exists, use it instead of the plain one.
+overwrite_annotated_filemap: False
+
 get_experiment_time: True
 
 # Regexes keep single quotes so the backslashes don't need escaping.
@@ -61,6 +64,10 @@ rerun_fluorescence_quantification: [ False ]
 rerun_quality_control: [ False ]
 rerun_molt_detection: [ False ]
 
+# Folder references below name a directory produced under the analysis dir; the
+# analysis_dir_name prefix is optional (e.g. "ch2_seg" == "analysis/ch2_seg").
+# "raw" is the raw input; an absolute path is used as-is.
+
 # segmentation parameters
 segmentation_column: [ "raw" ]
 segmentation_name_suffix: [ null ]
@@ -71,10 +78,6 @@ segmentation_channels: [ [ 1 ], [ 0 ] ]
 # deep learning segmentation parameters
 model_path: [ "/mnt/towbin.data/shared/spsalmon/towbinlab_segmentation_database/models/paper/body/towbintools_medium/best_light.ckpt", "/mnt/towbin.data/shared/spsalmon/towbinlab_segmentation_database/models/paper/pharynx/towbintools_medium/best_light.ckpt" ]
 batch_size: [ 4 ]
-
-# Folder references below name a directory produced under the analysis dir; the
-# analysis_dir_name prefix is optional (e.g. "ch2_seg" == "analysis/ch2_seg").
-# "raw" is the raw input; an absolute path is used as-is.
 
 # straightening parameters
 straightening_source: [ [ "ch2_seg", null ], [ "ch1_seg", null ], [ "raw", [ 1 ] ], [ "raw", [ 0 ] ] ]

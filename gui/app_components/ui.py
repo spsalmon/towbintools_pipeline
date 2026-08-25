@@ -2,7 +2,9 @@ from pathlib import Path
 
 import polars as pl
 from app_components.backend import ECDYSIS_COLUMNS
+from app_components.backend import fix_experiment_time
 from app_components.backend import infer_n_channels
+from app_components.backend import MOLT_ENTRY_COLUMNS
 from app_components.backend import populate_column_choices
 from app_components.backend import process_feature_at_molt_columns
 from app_components.ui_components import molt_annotation_buttons
@@ -11,7 +13,22 @@ from shiny import ui
 from shinywidgets import output_widget
 
 
-def create_molt_annotator(ecdysis_list_id, custom_columns_choices):
+def create_molt_annotator(ecdysis_list_id, entry_list_id, custom_columns_choices):
+    molt_columns = []
+    for molt in ecdysis_list_id:
+        entry = f"{molt}Entry"
+        if entry in entry_list_id:
+            molt_columns.append(
+                ui.column(
+                    2,
+                    molt_annotation_buttons(molt, molt=molt),
+                    ui.hr(),
+                    molt_annotation_buttons(entry, molt=entry),
+                )
+            )
+        else:
+            molt_columns.append(ui.column(2, molt_annotation_buttons(molt, molt=molt)))
+
     return ui.column(
         7,
         ui.tags.script("""
@@ -27,7 +44,7 @@ def create_molt_annotator(ecdysis_list_id, custom_columns_choices):
         ui.div(
             {"class": "annotation-buttons-container"},
             ui.row(
-                [molt_annotation_buttons(molt, molt=molt) for molt in ecdysis_list_id],
+                molt_columns,
                 ui.column(
                     1,
                     ui.row(ui.input_action_button("set_arrest", "Arrest")),
@@ -140,6 +157,8 @@ def create_timepoint_selector(
 def initialize_ui(filemap, recompute_features_at_molt=False):
     print("Initializing the UI ...")
 
+    filemap = fix_experiment_time(filemap)
+
     times = (
         filemap.select(pl.col("Time"))
         .unique(maintain_order=True)
@@ -180,7 +199,9 @@ def initialize_ui(filemap, recompute_features_at_molt=False):
     n_channels = infer_n_channels(filemap, raw_column=raw_column)
     list_channels = ["None"] + [f"Channel {i+1}" for i in range(n_channels)]
 
-    molt_annotator = create_molt_annotator(ECDYSIS_COLUMNS, custom_columns_choices)
+    molt_annotator = create_molt_annotator(
+        ECDYSIS_COLUMNS, MOLT_ENTRY_COLUMNS, custom_columns_choices
+    )
     timepoint_selector = create_timepoint_selector(
         list_channels,
         times,

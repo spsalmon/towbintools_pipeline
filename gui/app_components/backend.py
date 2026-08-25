@@ -13,6 +13,10 @@ from towbintools.foundation.worm_features import get_features_to_compute_at_molt
 # constant definitions
 FEATURES_TO_COMPUTE_AT_MOLT = get_features_to_compute_at_molt()
 ECDYSIS_COLUMNS = ["HatchTime", "M1", "M2", "M3", "M4"]
+MOLT_ENTRY_COLUMNS = ["M1Entry", "M2Entry", "M3Entry", "M4Entry"]
+# Events that get a feature-value-at-event column in the GUI. ECDYSIS_COLUMNS
+# stays the canonical developmental-events constant for downstream consumers.
+VALUE_AT_COLUMNS = ECDYSIS_COLUMNS + MOLT_ENTRY_COLUMNS
 
 KEY_CONVERSION_MAP = {
     "vol": "volume",
@@ -20,6 +24,23 @@ KEY_CONVERSION_MAP = {
     "strClass": "qc",
     "ecdys": "ecdysis",
 }
+
+
+def fix_experiment_time(filemap):
+    if "ExperimentTime" not in filemap.columns:
+        filemap = filemap.with_columns(pl.lit(np.nan).alias("ExperimentTime"))
+    filemap = filemap.with_columns(
+        pl.col("ExperimentTime")
+        .cast(pl.Utf8)
+        .str.strip_chars()
+        .replace("", None)
+        .cast(pl.Float64, strict=False)
+        .alias("ExperimentTime")
+    )
+
+    if filemap.select(pl.col("ExperimentTime")).drop_nulls().is_empty():
+        filemap = filemap.with_columns(pl.lit(np.nan).alias("ExperimentTime"))
+    return filemap
 
 
 def get_backup_path(filemap_folder, filemap_name, filemap_extension):
@@ -37,6 +58,51 @@ def get_backup_path(filemap_folder, filemap_name, filemap_extension):
 
     filemap_save_path = os.path.join(filemap_folder, filemap_save_path)
     return filemap_save_path
+
+
+def _drop_join_artifact_columns(filemap):
+    """Drop polars join-artifact columns left over from an earlier bug.
+
+    A `<base>_right` column paired with an existing `<base>` column is the
+    signature of an accidental self-join collision (the default `_right`
+    suffix). These carry no meaningful data and must never be persisted; older
+    annotated filemaps may already contain them, so we heal them on open.
+    """
+    columns = set(filemap.columns)
+    artifacts = [
+        col
+        for col in filemap.columns
+        if col.endswith("_right") and col[: -len("_right")] in columns
+    ]
+    if artifacts:
+        filemap = filemap.drop(artifacts)
+    return filemap
+
+
+def _coerce_event_columns_to_float(filemap):
+    """Coerce developmental-event columns and their feature-at-event columns to
+    Float64, turning empty strings and other unparseable values into null.
+
+    Older pipeline versions persisted newly-introduced event columns (e.g. the
+    molt-entry columns) as empty strings when no value existed yet. Reading such a
+    filemap back yields String columns that break the strict Float64 casts used
+    throughout the value-at-molt computations. These columns are always numeric,
+    so an unparseable value simply means "missing" (null / NaN).
+    """
+    event_columns = [
+        col
+        for col in filemap.columns
+        if col in VALUE_AT_COLUMNS
+        or any(col.endswith(f"_at_{event}") for event in VALUE_AT_COLUMNS)
+    ]
+    string_event_columns = [
+        col for col in event_columns if filemap.schema[col] == pl.String
+    ]
+    if string_event_columns:
+        filemap = filemap.with_columns(
+            [pl.col(col).cast(pl.Float64, strict=False) for col in string_event_columns]
+        )
+    return filemap
 
 
 def open_filemap(filemap_path, open_annotated=True, lazy_loading=False):
@@ -66,6 +132,10 @@ def open_filemap(filemap_path, open_annotated=True, lazy_loading=False):
     for col in filemap.columns:
         if "worm_type" in col:
             filemap = filemap.rename({col: col.replace("worm_type", "qc")})
+    # Heal join-artifact `_right` columns leaked by an earlier save-collision bug.
+    filemap = _drop_join_artifact_columns(filemap)
+    # Older filemaps may store event columns (e.g. molt-entry) as empty strings.
+    filemap = _coerce_event_columns_to_float(filemap)
     # Backup the filemap
     backup_path = get_backup_path(filemap_folder, filemap_name, filemap_extension)
     write_filemap(filemap, backup_path)
@@ -106,20 +176,21 @@ def infer_n_channels(filemap, raw_column="raw"):
 
 
 def populate_column_choices(filemap):
-    usual_columns = [
-        "Time",
-        "ExperimentTime",
-        "Point",
-        "HatchTime",
-        "M1",
-        "M2",
-        "M3",
-        "M4",
-        "Arrest",
-        "Ignore",
-        "Death",
-        "Dead",
-    ]
+    usual_columns = (
+        [
+            "Time",
+            "ExperimentTime",
+            "Point",
+        ]
+        + ECDYSIS_COLUMNS
+        + MOLT_ENTRY_COLUMNS
+        + [
+            "Arrest",
+            "Ignore",
+            "Death",
+            "Dead",
+        ]
+    )
 
     raw_columns = [column for column in filemap.columns if "raw" in column]
     usual_columns.extend(raw_columns)
@@ -220,21 +291,18 @@ def separate_column_by_point(filemap, column):
 
 
 def get_time_and_ecdysis(filemap):
-    ecdysis_df = filemap.select(pl.col(ECDYSIS_COLUMNS + ["Point"]))
+    ecdysis_df = filemap.select(pl.col(VALUE_AT_COLUMNS + ["Point"]))
     ecdysis_time = (
         (
             ecdysis_df.group_by("Point", maintain_order=True)
-            .agg(pl.col(ECDYSIS_COLUMNS).first())
-            .select(pl.col(ECDYSIS_COLUMNS))
+            .agg(pl.col(VALUE_AT_COLUMNS).first())
+            .select(pl.col(VALUE_AT_COLUMNS))
         )
         .to_numpy()
         .squeeze()
     )
 
     time = separate_column_by_point(filemap, "Time").astype(float)
-
-    if "ExperimentTime" not in filemap.columns:
-        filemap = filemap.with_columns(pl.lit(np.nan).alias("ExperimentTime"))
 
     experiment_time = separate_column_by_point(filemap, "ExperimentTime").astype(float)
 
@@ -271,15 +339,16 @@ def get_time_and_ecdysis(filemap):
 
 
 def build_single_values_df(filemap):
+    filemap = _coerce_event_columns_to_float(filemap)
     columns = filemap.columns
 
-    for ecdys in ECDYSIS_COLUMNS:
+    for ecdys in VALUE_AT_COLUMNS:
         if ecdys not in columns:
             filemap = filemap.with_columns(pl.lit(np.nan).alias(ecdys))
 
     columns_to_keep = ["Point"]
     columns_to_keep.extend([col for col in columns if "_at_" in col])
-    columns_to_keep.extend(ECDYSIS_COLUMNS)
+    columns_to_keep.extend(VALUE_AT_COLUMNS)
 
     single_values_df = filemap.select(pl.col(columns_to_keep))
 
@@ -300,9 +369,10 @@ def build_single_values_df(filemap):
 def process_feature_at_molt_columns(
     filemap, feature_columns, recompute_features_at_molt=False
 ):
+    filemap = _coerce_event_columns_to_float(filemap)
     columns = filemap.columns
 
-    for ecdys in ECDYSIS_COLUMNS:
+    for ecdys in VALUE_AT_COLUMNS:
         if ecdys not in filemap.columns:
             filemap = filemap.with_columns(pl.lit(np.nan).alias(ecdys))
 
@@ -324,15 +394,19 @@ def process_feature_at_molt_columns(
     for feature_column in feature_columns:
         # convert the feature column to float
         filemap = filemap.with_columns(pl.col(feature_column).cast(pl.Float64))
-        if len(qc_columns) == 1:
+
+        series = separate_column_by_point(filemap, feature_column)
+        if len(qc_columns) == 0:
+            # No qc column at all: treat every timepoint as a valid worm, matching
+            # the placeholder_qc default in populate_column_choices.
+            qcs = np.full(series.shape, "worm", dtype=object)
+        elif len(qc_columns) == 1:
             qcs = separate_column_by_point(filemap, qc_columns[0])
         else:
             qc_column = find_best_string_match(feature_column, qc_columns)
             qcs = separate_column_by_point(filemap, qc_column)
-
-        series = separate_column_by_point(filemap, feature_column)
         feature_at_ecdysis_columns = [
-            f"{feature_column}_at_{ecdys}" for ecdys in ECDYSIS_COLUMNS
+            f"{feature_column}_at_{ecdys}" for ecdys in VALUE_AT_COLUMNS
         ]
         for column in feature_at_ecdysis_columns:
             if column not in columns:
@@ -378,8 +452,7 @@ def process_feature_at_molt_columns(
 
 
 def _get_values_at_molt(filemap, column):
-    ecdysis = ["HatchTime", "M1", "M2", "M3", "M4"]
-    columns_at_ecdysis = [f"{column}_at_{e}" for e in ecdysis]
+    columns_at_ecdysis = [f"{column}_at_{e}" for e in VALUE_AT_COLUMNS]
 
     column_list = ["Point"] + columns_at_ecdysis
     filemap = filemap.select(pl.col(column_list))
@@ -551,6 +624,10 @@ def set_marker_shape(
     m4,
     custom_annotations: list = [],
     dark_mode: bool = False,
+    m1_entry=np.nan,
+    m2_entry=np.nan,
+    m3_entry=np.nan,
+    m4_entry=np.nan,
 ):
     symbols = []
     for qc in qcs:
@@ -619,6 +696,22 @@ def set_marker_shape(
         except IndexError:
             print(f"M4 {m4} not in list of times")
 
+    entry_specs = [
+        (m1_entry, "orange"),
+        (m2_entry, "yellow"),
+        (m3_entry, "green"),
+        (m4_entry, "blue"),
+    ]
+    for entry_time, color in entry_specs:
+        if np.isfinite(entry_time) and entry_time in times_of_point:
+            try:
+                entry_index = np.where(times_of_point == entry_time)[0][0]
+                symbols[entry_index] = "diamond"
+                sizes[entry_index] = 8
+                colors[entry_index] = color
+            except IndexError:
+                print(f"Molt entry {entry_time} not in list of times")
+
     widths = [1] * len(symbols)
     widths[int(selected_time_index)] = 4
 
@@ -646,19 +739,41 @@ def get_points_for_value_at_molts(
     value_at_m2,
     value_at_m3,
     value_at_m4,
+    m1_entry=np.nan,
+    m2_entry=np.nan,
+    m3_entry=np.nan,
+    m4_entry=np.nan,
+    value_at_m1_entry=np.nan,
+    value_at_m2_entry=np.nan,
+    value_at_m3_entry=np.nan,
+    value_at_m4_entry=np.nan,
 ):
-    ecdys_list = [hatch, m1, m2, m3, m4]
+    ecdys_list = [hatch, m1, m2, m3, m4, m1_entry, m2_entry, m3_entry, m4_entry]
     value_at_ecdys_list = [
         value_at_hatch,
         value_at_m1,
         value_at_m2,
         value_at_m3,
         value_at_m4,
+        value_at_m1_entry,
+        value_at_m2_entry,
+        value_at_m3_entry,
+        value_at_m4_entry,
     ]
-    symbols = ["cross", "cross", "cross", "cross", "cross"]
-    colors = ["red", "orange", "yellow", "green", "blue"]
-    sizes = [8, 8, 8, 8, 8]
-    widths = [4, 4, 4, 4, 4]
+    symbols = ["cross"] * 5 + ["x"] * 4
+    colors = [
+        "red",
+        "orange",
+        "yellow",
+        "green",
+        "blue",
+        "orange",
+        "yellow",
+        "green",
+        "blue",
+    ]
+    sizes = [8] * 9
+    widths = [4] * 9
 
     # Use numpy to handle NaN values efficiently
     ecdys_array = np.array(ecdys_list)
@@ -681,3 +796,37 @@ def get_points_for_value_at_molts(
         sizes_filtered,
         widths_filtered,
     )
+
+
+def get_molt_interval_bands(entry_times, exit_times, colors, opacity=0.15):
+    """Build Plotly rect shapes spanning each molt's entry->exit interval.
+
+    A band is produced only for molts where both endpoints are finite numbers.
+    """
+
+    def _finite(val):
+        try:
+            return np.isfinite(float(val))
+        except (TypeError, ValueError):
+            return False
+
+    bands = []
+    for entry, exit_time, color in zip(entry_times, exit_times, colors):
+        if _finite(entry) and _finite(exit_time):
+            x0, x1 = sorted([float(entry), float(exit_time)])
+            bands.append(
+                dict(
+                    type="rect",
+                    xref="x",
+                    yref="paper",
+                    x0=x0,
+                    x1=x1,
+                    y0=0,
+                    y1=1,
+                    fillcolor=color,
+                    opacity=opacity,
+                    layer="below",
+                    line_width=0,
+                )
+            )
+    return bands

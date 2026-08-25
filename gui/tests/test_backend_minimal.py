@@ -1,8 +1,12 @@
 import numpy as np
 import polars as pl
+from app_components.backend import _drop_join_artifact_columns
 from app_components.backend import build_single_values_df
+from app_components.backend import get_molt_interval_bands
+from app_components.backend import MOLT_ENTRY_COLUMNS
 from app_components.backend import populate_column_choices
 from app_components.backend import process_feature_at_molt_columns
+from app_components.backend import set_marker_shape
 
 
 def make_minimal_filemap():
@@ -60,6 +64,39 @@ def test_populate_column_choices_segmentation_overlay_is_none_only():
     assert overlay_seg == ["None"]
 
 
+def test_populate_column_choices_does_not_treat_entry_columns_as_custom():
+    """Molt-entry columns are canonical developmental-event columns and must not
+    be misclassified as custom annotation columns. If they are, they leak into
+    both work_df and the single-values df, producing a `_right` collision on
+    save (polars DuplicateError)."""
+    filemap = make_minimal_filemap()
+    for col in MOLT_ENTRY_COLUMNS:
+        filemap = filemap.with_columns(pl.lit(np.nan).alias(col))
+    _, _, _, custom_columns_choices, _, _ = populate_column_choices(filemap)
+    leaked = [c for c in MOLT_ENTRY_COLUMNS if c in custom_columns_choices]
+    assert leaked == [], f"entry columns leaked into custom columns: {leaked}"
+
+
+# --- _drop_join_artifact_columns ---
+
+
+def test_drop_join_artifact_columns_removes_paired_right_column():
+    filemap = make_minimal_filemap().with_columns(
+        pl.lit(np.nan).alias("M1Entry"),
+        pl.lit(np.nan).alias("M1Entry_right"),
+    )
+    healed = _drop_join_artifact_columns(filemap)
+    assert "M1Entry_right" not in healed.columns
+    assert "M1Entry" in healed.columns
+
+
+def test_drop_join_artifact_columns_keeps_unpaired_right_column():
+    """A `_right` column with no matching base is a legitimate name, not an artifact."""
+    filemap = make_minimal_filemap().with_columns(pl.lit(1.0).alias("intensity_right"))
+    healed = _drop_join_artifact_columns(filemap)
+    assert "intensity_right" in healed.columns
+
+
 # --- build_single_values_df ---
 
 
@@ -110,6 +147,22 @@ def test_process_feature_at_molt_columns_adds_feature_at_molt_columns():
         assert col in result.columns
 
 
+def test_process_feature_at_molt_columns_without_qc_column():
+    """The annotation-import flow builds a fresh dataframe from the imported file
+    and calls this function directly, without the placeholder_qc that
+    populate_column_choices would otherwise inject. A filemap that carries a
+    feature column but no qc column at all must not crash (regression: an empty
+    qc_columns list produced a None column name)."""
+    filemap = make_minimal_filemap().with_columns(
+        pl.Series("ch2_seg_str_volume", [1.0, 2.0, 3.0, 1.5, 2.5, 3.5]),
+        pl.Series("ExperimentTime", [0.0, 3600.0, 7200.0, 0.0, 3600.0, 7200.0]),
+    )
+    assert not [c for c in filemap.columns if "qc" in c]
+    result = process_feature_at_molt_columns(filemap, ["ch2_seg_str_volume"])
+    for ecdys in ["HatchTime", "M1", "M2", "M3", "M4"]:
+        assert f"ch2_seg_str_volume_at_{ecdys}" in result.columns
+
+
 def test_full_startup_pipeline_does_not_crash():
     """Simulate the full initialize_ui backend flow (minus infer_n_channels)."""
     filemap = make_minimal_filemap()
@@ -129,3 +182,114 @@ def test_full_startup_pipeline_does_not_crash():
     assert default_plotted_column == "placeholder_feature"
     assert overlay_seg == ["None"]
     assert "Point" in single_values_df.columns
+
+
+def test_build_single_values_df_adds_entry_columns_as_nan():
+    filemap = make_minimal_filemap()
+    result_filemap, *_ = populate_column_choices(filemap)
+    df = build_single_values_df(result_filemap)
+    for col in MOLT_ENTRY_COLUMNS:
+        assert col in df.columns
+        values = df.select(col).to_numpy().squeeze().astype(float)
+        assert np.all(np.isnan(values)), f"{col} should be all NaN, got {values}"
+
+
+def test_process_feature_at_molt_columns_adds_feature_at_entry_columns():
+    filemap = make_minimal_filemap()
+    filemap, _, feature_columns, *_ = populate_column_choices(filemap)
+    result = process_feature_at_molt_columns(filemap, feature_columns)
+    for entry in MOLT_ENTRY_COLUMNS:
+        col = f"placeholder_feature_at_{entry}"
+        assert col in result.columns
+
+
+def test_process_feature_at_molt_columns_tolerates_empty_string_event_columns():
+    """Older filemaps persisted freshly-introduced event columns (e.g. the
+    molt-entry columns) as empty strings before any value existed. Reading such a
+    filemap back yields String columns that must not break the Float64 casts."""
+    filemap = make_minimal_filemap()
+    filemap, _, feature_columns, *_ = populate_column_choices(filemap)
+    feature = feature_columns[0]
+    # Simulate an intermediate-version filemap: the entry event column and its
+    # feature-at-event column exist but are String "" (never populated).
+    filemap = filemap.with_columns(
+        pl.lit("").alias("M4Entry"),
+        pl.lit("").alias(f"{feature}_at_M4Entry"),
+    )
+    # Must not raise InvalidOperationError on the str -> f64 cast.
+    result = process_feature_at_molt_columns(filemap, feature_columns)
+    assert f"{feature}_at_M4Entry" in result.columns
+    values = result.select(f"{feature}_at_M4Entry").to_numpy().squeeze().astype(float)
+    assert np.all(np.isnan(values))
+
+
+def test_build_single_values_df_tolerates_empty_string_event_columns():
+    filemap = make_minimal_filemap()
+    filemap, _, feature_columns, *_ = populate_column_choices(filemap)
+    feature = feature_columns[0]
+    filemap = filemap.with_columns(
+        pl.lit("").alias("M4Entry"),
+        pl.lit("").alias(f"{feature}_at_M4Entry"),
+    )
+    df = build_single_values_df(filemap)
+    assert "M4Entry" in df.columns
+
+
+def test_existing_ecdysis_columns_still_present():
+    """Canonical developmental-event columns must remain untouched."""
+    filemap = make_minimal_filemap()
+    filemap, _, feature_columns, *_ = populate_column_choices(filemap)
+    result = process_feature_at_molt_columns(filemap, feature_columns)
+    for col in ["HatchTime", "M1", "M2", "M3", "M4"]:
+        assert col in result.columns
+        assert f"placeholder_feature_at_{col}" in result.columns
+
+
+# --- get_molt_interval_bands ---
+
+
+def test_get_molt_interval_bands_only_when_both_endpoints_finite():
+    # M1: entry=1, exit=3 -> band; M2: entry=5, exit=nan -> no band;
+    # M3: entry=nan, exit=9 -> no band; M4: entry=nan, exit=nan -> no band
+    bands = get_molt_interval_bands(
+        [1.0, 5.0, np.nan, np.nan],
+        [3.0, np.nan, 9.0, np.nan],
+        ["orange", "yellow", "green", "blue"],
+    )
+    assert len(bands) == 1
+    band = bands[0]
+    assert band["type"] == "rect"
+    assert band["x0"] == 1.0 and band["x1"] == 3.0
+    assert band["fillcolor"] == "orange"
+    assert band["layer"] == "below"
+
+
+def test_get_molt_interval_bands_orders_endpoints():
+    bands = get_molt_interval_bands([7.0], [2.0], ["orange"])
+    assert bands[0]["x0"] == 2.0 and bands[0]["x1"] == 7.0
+
+
+def test_get_molt_interval_bands_tolerates_empty_string():
+    bands = get_molt_interval_bands(["", 4.0], ["", 6.0], ["orange", "yellow"])
+    assert len(bands) == 1
+    assert bands[0]["fillcolor"] == "yellow"
+
+
+# --- set_marker_shape ---
+
+
+def test_set_marker_shape_marks_entry_as_diamond():
+    times = np.array([0, 1, 2, 3, 4])
+    qcs = np.array(["worm"] * 5)
+    markers = set_marker_shape(
+        times,
+        selected_time_index=0,
+        qcs=qcs,
+        hatch_time=np.nan,
+        m1=np.nan,
+        m2=np.nan,
+        m3=np.nan,
+        m4=np.nan,
+        m1_entry=2.0,
+    )
+    assert "diamond" in markers["symbol"]
