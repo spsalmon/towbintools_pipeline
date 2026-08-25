@@ -6,7 +6,6 @@ from threading import Thread
 import cv2
 import numpy as np
 import torch
-from cellpose import models
 from cv2 import resize
 from joblib import delayed, Parallel, parallel_config
 from tifffile import imwrite
@@ -281,6 +280,9 @@ def cellpose_segmentation(
     t_dim,
     stitch_3D=True,
 ):
+    # Imported here so cellpose is only required when this method is used.
+    from cellpose import models
+
     gpu = torch.cuda.is_available()
     batch_size = block_config.get("batch_size", 8)
     model = models.CellposeModel(gpu=gpu, pretrained_model=block_config["model_path"])
