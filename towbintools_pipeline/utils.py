@@ -306,7 +306,9 @@ def resolve_ref(ref, config):
     # raw_dir_name both map to the raw column; absolute paths pass through.
     raw_dir_name = config.get("raw_dir_name", "raw")
     analysis_dir_name = config.get("analysis_dir_name", "analysis")
-    if os.path.isabs(ref):
+    # os.path.isabs misses POSIX absolute paths on Windows; a folder ref is never
+    # a leading-slash relative name, so treat a leading "/" as absolute too.
+    if os.path.isabs(ref) or ref.startswith("/"):
         return ref
     if ref == "raw" or ref == raw_dir_name:
         return raw_dir_name
