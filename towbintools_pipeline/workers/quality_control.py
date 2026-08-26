@@ -107,28 +107,32 @@ def main(input_pickle, output_file, block_config, config, filemap, n_jobs=-1):
 
     non_egg_indices = [i for i, pred in enumerate(egg_predictions) if pred != "egg"]
 
-    qc_features_df = features_df.iloc[non_egg_indices].copy()
+    # QC-classify only the non-egg samples; with none (all eggs) skip the empty
+    # DMatrix (which xgboost 3.4.1 chokes on) and keep every egg prediction.
+    if non_egg_indices:
+        qc_features_df = features_df.iloc[non_egg_indices].copy()
 
-    # now, predict qc classes for non-egg samples
-    # if for some reason scikit-image decided to add features that we didn't include, we need to remove them
-    qc_feature_names = qc_classifier.get_booster().feature_names
-    extracted_feature_names = qc_features_df.columns.to_list()
-    extra_features = [
-        fname for fname in extracted_feature_names if fname not in qc_feature_names
-    ]
-    if len(extra_features) > 0:
-        qc_features_df = qc_features_df.drop(columns=extra_features)
+        # if for some reason scikit-image decided to add features that we didn't include, we need to remove them
+        qc_feature_names = qc_classifier.get_booster().feature_names
+        extracted_feature_names = qc_features_df.columns.to_list()
+        extra_features = [
+            fname for fname in extracted_feature_names if fname not in qc_feature_names
+        ]
+        if len(extra_features) > 0:
+            qc_features_df = qc_features_df.drop(columns=extra_features)
 
-    qc_features_dm = xgb.DMatrix(
-        qc_features_df, feature_names=qc_features_df.columns.to_list()
-    )
-    qc_predictions = qc_classifier.get_booster().predict(qc_features_dm)
-    # map numeric predictions back to class labels
-    if len(qc_predictions.shape) > 1:
-        qc_predictions = np.argmax(qc_predictions, axis=1)
+        qc_features_dm = xgb.DMatrix(
+            qc_features_df, feature_names=qc_features_df.columns.to_list()
+        )
+        qc_predictions = qc_classifier.get_booster().predict(qc_features_dm)
+        # map numeric predictions back to class labels
+        if len(qc_predictions.shape) > 1:
+            qc_predictions = np.argmax(qc_predictions, axis=1)
+        else:
+            qc_predictions = (qc_predictions > 0.5).astype(int)
+        qc_predictions = [qc_classes[pred] for pred in qc_predictions]
     else:
-        qc_predictions = (qc_predictions > 0.5).astype(int)
-    qc_predictions = [qc_classes[pred] for pred in qc_predictions]
+        qc_predictions = []
 
     # combine predictions - start with egg predictions
     predictions = egg_predictions.copy()
