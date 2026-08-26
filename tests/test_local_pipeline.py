@@ -284,6 +284,19 @@ def test_get_output_name_channels_and_raw(tmp_path):
     assert os.path.basename(straight) == "ch2_raw_str"
 
 
+def test_get_output_name_raw_ref_with_renamed_raw_dir(tmp_path):
+    # A "raw" segmentation ref must still name its output ch2_seg (not ch2_raw_seg)
+    # when raw_dir_name is renamed; add_raw still forces the basename in.
+    from towbintools_pipeline.utils import get_output_name
+
+    config = _naming_config(tmp_path)
+    config["raw_dir_name"] = "raw_subset"
+    seg = get_output_name(config, "raw", "seg", channels=[1], add_raw=False)
+    assert os.path.basename(seg) == "ch2_seg"
+    straight = get_output_name(config, "raw", "str", channels=[1], add_raw=True)
+    assert os.path.basename(straight) == "ch2_raw_str"
+
+
 def test_get_output_name_prefix_strip_and_report(tmp_path):
     # An analysis-dir-prefixed input is reduced to its basename; return_subdir
     # False yields a report file named with the report_format extension, with
@@ -313,6 +326,9 @@ def test_resolve_ref():
     assert resolve_ref("ch2_seg", {}) == "analysis/ch2_seg"
     assert resolve_ref("analysis/ch2_seg", {}) == "analysis/ch2_seg"
     assert resolve_ref("raw", {}) == "raw"
+    # literal "raw" always resolves to the raw column, even when it is renamed
+    assert resolve_ref("raw", {"raw_dir_name": "raw_subset"}) == "raw_subset"
+    assert resolve_ref("raw_subset", {"raw_dir_name": "raw_subset"}) == "raw_subset"
     # a renamed analysis_dir_name re-homes both forms to the new prefix
     assert resolve_ref("ch2_seg", {"analysis_dir_name": "output"}) == "output/ch2_seg"
     assert (
