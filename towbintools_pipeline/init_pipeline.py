@@ -177,8 +177,13 @@ def build_blocks_for_subdir(global_config, temp_dir_basename, temp_dir, subdir=N
         and "Time" in experiment_filemap.columns
         and experiment_filemap["ExperimentTime"].is_null().any()
     )
+    # ExperimentTime needs a Time column; without one (no_timepoints filemap)
+    # skip extraction and leave it null instead of crashing.
+    can_compute_exp_time = (
+        extract_experiment_time and "Time" in experiment_filemap.columns
+    )
     if "ExperimentTime" not in experiment_filemap.columns or has_missing_exp_time:
-        if extract_experiment_time:
+        if can_compute_exp_time:
             print("### Calculating ExperimentTime ###")
             experiment_filemap = experiment_filemap.with_columns(
                 pl.lit(
