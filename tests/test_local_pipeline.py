@@ -339,6 +339,26 @@ def test_resolve_ref():
     assert resolve_ref("/mnt/data/ch2_seg", {}) == "/mnt/data/ch2_seg"
 
 
+def test_warnings_filter():
+    # The curated rules suppress their targets; unrelated warnings pass through.
+    import warnings
+
+    from towbintools_pipeline.warnings_filter import configure_warnings
+
+    with warnings.catch_warnings(record=True) as rec:
+        warnings.resetwarnings()
+        configure_warnings()
+        warnings.warn(
+            "pin_memory argument is set as true but no accelerator is found",
+            UserWarning,
+        )
+        warnings.warn("an unrelated warning that should pass through", UserWarning)
+
+    messages = [str(w.message) for w in rec]
+    assert not any("pin_memory" in m for m in messages)
+    assert any("unrelated" in m for m in messages)
+
+
 # ---- Per-file input selection ----
 
 
