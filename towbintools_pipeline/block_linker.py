@@ -65,8 +65,8 @@ def update_experiment_filemap(
     if previous_block.return_type == "subdir":
         # The column name is always the same regardless of previous_subdir
         column_name = f'{config["analysis_dir_name"]}/{os.path.basename(os.path.normpath(result))}'
-        no_timepoint = config.get("no_timepoint", False)
-        if no_timepoint or ("Time" not in experiment_filemap.columns):
+        no_timepoints = config.get("no_timepoints", False)
+        if no_timepoints or ("Time" not in experiment_filemap.columns):
             image_paths = sorted([os.path.join(result, f) for f in os.listdir(result)])
             experiment_filemap = experiment_filemap.with_columns(
                 pl.Series(name=column_name, values=image_paths)
