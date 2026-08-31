@@ -9,10 +9,12 @@ from datetime import datetime
 import numpy as np
 import polars as pl
 import yaml
-from joblib import delayed, Parallel, parallel_config
-from towbintools.foundation.file_handling import read_filemap, write_filemap
+from joblib import Parallel
+from joblib import delayed
+from joblib import parallel_config
+from towbintools.foundation.file_handling import read_filemap
+from towbintools.foundation.file_handling import write_filemap
 from towbintools.foundation.image_handling import get_acquisition_date
-
 
 # ---- File handling ----
 
@@ -217,7 +219,9 @@ def setup_run_dir(temp_dir, backend="slurm"):
     # launcher's logs in. Returns the run directory.
     job_id = os.environ.get("SLURM_JOB_ID")
     if not job_id:
-        run_dir = os.path.join(temp_dir, datetime.now().strftime("pipeline_%Y%m%d-%H%M%S"))
+        run_dir = os.path.join(
+            temp_dir, datetime.now().strftime("pipeline_%Y%m%d-%H%M%S")
+        )
     else:
         run_dir = os.path.join(temp_dir, f"pipeline_{job_id}")
 
@@ -619,7 +623,7 @@ def save_version_control_info(temp_dir):
     try:
         for label, rev in (("Git Branch", "--abbrev-ref"), ("Git Commit", "")):
             out = subprocess.run(
-                ["git", "-C", _REPO_DIR, "rev-parse", *( [rev] if rev else [] ), "HEAD"],
+                ["git", "-C", _REPO_DIR, "rev-parse", *([rev] if rev else []), "HEAD"],
                 capture_output=True,
                 text=True,
             )
@@ -729,9 +733,7 @@ def run_command(
 ):
     # Local backend: run the worker (and linker) directly instead of submitting to slurm.
     if config.get("backend", "slurm") == "local":
-        run_command_local(
-            command, run_linker=run_linker, linker_command=linker_command
-        )
+        run_command_local(command, run_linker=run_linker, linker_command=linker_command)
         return
 
     # Per-block resources: shared defaults overlaid with this block type's

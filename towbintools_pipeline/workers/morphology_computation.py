@@ -2,9 +2,13 @@ import logging
 import os
 
 import polars as pl
-from joblib import delayed, Parallel, parallel_config
-from towbintools.foundation import image_handling, worm_features
-from towbintools.foundation.file_handling import extract_time_point, write_filemap
+from joblib import Parallel
+from joblib import delayed
+from joblib import parallel_config
+from towbintools.foundation import image_handling
+from towbintools.foundation import worm_features
+from towbintools.foundation.file_handling import extract_time_point
+from towbintools.foundation.file_handling import write_filemap
 
 from towbintools_pipeline import utils
 

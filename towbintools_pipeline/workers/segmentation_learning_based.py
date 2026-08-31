@@ -7,7 +7,9 @@ import cv2
 import numpy as np
 import torch
 from cv2 import resize
-from joblib import delayed, Parallel, parallel_config
+from joblib import Parallel
+from joblib import delayed
+from joblib import parallel_config
 from tifffile import imwrite
 from torch.utils.data import DataLoader
 from towbintools.deep_learning.deep_learning_tools import (
@@ -16,10 +18,8 @@ from towbintools.deep_learning.deep_learning_tools import (
 from towbintools.deep_learning.utils.augmentation import (
     get_prediction_augmentation_from_model,
 )
-from towbintools.deep_learning.utils.dataset import (
-    SegmentationPredictionDataset,
-    StackPredictionDataset,
-)
+from towbintools.deep_learning.utils.dataset import SegmentationPredictionDataset
+from towbintools.deep_learning.utils.dataset import StackPredictionDataset
 from towbintools.foundation import image_handling
 
 from towbintools_pipeline import utils

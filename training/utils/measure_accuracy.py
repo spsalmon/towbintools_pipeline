@@ -3,8 +3,8 @@ import os
 import numpy as np
 import pandas as pd
 import torch
-from joblib import delayed
 from joblib import Parallel
+from joblib import delayed
 from sklearn import metrics
 from tifffile import imwrite
 from torch.utils.data import DataLoader

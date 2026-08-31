@@ -79,6 +79,10 @@ segmentation_channels: [ [ 1 ], [ 0 ] ]
 model_path: [ "/mnt/towbin.data/shared/spsalmon/towbinlab_segmentation_database/models/paper/body/towbintools_medium/best_light.ckpt", "/mnt/towbin.data/shared/spsalmon/towbinlab_segmentation_database/models/paper/pharynx/towbintools_medium/best_light.ckpt" ]
 batch_size: [ 4 ]
 
+# Folder references below name a directory produced under the analysis dir; the
+# analysis_dir_name prefix is optional (e.g. "ch2_seg" == "analysis/ch2_seg").
+# "raw" is the raw input; an absolute path is used as-is.
+
 # straightening parameters
 straightening_source: [ [ "ch2_seg", null ], [ "ch1_seg", null ], [ "raw", [ 1 ] ], [ "raw", [ 0 ] ] ]
 straightening_masks: [ "ch2_seg", "ch1_seg", "ch2_seg", "ch1_seg" ]

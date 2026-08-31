@@ -11,7 +11,7 @@ version = "0.1.0"
 description = "Configurable image-analysis pipeline built on towbintools."
 requires-python = ">=3.11"
 dependencies = [
-    "towbintools>=0.4.3",  # 0.4.3+ has the current molt-detection model architecture
+    "towbintools",
     "numpy",
     "polars",
     "pyarrow",
@@ -19,23 +19,10 @@ dependencies = [
     "tifffile",
     "pyyaml",
     "lxml",
-    "tqdm",  # used directly; not pulled in by towbintools
-    # Imported directly by the pipeline but typically pulled in transitively by
-    # towbintools; declared explicitly so we do not rely on its requirements.
-    "opencv-contrib-python",
-    "pandas",
-    "scipy",
-    "torch",
-    # Interim pin to a known-good build to keep results stable; to be relaxed
-    # once the code tolerates newer versions directly.
-    "xgboost==3.3.0",
 ]
 
 [project.optional-dependencies]
 dev = ["pytest"]
-# Optional segmentation backend, imported lazily. Kept out of the core so a
-# default install does not pull opencv-python-headless over opencv-contrib.
-cellpose = ["cellpose==4.2.1.1"]
 
 [project.scripts]
 # Subcommand dispatcher: `towbintools-pipeline run|init-configs`. With no known
@@ -53,3 +40,17 @@ packages = ["towbintools_pipeline", "towbintools_pipeline.workers"]
 [tool.setuptools.package-data]
 # Ship the bundled example configs and default models with the package.
 towbintools_pipeline = ["defaults/**/*.yaml", "defaults/**/*.ckpt", "defaults/**/*.json"]
+
+[tool.black]
+# Pin the target explicitly. Left unset, Black infers targets from
+# requires-python (">=3.11") and includes every future version it knows about
+# (py314), then fails its AST safety check when run under an older interpreter.
+# The floor of requires-python is the correct target: output must parse on 3.11.
+target-version = ["py311"]
+
+[tool.isort]
+# black-compatible import sorting. force_single_line keeps the one-import-per-line
+# style the repo already used under reorder-python-imports, which was dropped
+# because it strips the blank line after a module docstring that Black re-adds.
+profile = "black"
+force_single_line = true

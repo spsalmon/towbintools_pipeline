@@ -5,8 +5,8 @@ import bioio_nd2
 import ome_types
 from bioio import BioImage
 from bioio_ome_tiff.writers import OmeTiffWriter
-from joblib import delayed
 from joblib import Parallel
+from joblib import delayed
 from ome_types.model import Image
 from ome_types.model import Pixels
 from tqdm import tqdm

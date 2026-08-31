@@ -6,6 +6,7 @@ smoke test for the local backend: generates tiny synthetic images, runs the
 pipeline with `backend: local` (threshold segmentation -> area morphology), and
 checks the outputs. No slurm, no micromamba, no bundled data.
 """
+
 import csv
 import os
 import subprocess
@@ -31,7 +32,10 @@ def _write_image(path, blob_width):
 
 
 def _build_experiment(
-    tmp_path, config_experiment_dir=None, analysis_dir_name="analysis", extra_config=None
+    tmp_path,
+    config_experiment_dir=None,
+    analysis_dir_name="analysis",
+    extra_config=None,
 ):
     # Tiny 2-image raw experiment + a local-backend config; returns config_path.
     # config_experiment_dir overrides what the config records as experiment_dir.
@@ -237,7 +241,11 @@ def test_parse_building_blocks_broadcast_and_select():
     assert blocks[0]["name"] == "segmentation"
     assert blocks[0]["segmentation_channels"] == [0]
     assert blocks[1]["segmentation_channels"] == [1]
-    assert blocks[0]["segmentation_method"] == blocks[1]["segmentation_method"] == "threshold"
+    assert (
+        blocks[0]["segmentation_method"]
+        == blocks[1]["segmentation_method"]
+        == "threshold"
+    )
     assert blocks[0]["rerun_segmentation"] is False  # from the block defaults
     assert blocks[2]["name"] == "morphology_computation"
     assert blocks[2]["morphology_computation_masks"] == "ch1_seg"
@@ -397,7 +405,11 @@ def test_resolve_block_slurm_default_and_override():
     }
 
     morph = resolve_block_slurm(config, "morphology_computation")
-    assert morph == {"sbatch_cpus": 8, "sbatch_memory": "16G", "sbatch_time": "0-02:00:00"}
+    assert morph == {
+        "sbatch_cpus": 8,
+        "sbatch_memory": "16G",
+        "sbatch_time": "0-02:00:00",
+    }
 
     seg = resolve_block_slurm(config, "segmentation")
     assert seg["sbatch_gpus"] == "rtx6000:1"
@@ -496,7 +508,11 @@ def test_run_params_sbatch_init_flags():
         "sbatch_memory": "64G",
         "sbatch_gpus": "rtx6000:1",
         "sbatch_extra_options": ["--account=gratis"],
-        "sbatch_init": {"sbatch_cpus": 4, "sbatch_memory": "8G", "sbatch_time": "0-12:00:00"},
+        "sbatch_init": {
+            "sbatch_cpus": 4,
+            "sbatch_memory": "8G",
+            "sbatch_time": "0-12:00:00",
+        },
     }
 
     flags = sbatch_init_flags(config)
@@ -516,11 +532,15 @@ def test_get_python_command():
         "~/.local/bin/micromamba run -n towbintools python3"
     )
     assert (
-        get_python_command({"backend": "slurm", "python_command": "conda run -n x python"})
+        get_python_command(
+            {"backend": "slurm", "python_command": "conda run -n x python"}
+        )
         == "conda run -n x python"
     )
     assert (
-        get_python_command({"backend": "local", "python_command": "conda run -n x python"})
+        get_python_command(
+            {"backend": "local", "python_command": "conda run -n x python"}
+        )
         == "conda run -n x python"
     )
 
@@ -596,11 +616,11 @@ def test_run_config_and_version_info_backed_up(tmp_path):
     config_path = _build_experiment(tmp_path)
 
     result = _run_pipeline(config_path, ["--temp_dir", str(tmp_path / "pipeline_temp")])
-    assert (
-        result.returncode == 0
-    ), f"pipeline failed:\n{result.stdout}\n{result.stderr}"
+    assert result.returncode == 0, f"pipeline failed:\n{result.stdout}\n{result.stderr}"
 
-    backups = list((tmp_path / "exp" / "analysis" / "pipeline_backup").glob("pipeline_*"))
+    backups = list(
+        (tmp_path / "exp" / "analysis" / "pipeline_backup").glob("pipeline_*")
+    )
     assert len(backups) == 1
     assert (backups[0] / "config.yaml").exists()
     assert (backups[0] / "git_info.txt").exists()
@@ -617,7 +637,9 @@ def test_repeated_runs_get_separate_backups(tmp_path):
             result.returncode == 0
         ), f"pipeline failed:\n{result.stdout}\n{result.stderr}"
 
-    backups = list((tmp_path / "exp" / "analysis" / "pipeline_backup").glob("pipeline_*"))
+    backups = list(
+        (tmp_path / "exp" / "analysis" / "pipeline_backup").glob("pipeline_*")
+    )
     assert len(backups) == 2
 
 
@@ -627,14 +649,14 @@ def test_cleanup_on_success_removes_temp_dir(tmp_path):
     config_path = _build_experiment(tmp_path, extra_config={"cleanup_on_success": True})
 
     result = _run_pipeline(config_path, cwd=str(tmp_path))
-    assert (
-        result.returncode == 0
-    ), f"pipeline failed:\n{result.stdout}\n{result.stderr}"
+    assert result.returncode == 0, f"pipeline failed:\n{result.stdout}\n{result.stderr}"
 
     # the run's temp subdir is gone
     assert list((tmp_path / "temp_files").glob("pipeline_*")) == []
     # the durable backup remains
-    backups = list((tmp_path / "exp" / "analysis" / "pipeline_backup").glob("pipeline_*"))
+    backups = list(
+        (tmp_path / "exp" / "analysis" / "pipeline_backup").glob("pipeline_*")
+    )
     assert len(backups) == 1
     # the outputs remain
     morph_csv = tmp_path / "exp" / "analysis" / "report" / "ch1_seg_morphology.csv"
@@ -660,24 +682,33 @@ def test_concatenate_sbatch_logs(tmp_path):
     (log_dir / "init-1.out").write_text("first\n")
     (log_dir / "segmentation-2.out").write_text("second\n")
     (log_dir / "segmentation-2.err").write_text("a warning\n")
-    for name, stamp in (("init-1.out", 1000), ("segmentation-2.out", 2000),
-                        ("straightening-3.out", 3000)):
+    for name, stamp in (
+        ("init-1.out", 1000),
+        ("segmentation-2.out", 2000),
+        ("straightening-3.out", 3000),
+    ):
         _os.utime(log_dir / name, (stamp, stamp))
 
-    concatenate_sbatch_logs(str(temp_dir), "PIPELINE FINISHED -- all 3 blocks completed")
+    concatenate_sbatch_logs(
+        str(temp_dir), "PIPELINE FINISHED -- all 3 blocks completed"
+    )
 
     combined = (temp_dir / "pipeline-4242.out").read_text()
     assert combined.index("first") < combined.index("second") < combined.index("third")
     assert "===== init-1.out =====" in combined
     # the last line says whether the run got to the end
-    assert combined.rstrip().endswith("PIPELINE FINISHED -- all 3 blocks completed =====")
+    assert combined.rstrip().endswith(
+        "PIPELINE FINISHED -- all 3 blocks completed ====="
+    )
     # each stream gets its own file, and the originals stay put
     assert (temp_dir / "pipeline-4242.err").read_text().count("a warning") == 1
     assert (log_dir / "init-1.out").read_text() == "first\n"
 
     # Rebuilding is idempotent: the combined file lives outside the log dir, so
     # it is never folded into itself.
-    concatenate_sbatch_logs(str(temp_dir), "PIPELINE FINISHED -- all 3 blocks completed")
+    concatenate_sbatch_logs(
+        str(temp_dir), "PIPELINE FINISHED -- all 3 blocks completed"
+    )
     assert (temp_dir / "pipeline-4242.out").read_text() == combined
 
 
@@ -699,9 +730,7 @@ def test_local_pipeline_segmentation_and_morphology(tmp_path):
     temp_dir = tmp_path / "pipeline_temp"
 
     result = _run_pipeline(config_path, ["--temp_dir", str(temp_dir)])
-    assert (
-        result.returncode == 0
-    ), f"pipeline failed:\n{result.stdout}\n{result.stderr}"
+    assert result.returncode == 0, f"pipeline failed:\n{result.stdout}\n{result.stderr}"
 
     # segmentation produced one mask per input image
     mask_dir = tmp_path / "exp" / "analysis" / "ch1_seg"
@@ -723,9 +752,7 @@ def test_local_pipeline_default_temp_dir_in_cwd(tmp_path):
     config_path = _build_experiment(tmp_path)
 
     result = _run_pipeline(config_path, cwd=str(tmp_path))
-    assert (
-        result.returncode == 0
-    ), f"pipeline failed:\n{result.stdout}\n{result.stderr}"
+    assert result.returncode == 0, f"pipeline failed:\n{result.stdout}\n{result.stderr}"
 
     # each run gets its own subdirectory, named after its start time locally
     runs = list((tmp_path / "temp_files").glob("pipeline_*"))
@@ -745,9 +772,7 @@ def test_block_progress_is_logged(tmp_path):
     config_path = _build_experiment(tmp_path)
 
     result = _run_pipeline(config_path, ["--temp_dir", str(tmp_path / "pipeline_temp")])
-    assert (
-        result.returncode == 0
-    ), f"pipeline failed:\n{result.stdout}\n{result.stderr}"
+    assert result.returncode == 0, f"pipeline failed:\n{result.stdout}\n{result.stderr}"
 
     markers = [
         line.strip()
@@ -773,9 +798,7 @@ def test_custom_analysis_dir_name(tmp_path):
     config_path = _build_experiment(tmp_path, analysis_dir_name="results")
 
     result = _run_pipeline(config_path, ["--temp_dir", str(tmp_path / "pipeline_temp")])
-    assert (
-        result.returncode == 0
-    ), f"pipeline failed:\n{result.stdout}\n{result.stderr}"
+    assert result.returncode == 0, f"pipeline failed:\n{result.stdout}\n{result.stderr}"
 
     masks = sorted((tmp_path / "exp" / "results" / "ch1_seg").glob("*.tiff"))
     assert len(masks) == 2
@@ -795,10 +818,10 @@ def test_prefix_free_folder_refs(tmp_path):
     )
 
     result = _run_pipeline(config_path, ["--temp_dir", str(tmp_path / "pipeline_temp")])
+    assert result.returncode == 0, f"pipeline failed:\n{result.stdout}\n{result.stderr}"
     assert (
-        result.returncode == 0
-    ), f"pipeline failed:\n{result.stdout}\n{result.stderr}"
-    assert (tmp_path / "exp" / "analysis" / "report" / "ch1_seg_morphology.csv").exists()
+        tmp_path / "exp" / "analysis" / "report" / "ch1_seg_morphology.csv"
+    ).exists()
 
 
 def test_prefix_free_refs_survive_analysis_dir_rename(tmp_path):
@@ -811,9 +834,7 @@ def test_prefix_free_refs_survive_analysis_dir_rename(tmp_path):
     )
 
     result = _run_pipeline(config_path, ["--temp_dir", str(tmp_path / "pipeline_temp")])
-    assert (
-        result.returncode == 0
-    ), f"pipeline failed:\n{result.stdout}\n{result.stderr}"
+    assert result.returncode == 0, f"pipeline failed:\n{result.stdout}\n{result.stderr}"
     assert (tmp_path / "exp" / "output" / "report" / "ch1_seg_morphology.csv").exists()
 
 
@@ -833,9 +854,7 @@ def test_experiment_dir_cli_overrides_config(tmp_path):
             str(tmp_path / "pipeline_temp"),
         ],
     )
-    assert (
-        result.returncode == 0
-    ), f"pipeline failed:\n{result.stdout}\n{result.stderr}"
+    assert result.returncode == 0, f"pipeline failed:\n{result.stdout}\n{result.stderr}"
 
     morph_csv = tmp_path / "exp" / "analysis" / "report" / "ch1_seg_morphology.csv"
     assert morph_csv.exists()

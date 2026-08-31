@@ -5,20 +5,21 @@ import numpy as np
 import pandas as pd
 import polars as pl
 import torch
-from joblib import delayed, Parallel, parallel_config
+from joblib import Parallel
+from joblib import delayed
+from joblib import parallel_config
 from torch.utils.data import DataLoader
-from towbintools.data_analysis import (
-    compute_instantaneous_growth_rate_classified,
-    compute_series_at_time_classified,
-    correct_series_with_classification,
-)
+from towbintools.data_analysis import compute_instantaneous_growth_rate_classified
+from towbintools.data_analysis import compute_series_at_time_classified
+from towbintools.data_analysis import correct_series_with_classification
 from towbintools.deep_learning.deep_learning_tools import (
     load_keypoint_detection_model_from_checkpoint,
 )
 from towbintools.deep_learning.utils.dataset import KeypointDetection1DPredictionDataset
 from towbintools.foundation import detect_molts
 from towbintools.foundation.detect_molts import find_hatch_time
-from towbintools.foundation.file_handling import read_filemap, write_filemap
+from towbintools.foundation.file_handling import read_filemap
+from towbintools.foundation.file_handling import write_filemap
 from towbintools.foundation.keypoint_detection import heatmap_to_keypoints_1D
 from towbintools.foundation.utils import find_best_string_match
 from towbintools.foundation.worm_features import get_features_to_compute_at_molt

@@ -5,17 +5,17 @@ from unittest.mock import patch
 
 import numpy as np
 import pytest
+from app_components.image_cache import BackgroundLoader
+from app_components.image_cache import PointImageCache
+from app_components.image_cache import ProgressTracker
 from app_components.image_cache import alpha_composite
 from app_components.image_cache import apply_lut
 from app_components.image_cache import array_to_data_url
-from app_components.image_cache import BackgroundLoader
 from app_components.image_cache import compose_display_image
 from app_components.image_cache import composite_mask
 from app_components.image_cache import downsample
 from app_components.image_cache import extract_channel
-from app_components.image_cache import PointImageCache
 from app_components.image_cache import prepare_channel
-from app_components.image_cache import ProgressTracker
 
 
 class TestPointImageCache:

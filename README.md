@@ -1,18 +1,25 @@
 # TOWBINTOOLS PIPELINE
 
-[![tests](https://github.com/spsalmon/towbintools_pipeline/actions/workflows/tests.yml/badge.svg)](https://github.com/spsalmon/towbintools_pipeline/actions/workflows/tests.yml)
+Towbintools Pipeline is a pipeline for processing and analyzing time lapse microscopy experiments. It implements many of the functions present in the towbintools package and bundles them with a pipelining tool to easily and reproducibly process large experiments.
 
-This is still in early development, hopefully in the future it will replace all of the lab's dozens of different bash scripts laying around and give the opportunity to everyone to easily customize their image analysis pipeline.
-
+A detailed documentation of the pipeline can be found here : <https://spsalmon.github.io/towbintools_pipeline/>
 The documentation for the package used as a backbone for the pipeline can be found here : <https://towbintools.readthedocs.io/en/latest/towbintools.html>
 
 ## RTFM
 
-You will find detailed explanations on how to install, update and use the pipeline here : <https://spsalmon.github.io/towbintools_pipeline/>
-
 ## How to install ?
 
-### How to set up Visual Studio Code ?
+You will find detailed explanations on how to install, update and use the pipeline here : <https://spsalmon.github.io/towbintools_pipeline/getting-started/installation/>
+
+## Running the pipeline
+
+You will find a detailed explanation on how to run the pipeline here : <https://spsalmon.github.io/towbintools_pipeline/getting-started/runningfirstpipelinee/>
+
+## Updating the pipeline
+
+You will find a detailed explanation on how to update the pipeline here : <https://spsalmon.github.io/towbintools_pipeline/getting-started/update/>
+
+## How to set up Visual Studio Code ? (for members of the IZB)
 
 1. Download VS Code : <https://code.visualstudio.com/download>
 2. Install it like you would install any software.
@@ -66,108 +73,3 @@ code --install-extension ms-toolsai.jupyter
 ```bash
 code --install-extension ms-python.vscode-pylance
 ```
-
-### How do to install the pipeline itself
-
-- In VS Code, open a terminal and cd to your home directory :
-
-```bash
-cd
-```
-
-- Clone the pipeline repo from github :
-
-```bash
-git clone https://github.com/spsalmon/towbintools_pipeline.git
-```
-
-- Install micromamba and restart your shell :
-
-```bash
-"${SHELL}" <(curl -L micro.mamba.pm/install.sh)
-```
-
-```bash
-source ~/.bashrc
-```
-
-- Run the installation script :
-
-```bash
-chmod +x ~/towbintools_pipeline/scripts/install_pipeline.sh
-```
-
-```bash
-cd ~/towbintools_pipeline
-```
-
-```bash
-~/towbintools_pipeline/scripts/install_pipeline.sh
-```
-
-For some reason, the script doesn't really work for some people. In case it doesn't work for you, just run every line of the installation script manually.
-
-Follow the directions given, so basically, push enter a bunch of times and type yes (you want to answer yes everytime) when asked to.
-
-## Running the pipeline
-
-1. Read the WIKI !!!!!
-2. Modify your config.yaml file according to what you want to do
-3. run the following command
-
-```bash
-cd ~/towbintools_pipeline
-```
-
-```bash
-bash scripts/run_pipeline.sh
-```
-
-### Using a custom config file
-
-If you don't specify anything, the config file used will be the bundled default "towbintools_pipeline/defaults/configs/config.yaml" but you can specify one using
-
-```bash
-bash scripts/run_pipeline.sh -c path_to_config_file
-```
-
-or
-
-```bash
-bash scripts/run_pipeline.sh --config path_to_config_file
-```
-
-## Updating the pipeline
-
-I will update the pipeline frequently, so please try to keep up to date by running the following commands on a regular basis.
-
-Running the following script will update both the pipeline and the underlying towbintools python package
-
-```bash
-bash scripts/update_pipeline.sh
-```
-
-### If you want to reset the folder completely (manually)
-
-First, fetch the repository
-
-```bash
-git fetch origin
-```
-
-Then, run :
-
-```bash
-git reset --hard origin/main
-```
-
-### If you want to save some changes you made
-
-Run those commands before resetting the folder :
-
-```bash
-git commit -a -m "Saving my work, just in case"
-git branch my-saved-work
-```
-
-This way, your changes will be changed into a new branch. Note that this branch will to be updated. Overall, I would advise to not modify anything directly. Copy your config file(s) to a backup folder and just reset the folder everytime you want to update it.

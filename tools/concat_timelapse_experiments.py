@@ -3,8 +3,8 @@ import re
 import shutil
 
 import pandas as pd
-from joblib import delayed
 from joblib import Parallel
+from joblib import delayed
 from towbintools.foundation.file_handling import get_dir_filemap
 from tqdm import tqdm
 

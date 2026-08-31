@@ -3,26 +3,23 @@ experiment filemap, launch the next block, refresh the combined logs, and sync
 the backup (optionally cleaning up scratch when the run completes). Each block's
 job script appends a call to this module, so the chain self-propagates.
 """
+
 import argparse
 import os
 
 import polars as pl
-from towbintools.foundation.file_handling import (
-    add_dir_to_experiment_filemap,
-    read_filemap,
-    write_filemap,
-)
+from towbintools.foundation.file_handling import add_dir_to_experiment_filemap
+from towbintools.foundation.file_handling import read_filemap
+from towbintools.foundation.file_handling import write_filemap
 
-from towbintools_pipeline.utils import (
-    block_label,
-    cleanup_files,
-    cleanup_run,
-    concatenate_sbatch_logs,
-    load_pickles,
-    merge_and_save_records,
-    pickle_objects,
-    sync_backup_folder,
-)
+from towbintools_pipeline.utils import block_label
+from towbintools_pipeline.utils import cleanup_files
+from towbintools_pipeline.utils import cleanup_run
+from towbintools_pipeline.utils import concatenate_sbatch_logs
+from towbintools_pipeline.utils import load_pickles
+from towbintools_pipeline.utils import merge_and_save_records
+from towbintools_pipeline.utils import pickle_objects
+from towbintools_pipeline.utils import sync_backup_folder
 
 
 def get_args():
@@ -175,7 +172,9 @@ def main():
             f"/{len(building_blocks)} blocks done so far"
         )
     else:
-        print(f"### End of the pipeline! ({len(building_blocks)} blocks) ###", flush=True)
+        print(
+            f"### End of the pipeline! ({len(building_blocks)} blocks) ###", flush=True
+        )
         closing = (
             f"PIPELINE FINISHED -- all {len(building_blocks)} blocks completed, "
             "the run reached its end"

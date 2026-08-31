@@ -4,6 +4,7 @@ for another subcommand's dependencies. With no known subcommand the arguments
 are treated as a `run`, so the previous `towbintools-pipeline -c config.yaml`
 form keeps working.
 """
+
 import argparse
 import os
 import shutil
@@ -52,12 +53,9 @@ def _init_config(argv):
         print(f"Wrote {destination}")
     if skipped:
         print(
-            "Skipped (already exist, pass --force to overwrite): "
-            + ", ".join(skipped)
+            "Skipped (already exist, pass --force to overwrite): " + ", ".join(skipped)
         )
-    print(
-        "Bundled models are at: " + os.path.join(_PIPELINE_DIR, "defaults", "models")
-    )
+    print("Bundled models are at: " + os.path.join(_PIPELINE_DIR, "defaults", "models"))
 
 
 SUBCOMMANDS = {

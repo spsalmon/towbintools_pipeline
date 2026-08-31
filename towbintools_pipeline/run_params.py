@@ -2,15 +2,14 @@
 config so the launch scripts stay generic. Currently prints the sbatch CLI
 flags for the outer/orchestrator job (from sbatch_init).
 """
+
 import argparse
 
 import yaml
 
-from towbintools_pipeline.utils import (
-    build_resource_directives,
-    merge_slurm_config,
-    resolve_init_slurm,
-)
+from towbintools_pipeline.utils import build_resource_directives
+from towbintools_pipeline.utils import merge_slurm_config
+from towbintools_pipeline.utils import resolve_init_slurm
 
 
 def get_args():

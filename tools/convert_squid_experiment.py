@@ -7,8 +7,8 @@ import numpy as np
 import ome_types
 import tifffile
 from bioio.writers import OmeTiffWriter
-from joblib import delayed
 from joblib import Parallel
+from joblib import delayed
 from joblib import parallel_config
 from ome_types.model import Channel
 from ome_types.model import Image

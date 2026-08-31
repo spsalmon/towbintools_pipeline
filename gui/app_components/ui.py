@@ -2,9 +2,9 @@ from pathlib import Path
 
 import polars as pl
 from app_components.backend import ECDYSIS_COLUMNS
+from app_components.backend import MOLT_ENTRY_COLUMNS
 from app_components.backend import fix_experiment_time
 from app_components.backend import infer_n_channels
-from app_components.backend import MOLT_ENTRY_COLUMNS
 from app_components.backend import populate_column_choices
 from app_components.backend import process_feature_at_molt_columns
 from app_components.ui_components import molt_annotation_buttons

@@ -3,21 +3,21 @@ straightening, morphology, quality control, molt detection, fluorescence, and a
 user-supplied custom block). Validates the config, parses it into per-block
 configurations, and builds the block objects that init_pipeline runs.
 """
+
 import os
-from abc import ABC, abstractmethod
+from abc import ABC
+from abc import abstractmethod
 
 import numpy as np
 from towbintools.foundation.file_handling import add_dir_to_experiment_filemap
 
-from towbintools_pipeline.utils import (
-    create_linker_command,
-    get_input_and_output_files,
-    get_output_name,
-    get_python_command,
-    pickle_objects,
-    resolve_ref,
-    run_command,
-)
+from towbintools_pipeline.utils import create_linker_command
+from towbintools_pipeline.utils import get_input_and_output_files
+from towbintools_pipeline.utils import get_output_name
+from towbintools_pipeline.utils import get_python_command
+from towbintools_pipeline.utils import pickle_objects
+from towbintools_pipeline.utils import resolve_ref
+from towbintools_pipeline.utils import run_command
 
 # Resolve bundled scripts/models relative to this package, so the pipeline
 # works regardless of the current working directory.
@@ -115,7 +115,9 @@ DEFAULT_OPTIONS = {
         "rerun_molt_detection": [False],
         "molt_detection_method": ["deep_learning"],
         "molt_detection_model_path": [
-            os.path.join(_PIPELINE_DIR, "defaults", "models", "molt_detection_model.ckpt")
+            os.path.join(
+                _PIPELINE_DIR, "defaults", "models", "molt_detection_model.ckpt"
+            )
         ],
         "molt_detection_batch_size": [1],
         "molt_detection_volume": [
@@ -271,9 +273,7 @@ class BuildingBlock(ABC):
                     pickled_filemap_path=pickled_filemap_path,
                 )
 
-                linker_command = create_linker_command(
-                    python_command, temp_dir, subdir
-                )
+                linker_command = create_linker_command(python_command, temp_dir, subdir)
 
                 run_command(
                     command,
@@ -285,9 +285,7 @@ class BuildingBlock(ABC):
                 )
 
             else:
-                linker_command = create_linker_command(
-                    python_command, temp_dir, subdir
-                )
+                linker_command = create_linker_command(python_command, temp_dir, subdir)
                 run_command(
                     "# No input files found, skipping this building block.",
                     self.name,

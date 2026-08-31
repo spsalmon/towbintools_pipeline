@@ -2,34 +2,29 @@
 for the experiment (per raw subdir), and launch the first one. The block linker
 chains the rest. Exposed as the `towbintools-pipeline` command via main().
 """
+
 import argparse
 import os
 
 import numpy as np
 import polars as pl
 import yaml
-from towbintools.foundation.file_handling import (
-    get_dir_filemap,
-    read_filemap,
-    write_filemap,
-)
+from towbintools.foundation.file_handling import get_dir_filemap
+from towbintools.foundation.file_handling import read_filemap
+from towbintools.foundation.file_handling import write_filemap
 
-from towbintools_pipeline.building_blocks import (
-    parse_and_create_building_blocks,
-    validate_config,
-)
-from towbintools_pipeline.utils import (
-    backup_run_config,
-    block_label,
-    get_and_create_folders,
-    get_experiment_subdirs,
-    get_experiment_time_from_filemap,
-    merge_slurm_config,
-    pickle_objects,
-    save_version_control_info,
-    setup_run_dir,
-    sync_backup_folder,
-)
+from towbintools_pipeline.building_blocks import parse_and_create_building_blocks
+from towbintools_pipeline.building_blocks import validate_config
+from towbintools_pipeline.utils import backup_run_config
+from towbintools_pipeline.utils import block_label
+from towbintools_pipeline.utils import get_and_create_folders
+from towbintools_pipeline.utils import get_experiment_subdirs
+from towbintools_pipeline.utils import get_experiment_time_from_filemap
+from towbintools_pipeline.utils import merge_slurm_config
+from towbintools_pipeline.utils import pickle_objects
+from towbintools_pipeline.utils import save_version_control_info
+from towbintools_pipeline.utils import setup_run_dir
+from towbintools_pipeline.utils import sync_backup_folder
 
 
 def get_args(argv=None):
@@ -286,7 +281,9 @@ def main(argv=None):
     experiment_filemap = read_filemap(current_config["filemap_path"])
     print(f"### Starting block {block_label(building_blocks, 0)} ###")
     print(f"Running {current_building_block} ...", flush=True)
-    current_building_block.run(experiment_filemap, current_config, subdir=current_subdir)
+    current_building_block.run(
+        experiment_filemap, current_config, subdir=current_subdir
+    )
 
 
 if __name__ == "__main__":

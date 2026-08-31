@@ -3,8 +3,8 @@ import os
 
 import cv2
 import numpy as np
-from joblib import delayed
 from joblib import Parallel
+from joblib import delayed
 from skimage.morphology import remove_small_objects
 from tifffile import imwrite
 from towbintools.foundation.image_handling import read_tiff_file
