@@ -165,14 +165,18 @@ temp_files/*
 sbatch_output/*
 **/lightning_logs/
 
+# Local pipeline test output (e.g. tests/26-07-21_analysis/)
+tests/*_analysis/
+
 *.pkl
 *.csv
 *.log
 *.err
 *.out
 
-configs/*
-!configs/config.yaml
+towbintools_pipeline/defaults/config/*
+!towbintools_pipeline/defaults/config/config.yaml
+!towbintools_pipeline/defaults/config/slurm_config.yaml
 training/*.yaml
 training/segmentation/configs/*
 !training/segmentation/configs/segmentation_training_config.yaml

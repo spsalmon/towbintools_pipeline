@@ -1,5 +1,8 @@
 #!/usr/bin/env bash
 
+# Run from the repo root so ./gui/run.py resolves.
+cd "$(dirname "$0")/.."
+
 # --- Configuration: edit these ---
 FILEMAP_PATH="/mnt/towbin.data/shared/spsalmon/20260807_134551_682_ZIVA_60x_col10_reporter/analysis/report/analysis_filemap.parquet"
 OPEN_ANNOTATED=1      # 1 = open annotated if exists, 0 = always open original
@@ -8,7 +11,7 @@ PORT=0             # 0 = random available port
 HOST="127.0.0.1"
 # ---------------------------------
 
-~/.local/bin/micromamba run -n towbintools python "./gui/run.py" \
+${TOWBINTOOLS_PYTHON:-$HOME/.local/bin/micromamba run -n towbintools python3} "./gui/run.py" \
     ${FILEMAP_PATH:+--filemap "$FILEMAP_PATH"} \
     ${RECOMPUTE_VALUES_AT_MOLT:+$([ "$RECOMPUTE_VALUES_AT_MOLT" = "1" ] && echo "--recompute")} \
     $([ "$OPEN_ANNOTATED" = "0" ] && echo "--no-annotated") \

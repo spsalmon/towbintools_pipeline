@@ -6,12 +6,8 @@ from threading import Thread
 import cv2
 import numpy as np
 import torch
-import utils
-from cellpose import models
 from cv2 import resize
-from joblib import delayed
-from joblib import Parallel
-from joblib import parallel_config
+from joblib import delayed, Parallel, parallel_config
 from tifffile import imwrite
 from torch.utils.data import DataLoader
 from towbintools.deep_learning.deep_learning_tools import (
@@ -20,9 +16,13 @@ from towbintools.deep_learning.deep_learning_tools import (
 from towbintools.deep_learning.utils.augmentation import (
     get_prediction_augmentation_from_model,
 )
-from towbintools.deep_learning.utils.dataset import SegmentationPredictionDataset
-from towbintools.deep_learning.utils.dataset import StackPredictionDataset
+from towbintools.deep_learning.utils.dataset import (
+    SegmentationPredictionDataset,
+    StackPredictionDataset,
+)
 from towbintools.foundation import image_handling
+
+from towbintools_pipeline import utils
 
 logging.basicConfig(level=logging.INFO)
 
@@ -121,7 +121,9 @@ def save_prediction(prediction, output_path, z_dim=None, t_dim=None):
         )
 
 
-# method functions
+# ---- Segmentation methods ----
+
+
 def deep_learning_segmentation(
     block_config,
     input_files,
@@ -278,6 +280,9 @@ def cellpose_segmentation(
     t_dim,
     stitch_3D=True,
 ):
+    # Imported here so cellpose is only required when this method is used.
+    from cellpose import models
+
     gpu = torch.cuda.is_available()
     batch_size = block_config.get("batch_size", 8)
     model = models.CellposeModel(gpu=gpu, pretrained_model=block_config["model_path"])

@@ -1,15 +1,27 @@
+"""Building blocks of the pipeline: one class per analysis step (segmentation,
+straightening, morphology, quality control, molt detection, fluorescence, and a
+user-supplied custom block). Validates the config, parses it into per-block
+configurations, and builds the block objects that init_pipeline runs.
+"""
 import os
-from abc import ABC
-from abc import abstractmethod
+from abc import ABC, abstractmethod
 
 import numpy as np
 from towbintools.foundation.file_handling import add_dir_to_experiment_filemap
 
-from pipeline_scripts.utils import create_linker_command
-from pipeline_scripts.utils import get_input_and_output_files
-from pipeline_scripts.utils import get_output_name
-from pipeline_scripts.utils import pickle_objects
-from pipeline_scripts.utils import run_command
+from towbintools_pipeline.utils import (
+    create_linker_command,
+    get_input_and_output_files,
+    get_output_name,
+    get_python_command,
+    pickle_objects,
+    resolve_ref,
+    run_command,
+)
+
+# Resolve bundled scripts/models relative to this package, so the pipeline
+# works regardless of the current working directory.
+_PIPELINE_DIR = os.path.dirname(os.path.abspath(__file__))
 
 OPTIONS_MAP = {
     "segmentation": [
@@ -102,7 +114,9 @@ DEFAULT_OPTIONS = {
     "molt_detection": {
         "rerun_molt_detection": [False],
         "molt_detection_method": ["deep_learning"],
-        "molt_detection_model_path": ["./models/molt_detection_model.ckpt"],
+        "molt_detection_model_path": [
+            os.path.join(_PIPELINE_DIR, "defaults", "models", "molt_detection_model.ckpt")
+        ],
         "molt_detection_batch_size": [1],
         "molt_detection_volume": [
             None
@@ -118,6 +132,44 @@ DEFAULT_OPTIONS = {
     },
 }
 
+# User-settable top-level keys that are not per-block options. Keep this in sync
+# when adding a new config key: validate_config rejects any key that is neither
+# here, a per-block option (OPTIONS_MAP), nor an sbatch_* SLURM key.
+GLOBAL_CONFIG_KEYS = frozenset(
+    {
+        "experiment_dir",
+        "analysis_dir_name",
+        "raw_dir_name",
+        "temp_dir",
+        "cleanup_on_success",
+        "report_format",
+        "get_experiment_time",
+        "overwrite_annotated_filemap",
+        "time_regex",
+        "point_regex",
+        "n_jobs",
+        "backend",
+        "slurm_config",
+        "python_command",
+        "building_blocks",
+        "groups",
+    }
+)
+
+# Every per-block option name, flattened across block types.
+ALL_OPTION_KEYS = frozenset(
+    option for options in OPTIONS_MAP.values() for option in options
+)
+
+# Option keys whose values are input files/dirs that must exist before the run.
+# Only inputs the user supplies -- never a folder an earlier block produces.
+PATH_OPTIONS = (
+    "model_path",
+    "qc_model_path",
+    "molt_detection_model_path",
+    "custom_script_path",
+)
+
 
 class BuildingBlock(ABC):
     def __init__(
@@ -126,7 +178,7 @@ class BuildingBlock(ABC):
         options,
         block_config,
         return_type,
-        script_path,
+        worker_module,
         requires_gpu=False,
         requires_filemap=False,
     ):
@@ -134,7 +186,7 @@ class BuildingBlock(ABC):
         self.options = options
         self.block_config = block_config
         self.return_type = return_type
-        self.script_path = script_path
+        self.worker_module = worker_module
         self.requires_gpu = requires_gpu
         self.requires_filemap = requires_filemap
 
@@ -151,7 +203,7 @@ class BuildingBlock(ABC):
 
     def create_command(
         self,
-        micromamba_path,
+        python_command,
         input_pickle_path,
         output_pickle_path,
         pickled_block_config,
@@ -159,16 +211,18 @@ class BuildingBlock(ABC):
         config,
         pickled_filemap_path=None,
     ):
-        script_path = self.script_path
+        # Worker compute parallelism (joblib --n_jobs), needed by every backend.
+        # Falls back to the SLURM cpu request so configs that only set
+        # sbatch_cpus keep working.
+        n_jobs = config.get("n_jobs", config.get("sbatch_cpus", 1))
 
-        if script_path.endswith(".sh"):
-            command = f"bash {script_path} --input {input_pickle_path} -output {output_pickle_path} --block_config {pickled_block_config} --config {pickled_config}"
-        elif script_path.endswith(".py"):
-            command = f"{micromamba_path} run -n towbintools python3 {script_path} --input {input_pickle_path} --output {output_pickle_path} --block_config {pickled_block_config} --config {pickled_config} --n_jobs {config['sbatch_cpus']}"
-        else:
-            raise ValueError(
-                f"Script type of {script_path} is not supported. The pipeline only supports bash or python scripts."
-            )
+        # Run the worker as a module, so it resolves by import rather than by a
+        # working-directory-relative path.
+        command = (
+            f"{python_command} -m {self.worker_module} --input {input_pickle_path} "
+            f"--output {output_pickle_path} --block_config {pickled_block_config} "
+            f"--config {pickled_config} --n_jobs {n_jobs}"
+        )
 
         if pickled_filemap_path is not None:
             command += f" -f {pickled_filemap_path}"
@@ -176,7 +230,7 @@ class BuildingBlock(ABC):
 
     def run(self, experiment_filemap, config, subdir=None):
         block_config = self.block_config
-        micromamba_path = config.get("micromamba_path", "~/.local/bin/micromamba")
+        python_command = get_python_command(config)
         temp_dir = config["temp_dir"]
 
         if self.requires_filemap:
@@ -208,7 +262,7 @@ class BuildingBlock(ABC):
                 )
 
                 command = self.create_command(
-                    micromamba_path,
+                    python_command,
                     input_pickle_path,
                     output_pickle_path,
                     pickled_block_config,
@@ -218,7 +272,7 @@ class BuildingBlock(ABC):
                 )
 
                 linker_command = create_linker_command(
-                    micromamba_path, temp_dir, subdir
+                    python_command, temp_dir, subdir
                 )
 
                 run_command(
@@ -232,7 +286,7 @@ class BuildingBlock(ABC):
 
             else:
                 linker_command = create_linker_command(
-                    micromamba_path, temp_dir, subdir
+                    python_command, temp_dir, subdir
                 )
                 run_command(
                     "# No input files found, skipping this building block.",
@@ -266,7 +320,7 @@ class BuildingBlock(ABC):
                 )
 
                 command = self.create_command(
-                    micromamba_path,
+                    python_command,
                     input_pickle_path,
                     output_file,
                     pickled_block_config,
@@ -276,7 +330,7 @@ class BuildingBlock(ABC):
                 )
 
                 linker_command = create_linker_command(
-                    micromamba_path, temp_dir, output_file
+                    python_command, temp_dir, output_file
                 )
 
                 run_command(
@@ -290,7 +344,7 @@ class BuildingBlock(ABC):
 
             else:
                 linker_command = create_linker_command(
-                    micromamba_path, temp_dir, output_file
+                    python_command, temp_dir, output_file
                 )
                 run_command(
                     "# No input files found, skipping this building block.",
@@ -311,10 +365,10 @@ class SegmentationBuildingBlock(BuildingBlock):
 
         if block_config["segmentation_method"] in NON_LEARNING_METHODS:
             requires_gpu = False
-            script_path = "./pipeline_scripts/non_learning_segment.py"
+            worker_module = "towbintools_pipeline.workers.segmentation_non_learning"
         elif block_config["segmentation_method"] in LEARNING_BASED_METHODS:
             requires_gpu = True
-            script_path = "./pipeline_scripts/learning_based_segment.py"
+            worker_module = "towbintools_pipeline.workers.segmentation_learning_based"
         else:
             raise ValueError(
                 f"Segmentation method {block_config['segmentation_method']} not supported."
@@ -325,7 +379,7 @@ class SegmentationBuildingBlock(BuildingBlock):
             OPTIONS_MAP["segmentation"],
             block_config,
             "subdir",
-            script_path,
+            worker_module,
             requires_gpu,
         )
 
@@ -344,7 +398,7 @@ class SegmentationBuildingBlock(BuildingBlock):
     def get_input_and_output_files(self, config, experiment_filemap, subdir):
         input_files, output_files = get_input_and_output_files(
             experiment_filemap,
-            [self.block_config["segmentation_column"]],
+            [resolve_ref(self.block_config["segmentation_column"], config)],
             subdir,
             rerun=self.block_config["rerun_segmentation"],
         )
@@ -354,13 +408,13 @@ class SegmentationBuildingBlock(BuildingBlock):
 
 class StraighteningBuildingBlock(BuildingBlock):
     def __init__(self, block_config):
-        script_path = "./pipeline_scripts/straighten.py"
+        worker_module = "towbintools_pipeline.workers.straightening"
         super().__init__(
             "straightening",
             OPTIONS_MAP["straightening"],
             block_config,
             "subdir",
-            script_path,
+            worker_module,
         )
 
     def get_output_name(self, config, subdir):
@@ -377,8 +431,8 @@ class StraighteningBuildingBlock(BuildingBlock):
     def get_input_and_output_files(self, config, experiment_filemap, subdir):
         block_config = self.block_config
         columns = [
-            block_config["straightening_source"][0],
-            block_config["straightening_masks"],
+            resolve_ref(block_config["straightening_source"][0], config),
+            resolve_ref(block_config["straightening_masks"], config),
         ]
 
         for column in columns:
@@ -415,13 +469,13 @@ class StraighteningBuildingBlock(BuildingBlock):
 
 class QualityControlBuildingBlock(BuildingBlock):
     def __init__(self, block_config):
-        script_path = "./pipeline_scripts/quality_control.py"
+        worker_module = "towbintools_pipeline.workers.quality_control"
         super().__init__(
             "quality_control",
             OPTIONS_MAP["quality_control"],
             block_config,
             "csv",
-            script_path,
+            worker_module,
             requires_filemap=True,
         )
         self.mask_only = (
@@ -441,9 +495,12 @@ class QualityControlBuildingBlock(BuildingBlock):
     def get_input_and_output_files(self, config, experiment_filemap, subdir):
         block_config = self.block_config
         if self.mask_only:
-            columns = [block_config["qc_masks"]]
+            columns = [resolve_ref(block_config["qc_masks"], config)]
         else:
-            columns = [block_config["qc_images"][0], block_config["qc_masks"]]
+            columns = [
+                resolve_ref(block_config["qc_images"][0], config),
+                resolve_ref(block_config["qc_masks"], config),
+            ]
 
         input_files, _ = get_input_and_output_files(
             experiment_filemap,
@@ -468,13 +525,13 @@ class QualityControlBuildingBlock(BuildingBlock):
 
 class MorphologyComputationBuildingBlock(BuildingBlock):
     def __init__(self, block_config):
-        script_path = "./pipeline_scripts/compute_morphology.py"
+        worker_module = "towbintools_pipeline.workers.morphology_computation"
         super().__init__(
             "morphology_computation",
             OPTIONS_MAP["morphology_computation"],
             block_config,
             "csv",
-            script_path,
+            worker_module,
         )
 
     def get_output_name(self, config, subdir):
@@ -488,7 +545,7 @@ class MorphologyComputationBuildingBlock(BuildingBlock):
 
     def get_input_and_output_files(self, config, experiment_filemap, subdir):
         morphology_computation_masks = [
-            self.block_config["morphology_computation_masks"]
+            resolve_ref(self.block_config["morphology_computation_masks"], config)
         ]
         analysis_subdir = config["analysis_subdir"]
 
@@ -505,13 +562,13 @@ class MorphologyComputationBuildingBlock(BuildingBlock):
 
 class MoltDetectionBuildingBlock(BuildingBlock):
     def __init__(self, block_config):
-        script_path = "./pipeline_scripts/detect_molts.py"
+        worker_module = "towbintools_pipeline.workers.molt_detection"
         super().__init__(
             "molt_detection",
             OPTIONS_MAP["molt_detection"],
             block_config,
             "csv",
-            script_path,
+            worker_module,
         )
 
     def get_output_name(self, config, subdir):
@@ -525,13 +582,13 @@ class MoltDetectionBuildingBlock(BuildingBlock):
 
 class FluorescenceQuantificationBuildingBlock(BuildingBlock):
     def __init__(self, block_config):
-        script_path = "./pipeline_scripts/quantify_fluorescence.py"
+        worker_module = "towbintools_pipeline.workers.fluorescence_quantification"
         super().__init__(
             "fluorescence_quantification",
             OPTIONS_MAP["fluorescence_quantification"],
             block_config,
             "csv",
-            script_path,
+            worker_module,
         )
 
     def get_output_name(self, config, subdir):
@@ -565,8 +622,8 @@ class FluorescenceQuantificationBuildingBlock(BuildingBlock):
         ][0]
 
         columns = [
-            fluorescence_quantification_source,
-            self.block_config["fluorescence_quantification_masks"],
+            resolve_ref(fluorescence_quantification_source, config),
+            resolve_ref(self.block_config["fluorescence_quantification_masks"], config),
         ]
 
         input_files, _ = get_input_and_output_files(experiment_filemap, columns, subdir)
@@ -582,13 +639,14 @@ class FluorescenceQuantificationBuildingBlock(BuildingBlock):
 
 class CustomBuildingBlock(BuildingBlock):
     def __init__(self, block_config):
-        script_path = block_config["custom_script_path"]
+        # No worker module: custom blocks run a user-supplied script and override
+        # create_command below.
         super().__init__(
             "custom",
             OPTIONS_MAP["custom"],
             block_config,
             block_config["custom_script_return_type"],
-            script_path,
+            None,
             requires_gpu=block_config.get("custom_script_requires_gpu", False),
             requires_filemap=False,
         )
@@ -622,7 +680,7 @@ class CustomBuildingBlock(BuildingBlock):
 
     def create_command(
         self,
-        micromamba_path,
+        python_command,
         input_pickle_path,
         output_pickle_path,
         pickled_block_config,
@@ -640,12 +698,99 @@ class CustomBuildingBlock(BuildingBlock):
         if custom_script_path.endswith(".sh"):
             command = f"bash {custom_script_path} --filemap {input_pickle_path} --output {output_pickle_path} --block_config {pickled_block_config} --config {pickled_config} {custom_script_parameters}"
         elif custom_script_path.endswith(".py"):
-            command = f"{micromamba_path} run -n towbintools python3 {custom_script_path} --filemap {input_pickle_path} --block_config {pickled_block_config} --output {output_pickle_path} --config {pickled_config} {custom_script_parameters}"
+            command = f"{python_command} {custom_script_path} --filemap {input_pickle_path} --block_config {pickled_block_config} --output {output_pickle_path} --config {pickled_config} {custom_script_parameters}"
         else:
             print(
                 f"Script type of {custom_script_path} is not supported. The pipeline only supports bash or python scripts."
             )
         return command
+
+
+def validate_config(config):
+    # Pre-flight check run before any run dir or job is created. Collects every
+    # problem and raises them together, rather than failing on the first.
+    errors = []
+
+    for key in ("experiment_dir", "building_blocks"):
+        if key not in config:
+            errors.append(f"missing required key '{key}'")
+
+    # Flag typo'd / unrecognised keys. sbatch_* keys (merged from the slurm
+    # config) are cluster-specific and free-form, so they pass by prefix.
+    for key in config:
+        if (
+            key in GLOBAL_CONFIG_KEYS
+            or key in ALL_OPTION_KEYS
+            or key.startswith("sbatch_")
+        ):
+            continue
+        errors.append(f"unknown config key '{key}'")
+
+    blocks = config.get("building_blocks")
+    if "building_blocks" in config and (not isinstance(blocks, list) or not blocks):
+        errors.append("'building_blocks' must be a non-empty list")
+    elif isinstance(blocks, list):
+        for name in blocks:
+            if name == "classification":
+                errors.append(
+                    "building block 'classification' was replaced by "
+                    "'quality_control'; update your config"
+                )
+            elif name not in OPTIONS_MAP:
+                errors.append(f"unknown building block '{name}'")
+
+        # Each per-block option list must hold one value per block of that type
+        # (or a single value broadcast to all of them).
+        counts = count_building_blocks_types(blocks)
+        for name, indices in counts.items():
+            if name not in OPTIONS_MAP:
+                continue
+            n = len(indices)
+            for option in OPTIONS_MAP[name]:
+                if option not in config:
+                    if option not in DEFAULT_OPTIONS.get(name, {}):
+                        errors.append(
+                            f"'{option}' is required for the '{name}' building block"
+                        )
+                    continue
+                value = config[option]
+                if not isinstance(value, list):
+                    errors.append(f"'{option}' must be a list")
+                elif len(value) not in (1, n):
+                    errors.append(
+                        f"'{option}' has {len(value)} value(s) but there are "
+                        f"{n} '{name}' block(s) (expected 1 or {n})"
+                    )
+
+    # Input paths given in the config must already exist. experiment_dir is a
+    # directory; the model/script options are lists of files (skip None and any
+    # non-string entry). Folders produced by earlier blocks are NOT checked --
+    # they do not exist yet at validation time.
+    experiment_dir = config.get("experiment_dir")
+    if isinstance(experiment_dir, str) and not os.path.isdir(experiment_dir):
+        errors.append(f"'experiment_dir' does not exist: {experiment_dir}")
+    for option in PATH_OPTIONS:
+        values = config.get(option)
+        if not isinstance(values, list):
+            continue
+        for value in values:
+            if isinstance(value, str) and not os.path.isfile(value):
+                errors.append(f"'{option}' file does not exist: {value}")
+
+    backend = config.get("backend", "slurm")
+    if backend not in ("slurm", "local"):
+        errors.append(f"'backend' must be 'slurm' or 'local', got '{backend}'")
+
+    report_format = config.get("report_format", "csv")
+    if report_format not in ("csv", "parquet"):
+        errors.append(
+            f"'report_format' must be 'csv' or 'parquet', got '{report_format}'"
+        )
+
+    if errors:
+        raise ValueError(
+            "Invalid pipeline config:\n" + "\n".join(f"  - {e}" for e in errors)
+        )
 
 
 def count_building_blocks_types(building_block_names):

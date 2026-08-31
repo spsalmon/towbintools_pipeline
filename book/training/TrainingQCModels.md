@@ -103,7 +103,7 @@ qc_model_path: [ "/path/to/qc_xgb_model.pkl" ]
 
 There is no separate "method" option: the block always loads the joblib
 bundle at `qc_model_path` and uses whichever classifier(s) it points to. See
-`OPTIONS_MAP["quality_control"]` in `pipeline_scripts/building_blocks.py` for
+`OPTIONS_MAP["quality_control"]` in `towbintools_pipeline/building_blocks.py` for
 the full list of accepted keys (`qc_masks`, `qc_images`, `qc_model_path`,
 `qc_import_eggs_from`, `rerun_quality_control`).
 

@@ -2,14 +2,12 @@ import os
 
 import numpy as np
 import polars as pl
-import utils
-from joblib import delayed
-from joblib import Parallel
-from joblib import parallel_config
+from joblib import delayed, Parallel, parallel_config
 from towbintools.foundation import image_handling
-from towbintools.foundation.file_handling import extract_time_point
-from towbintools.foundation.file_handling import write_filemap
+from towbintools.foundation.file_handling import extract_time_point, write_filemap
 from towbintools.quantification import compute_fluorescence_in_mask
+
+from towbintools_pipeline import utils
 
 
 def quantify_fluorescence_from_file_path(
