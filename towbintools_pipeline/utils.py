@@ -193,7 +193,9 @@ def get_output_name(
                 output_name += f"ch{channel+1}_"
         else:
             output_name += f"ch{channels+1}_"
-    if input_name != raw_dir_name or add_raw:
+    # The literal "raw" and the configured raw_dir_name both denote the raw
+    # input, which contributes no basename unless add_raw is set.
+    if (input_name != raw_dir_name and input_name != "raw") or add_raw:
         output_name += os.path.basename(os.path.normpath(input_name)) + "_"
     output_name += task_name
     if suffix is not None:
@@ -300,11 +302,16 @@ def process_input_output_files(input_files, output_dir, rerun):
 def resolve_ref(ref, config):
     # Normalize a directory reference to the `{analysis_dir_name}/{name}` column,
     # so it can be written with or without the analysis-dir prefix (and survives
-    # renaming analysis_dir_name). raw and absolute paths pass through unchanged.
+    # renaming analysis_dir_name). The literal "raw" and the configured
+    # raw_dir_name both map to the raw column; absolute paths pass through.
     raw_dir_name = config.get("raw_dir_name", "raw")
     analysis_dir_name = config.get("analysis_dir_name", "analysis")
-    if os.path.isabs(ref) or ref == raw_dir_name:
+    # os.path.isabs misses POSIX absolute paths on Windows; a folder ref is never
+    # a leading-slash relative name, so treat a leading "/" as absolute too.
+    if os.path.isabs(ref) or ref.startswith("/"):
         return ref
+    if ref == "raw" or ref == raw_dir_name:
+        return raw_dir_name
     return f"{analysis_dir_name}/{os.path.basename(os.path.normpath(ref))}"
 
 

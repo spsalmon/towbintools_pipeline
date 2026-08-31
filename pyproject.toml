@@ -11,7 +11,7 @@ version = "0.1.0"
 description = "Configurable image-analysis pipeline built on towbintools."
 requires-python = ">=3.11"
 dependencies = [
-    "towbintools",
+    "towbintools>=0.4.3",  # 0.4.3+ has the current molt-detection model architecture
     "numpy",
     "polars",
     "pyarrow",
@@ -19,10 +19,22 @@ dependencies = [
     "tifffile",
     "pyyaml",
     "lxml",
+    "tqdm",  # used directly; not pulled in by towbintools
+    # Imported directly by the pipeline but typically pulled in transitively by
+    # towbintools; declared explicitly so a change in its requirements cannot
+    # silently drop them from under the pipeline.
+    "opencv-contrib-python",
+    "pandas",
+    "scipy",
+    "torch",
+    "xgboost",
 ]
 
 [project.optional-dependencies]
 dev = ["pytest"]
+# Optional segmentation backend, imported lazily. Kept out of the core so a
+# default install does not pull opencv-python-headless over opencv-contrib.
+cellpose = ["cellpose==4.2.1.1"]
 
 [project.scripts]
 # Subcommand dispatcher: `towbintools-pipeline run|init-configs`. With no known

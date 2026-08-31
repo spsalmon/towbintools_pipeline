@@ -51,43 +51,15 @@ def get_args(argv=None):
     return args
 
 
-def build_blocks_for_subdir(global_config, temp_dir_basename, temp_dir, subdir=None):
-    print(f"### Initializing the pipeline for subdir {subdir} ###")
-
-    (
-        experiment_dir,
-        raw_subdir,
-        analysis_subdir,
-        report_subdir,
-        pipeline_backup_dir,
-    ) = get_and_create_folders(global_config, subdir)
-
-    pipeline_backup_dir = os.path.join(pipeline_backup_dir, temp_dir_basename)
-    os.makedirs(pipeline_backup_dir, exist_ok=True)
-
-    config = global_config.copy()
-
-    config["raw_subdir"] = raw_subdir
-    if subdir is None:
-        raw_dir_name = os.path.basename(os.path.normpath(raw_subdir))
-    else:
-        # instead, get the name from the parent directory
-        raw_dir_name = os.path.basename(os.path.normpath(os.path.dirname(raw_subdir)))
-
-    config["raw_dir_name"] = raw_dir_name
-    config["analysis_subdir"] = analysis_subdir
-    config["report_subdir"] = report_subdir
-    config["pipeline_backup_dir"] = pipeline_backup_dir
-    config["temp_dir"] = temp_dir
-
-    report_format = config.get("report_format", "csv")
-    config["report_format"] = report_format
-
+def build_or_load_filemap(config):
+    """Build the base filemap from the raw dir (or load the existing one) and add
+    ExperimentTime. Returns (experiment_filemap, filemap_path)."""
+    report_subdir = config["report_subdir"]
+    report_format = config["report_format"]
+    raw_subdir = config["raw_subdir"]
+    raw_dir_name = config["raw_dir_name"]
     time_regex = config.get("time_regex", r"Time(\d+)")
     point_regex = config.get("point_regex", r"Point(\d+)")
-
-    sync_backup_folder(temp_dir, pipeline_backup_dir)
-
     extract_experiment_time = config.get("get_experiment_time", True)
     overwrite_annotated = config.get("overwrite_annotated_filemap", False)
 
@@ -177,8 +149,13 @@ def build_blocks_for_subdir(global_config, temp_dir_basename, temp_dir, subdir=N
         and "Time" in experiment_filemap.columns
         and experiment_filemap["ExperimentTime"].is_null().any()
     )
+    # ExperimentTime needs a Time column; without one (no_timepoints filemap)
+    # skip extraction and leave it null instead of crashing.
+    can_compute_exp_time = (
+        extract_experiment_time and "Time" in experiment_filemap.columns
+    )
     if "ExperimentTime" not in experiment_filemap.columns or has_missing_exp_time:
-        if extract_experiment_time:
+        if can_compute_exp_time:
             print("### Calculating ExperimentTime ###")
             experiment_filemap = experiment_filemap.with_columns(
                 pl.lit(
@@ -193,6 +170,54 @@ def build_blocks_for_subdir(global_config, temp_dir_basename, temp_dir, subdir=N
                 pl.lit(np.nan).alias("ExperimentTime")
             )
             write_filemap(experiment_filemap, filemap_path)
+
+    return experiment_filemap, filemap_path
+
+
+def build_blocks_for_subdir(global_config, temp_dir_basename, temp_dir, subdir=None):
+    print(f"### Initializing the pipeline for subdir {subdir} ###")
+
+    (
+        _,
+        raw_subdir,
+        analysis_subdir,
+        report_subdir,
+        pipeline_backup_dir,
+    ) = get_and_create_folders(global_config, subdir)
+
+    pipeline_backup_dir = os.path.join(pipeline_backup_dir, temp_dir_basename)
+    os.makedirs(pipeline_backup_dir, exist_ok=True)
+
+    config = global_config.copy()
+
+    config["raw_subdir"] = raw_subdir
+    if subdir is None:
+        raw_dir_name = os.path.basename(os.path.normpath(raw_subdir))
+    else:
+        # instead, get the name from the parent directory
+        raw_dir_name = os.path.basename(os.path.normpath(os.path.dirname(raw_subdir)))
+
+    config["raw_dir_name"] = raw_dir_name
+    config["analysis_subdir"] = analysis_subdir
+    config["report_subdir"] = report_subdir
+    config["pipeline_backup_dir"] = pipeline_backup_dir
+    config["temp_dir"] = temp_dir
+
+    report_format = config.get("report_format", "csv")
+    config["report_format"] = report_format
+
+    sync_backup_folder(temp_dir, pipeline_backup_dir)
+
+    # If construction of a filemap we created this run fails partway, drop it so
+    # the next run rebuilds instead of reusing the partial one (regen gates on absence).
+    base_filemap_path = os.path.join(report_subdir, f"analysis_filemap.{report_format}")
+    already_existed = os.path.exists(base_filemap_path)
+    try:
+        build_or_load_filemap(config)
+    except Exception:
+        if not already_existed and os.path.exists(base_filemap_path):
+            os.remove(base_filemap_path)
+        raise
 
     print("Building the config of the building blocks ...")
 
