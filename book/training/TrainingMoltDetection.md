@@ -165,9 +165,10 @@ molt_detection_model_path: ["/path/to/best_light.ckpt"]
 molt_detection_columns: [["ch2_seg_str_volume"]]
 ```
 
-The default checkpoint shipped with the pipeline lives at
-`models/molt_detection_model.ckpt`. See the
-[Molt Detection building block](https://spsalmon.github.io/towbintools_pipeline/building_blocks/moltdetection)
+The default checkpoint shipped with the pipeline lives inside the package, at
+`towbintools_pipeline/defaults/models/molt_detection_model.ckpt`, and is used when
+`molt_detection_model_path` is left unset. See the
+[Molt Detection building block](https://spsalmon.github.io/towbintools_pipeline/building-blocks/moltdetection)
 documentation for the full list of options.
 
 The two notebooks in `training/molt_detection/utils/` help you inspect the gathered

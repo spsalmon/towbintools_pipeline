@@ -11,13 +11,74 @@ The documentation for the package used as a backbone for the pipeline can be fou
 
 You will find detailed explanations on how to install, update and use the pipeline here : <https://spsalmon.github.io/towbintools_pipeline/getting-started/installation/>
 
+Short version, on a cluster:
+
+```bash
+git clone https://github.com/spsalmon/towbintools_pipeline.git
+cd towbintools_pipeline
+bash scripts/install_pipeline.sh
+```
+
+On your own machine (conda, no cluster needed):
+
+```bash
+bash scripts/install_pipeline_local.sh
+conda activate towbintools_local
+```
+
 ## Running the pipeline
 
-You will find a detailed explanation on how to run the pipeline here : <https://spsalmon.github.io/towbintools_pipeline/getting-started/runningfirstpipelinee/>
+You will find a detailed explanation on how to run the pipeline here : <https://spsalmon.github.io/towbintools_pipeline/getting-started/runningfirstpipeline/>
+
+Short version:
+
+```bash
+towbintools-pipeline init-configs ~/my_configs   # get a config to start from
+# edit ~/my_configs/config.yaml
+bash scripts/run_pipeline.sh -c ~/my_configs/config.yaml
+```
+
+Without a cluster, set `backend: "local"` in the config and run it directly:
+
+```bash
+towbintools-pipeline run ~/my_configs/config.yaml
+```
 
 ## Updating the pipeline
 
 You will find a detailed explanation on how to update the pipeline here : <https://spsalmon.github.io/towbintools_pipeline/getting-started/update/>
+
+```bash
+bash scripts/update_pipeline.sh                  # code + environment
+bash scripts/update_pipeline.sh --pipeline-only  # code only, much faster
+```
+
+## What is in this repository
+
+```
+towbintools_pipeline/   The pipeline itself (installable python package)
+  workers/                one worker per analysis step
+  defaults/               bundled example configs + default models
+scripts/                Operate the pipeline: install, update, run, cleanup
+env/                    Define and build the conda environment
+gui/                    The Shiny annotation GUI
+training/               Retrain the segmentation, QC and molt detection models
+tools/                  One-off helpers (ND2/SQUID/MATLAB conversion, ...)
+custom_workers/         Example scripts for the "custom" building block
+analysis_and_plots/     Notebooks for downstream analysis and plotting
+configs/                Working configurations
+book/                   Source of the documentation website
+tests/                  Automated tests
+```
+
+The four things to know:
+
+- **`towbintools_pipeline/`** is the pipeline. It is installed as a package, so
+  the `towbintools-pipeline` command works from any directory.
+- **`scripts/` and `env/`** are the glue that installs and runs it. `env/` builds
+  the environment, `scripts/` operates the pipeline.
+- **`gui/`, `training/`, `tools/`** are extras, each with its own launch scripts.
+- Everything else is documentation, configurations and tests.
 
 ## How to set up Visual Studio Code ? (for members of the IZB)
 

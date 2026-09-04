@@ -1,16 +1,44 @@
 # Running your first pipeline
 
-## Building your configuration
+A pipeline run needs two things: an **experiment directory** containing your raw
+images, and a **configuration file** describing what to do with them.
 
-The pipeline is configured using YAML files.
-For now, the basic assumption is that your images follow this specific naming scheme : TimeX_PointY_(...).tiff where Time refers to the index in your time loop and Point is the number that we will use as
-the unique identifier for the position (individual worm if each position contains one worm). All images (planes, channels, etc.) for a given position at a given time should be stored in the same OME-TIFF file. For more details on input formats and assumptions, head to [pipeline input](https://spsalmon.github.io/towbintools_pipeline/usage/pipelineinput/).
+## 1. Get a configuration to start from
 
-The pipeline works using atomic [building blocks](https://spsalmon.github.io/towbintools_pipeline/building-blocks/buildingblock/), head to the **Building Block** section to learn more about them.
+The pipeline ships with a working example configuration. Copy it into a folder of
+your choice with:
 
-After installing the pipeline you will find an example of a working configuration for measuring organ and body size over  in the 'towbintools_pipeline/defaults/configs/' directory. The default configuration in 'towbintools_pipeline/defaults/configs/config.yaml' will be reset to its upstream version every time you update.
+```bash
+towbintools-pipeline init-configs ~/my_configs
+```
 
-Let's break it down!
+This writes two files:
+
+- `config.yaml` — the analysis configuration (this is the one you will edit)
+- `slurm_config.yaml` — how much memory, CPU and time each step gets on the
+  cluster. You can ignore it until you need to change it, see
+  [running on a cluster](https://spsalmon.github.io/towbintools_pipeline/usage/runningonacluster/).
+
+Both are copied because the main configuration refers to the SLURM one by name.
+
+```{tip}
+Never edit the bundled configuration inside the pipeline folder
+(`towbintools_pipeline/defaults/configs/`) — it is reset to its upstream version
+every time you update. Always work on a copy.
+```
+
+## 2. Understand what you are editing
+
+The pipeline is configured with YAML files. The basic assumption is that your
+images follow the naming scheme `TimeX_PointY_(...).tiff`, where `Time` refers to
+the index in your time loop and `Point` is the unique identifier of the position
+(one individual worm, if each position contains one worm). All images (planes,
+channels, etc.) for a given position at a given time should be in the same
+OME-TIFF file. For more details, see [pipeline input](https://spsalmon.github.io/towbintools_pipeline/usage/pipelineinput/).
+
+Let's break the configuration down.
+
+### Where the data is
 
 ```yaml
 experiment_dir: "/mnt/towbin.data/shared/spsalmon/pipeline_test_folder/"
@@ -23,27 +51,42 @@ time_regex: 'Time(\d+)'
 point_regex: 'Point(\d+)'
 ```
 
-- **experiment_dir** : the root of your experiment
-- **analysis_dir_name** : the name of the directory where all the analysis files (segmentation masks, quantifications, etc.) will be saved. You can change it to run multiple different analysis of the same experiment
-- **raw_dir_name** : directory where all your raw images are saved
-- **report_format** : either "csv" or "parquet". Parquet files will be much smaller than CSVs (usefull for big experiments), but are less convenient to edit
-- **pixelsize** : physical size in µm of a pixel (depends on your microscope, camera and objective)
-- **get_experiment_time** : if True, the actual time the images were acquired at will be extracted for the metadata. This can take quite a while but is very usefull for downstream analysis
-- **time_regex** : the regular expression used to extract the time index from the filename. The default one works for filenames like TimeX_PointY_(...).tiff, but you can change it to fit your naming scheme. The part in brackets will be extracted as the time index.
-- **point_regex** : same as time_regex but for the point index (unique identifier for each worm). The part in brackets will be extracted as the point index.
+- **experiment_dir**: the root of your experiment.
+- **analysis_dir_name**: the directory where all the analysis files (segmentation
+  masks, quantifications, etc.) will be saved. Change it to run several different
+  analyses of the same experiment.
+- **raw_dir_name**: the directory where your raw images are saved.
+- **report_format**: either `"csv"` or `"parquet"`. Parquet files are much smaller
+  than CSVs (useful for big experiments) but less convenient to edit.
+- **pixelsize**: physical size of a pixel in µm (depends on your microscope,
+  camera and objective).
+- **get_experiment_time**: if True, the actual acquisition time of each image is
+  extracted from the metadata. This takes a while but is very useful downstream.
+- **time_regex** / **point_regex**: the regular expressions used to extract the
+  time and point indices from the file names. The defaults work for names like
+  `TimeX_PointY_(...).tiff`. The part in brackets is what gets extracted.
 
-If you have different imaging modalities during your timelapse (let's say you acquire a picture of each worm every 10 minutes but also take a Z-stack every hour), you should split them in different raw directories (e.g. raw and raw_stack). You can then run a pipeline for each of those directories and merge them at the end simply by joining the two dataframes.
+If you have different imaging modalities during your timelapse (say, a picture of
+each worm every 10 minutes and a Z-stack every hour), split them into different
+raw directories (e.g. `raw` and `raw_stack`), run a pipeline for each, and merge
+the results at the end by joining the two dataframes.
+
+### Where it runs
 
 ```yaml
 backend: "slurm"
-sbatch_memory: 64G
-sbatch_time: 0-48:00:00
-sbatch_cpus: 32
-sbatch_gpus: "rtx6000:1"
+n_jobs: 32
+slurm_config: "slurm_config.yaml"
 ```
 
-Those options control the amount of RAM, CPU cores, and GPU allocated to each building block, as well as their time limit. GPUs will only get allocated to jobs that can make use of them (segmentation, molt detection, or
-custom script requiring GPU). If you don't have access to a cluster and want to run the pipeline on your local machine, simply set **backend** to "local" and the building blocks will be run sequentially.
+- **backend**: `"slurm"` (the default) submits each step as a cluster job.
+  `"local"` runs the steps one after the other on the machine you are on — use
+  this if you don't have a cluster.
+- **n_jobs**: how many images are processed in parallel inside a step.
+- **slurm_config**: the file holding the cluster resource requests. Only used with
+  the SLURM backend, and the path is relative to your configuration file.
+
+### What it does
 
 ```yaml
 building_blocks:
@@ -63,40 +106,80 @@ building_blocks:
 rerun_segmentation: [ False ]
 rerun_straightening: [ False ]
 rerun_morphology_computation: [ False ]
-rerun_quality_control: [ False ]
 rerun_fluorescence_quantification: [ False ]
 rerun_quality_control: [ False ]
 rerun_molt_detection: [ False ]
 ```
 
-- **building_blocks** : the list of atomic tasks that you want the pipeline to perform. In this case, 2 segmentations, 3 straightenings, etc.
-- **rerun** : if False, images that were already processed will be skipped, only missing ones will be processed. For blocks like morphology_computation, the whole block is skipped if the resulting file "(...).csv" already exists. If true, everything is reprocessed.
+- **building_blocks**: the list of atomic tasks you want the pipeline to perform.
+  Here: 2 segmentations, 4 straightenings, and so on. They run in the order they
+  are written.
+- **rerun_...**: if False, images that were already processed are skipped and only
+  the missing ones are processed. For blocks producing a single report file (like
+  `morphology_computation`), the whole block is skipped if that file already
+  exists. If True, everything is reprocessed.
 
-After that, you should fill add the parameters for all of your building blocks. Those are described in detail [here](https://spsalmon.github.io/towbintools_pipeline/building-blocks/buildingblock/). Here is an example of configuration for the two segmentation blocks:
+Then come the parameters of each block. They are described in detail in the
+[building blocks](https://spsalmon.github.io/towbintools_pipeline/building-blocks/buildingblock/)
+section. Here is the configuration of the two segmentation blocks:
 
 ```yaml
 # segmentation parameters
-segmentation_column: [ 'raw' ]
+segmentation_column: [ "raw" ]
 segmentation_name_suffix: [ null ]
 segmentation_method: [ "deep_learning" ]
 segmentation_channels: [ [ 1 ], [ 0 ] ]
 
-
 # deep learning segmentation parameters
-model_path: [ "/mnt/towbin.data/shared/spsalmon/towbinlab_segmentation_database/models/paper/body/towbintools_medium/best_light.ckpt", "/mnt/towbin.data/shared/spsalmon/towbinlab_segmentation_database/models/paper/pharynx/towbintools_medium/best_light.ckpt" ]
+model_path: [ "/mnt/.../body/best_light.ckpt", "/mnt/.../pharynx/best_light.ckpt" ]
 batch_size: [ 4 ]
 ```
-## Running the pipeline
 
-An example configuration will always be available in the 'towbintools_pipeline/defaults/configs/' directory of your pipeline installation. You can use it as a template to build your own configuration. This configuration file will automatically be updated to the latest version when you update the pipeline. You should therefore not use it as your working configuration, but rather copy it and give it a different name. You can then modify it to fit your needs. This copied version will not be overwritten when we update the original configuration file.
+Every option in the full list of configuration keys is described in
+[configuration](https://spsalmon.github.io/towbintools_pipeline/usage/configuration/).
 
-Once your configuration is finished, you can save it anywhere. Let's assume you saved it in ~/towbintools_pipeline/configs/my_configuration.yaml. I recommend picking a folder where you will centralize all your configuration. The configuration you run on an experiment will always be backed up in the analysis/report folder of said experiment. To run this specific configuration :
+## 3. Run it
+
+Save your configuration anywhere you like — a single folder centralising all your
+configurations is a good idea. Assuming you saved it as
+`~/my_configs/my_experiment.yaml`:
+
+**On the cluster:**
 
 ```bash
-cd ~/towbintools_pipeline # or wherever you chose to put the pipeline folder
-bash scripts/run_pipeline.sh -c configs/my_configuration.yaml
+cd ~/towbintools_pipeline # or wherever you put the pipeline folder
+bash scripts/run_pipeline.sh -c ~/my_configs/my_experiment.yaml
 ```
 
-The -c argument is used to specify the path to the configuration to be run.
+**On your own machine** (with `backend: "local"` in the config), from anywhere:
 
-That's it ! Once you're happy with your config, all you need to do to fully analyze a new experiment is to change the experiment path in the config file and run this command.
+```bash
+towbintools-pipeline run ~/my_configs/my_experiment.yaml
+```
+
+The `-c` argument specifies the configuration to run. Two more optional arguments
+are useful:
+
+- `-e / --experiment_dir` — run the same configuration on another experiment,
+  without editing the file.
+- `-t / --temp_dir` — where the pipeline puts its temporary files (defaults to
+  `temp_files/` inside the pipeline folder).
+
+So, to analyse a second experiment with the exact same settings:
+
+```bash
+bash scripts/run_pipeline.sh -c ~/my_configs/my_experiment.yaml -e /path/to/other_experiment
+```
+
+## 4. Watch it
+
+The configuration is checked before anything is submitted, so a typo or a missing
+file is reported immediately, in your terminal, with every problem listed at once.
+
+Once the run starts, it prints its list of steps and then a marker around each
+one, so you can always tell where it is. See
+[monitoring a run](https://spsalmon.github.io/towbintools_pipeline/usage/monitoringruns/)
+for where the logs live and what to do when something goes wrong.
+
+That's it! Once you are happy with your configuration, analysing a new experiment
+is a single command.

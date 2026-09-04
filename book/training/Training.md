@@ -15,3 +15,9 @@ For help gathering a dataset and training a quality control classifier:
 
 - For [creating a classification dataset from multiple experiments](https://spsalmon.github.io/towbintools_pipeline/training/gatheringqcdataset)
 - For [training an XGBoost quality control model](https://spsalmon.github.io/towbintools_pipeline/training/trainingqcmodels)
+
+## Training Molt Detection Models
+
+For help gathering a dataset and training a molt detection model:
+
+- For [gathering annotated growth curves and training the model](https://spsalmon.github.io/towbintools_pipeline/training/trainingmoltdetection)

@@ -108,6 +108,7 @@ the full list of accepted keys (`qc_masks`, `qc_images`, `qc_model_path`,
 `qc_import_eggs_from`, `rerun_quality_control`).
 
 The default checkpoints shipped with the pipeline live under
-`models/10x_body_qc/` and `models/10x_pharynx_qc/`. See the
-[Quality Control building block](https://spsalmon.github.io/towbintools_pipeline/building_blocks/qualitycontrol)
+`towbintools_pipeline/defaults/models/10x_body_qc/` and
+`towbintools_pipeline/defaults/models/10x_pharynx_qc/`. See the
+[Quality Control building block](https://spsalmon.github.io/towbintools_pipeline/building-blocks/qualitycontrol)
 documentation for the full list of options.

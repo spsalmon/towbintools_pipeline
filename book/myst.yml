@@ -14,6 +14,9 @@ project:
     - title: Usage
       children:
         - file: usage/PipelineInput.md
+        - file: usage/Configuration.md
+        - file: usage/RunningOnACluster.md
+        - file: usage/MonitoringRuns.md
         - file: usage/PipelineOutput.md
         - file: usage/UsingGUI.md
         - file: usage/Plotting.md
@@ -28,7 +31,9 @@ project:
           children:
             - file: training/GatheringQCDataset.md
             - file: training/TrainingQCModels.md
-        #   - file: training/TrainingMoltDetectionModels.md
+        - title: Training Molt Detection Models
+          children:
+            - file: training/TrainingMoltDetection.md
     - title: Building Blocks
       children:
         - file: building_blocks/BuildingBlock.md

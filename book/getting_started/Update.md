@@ -2,29 +2,41 @@
 
 ## Fast explanation
 
-For convenience, I created a script that will do all operations explained in the second section. To update the pipeline:
+A script does everything described below. To update the pipeline:
 
-1. Deactivate the environment and close scripts, notebooks, terminals, where it's activated
-2. Run the update script
+1. Deactivate the environment, and close the scripts, notebooks and terminals
+   where it is activated.
+2. Run the update script:
 
 ```bash
-cd ~/towbintools_pipeline #(or where you installed the pipeline)
+cd ~/towbintools_pipeline # (or wherever you installed the pipeline)
 bash scripts/update_pipeline.sh
 ```
 
-Optionally, you can run
+Optionally, you can run:
 
 ```bash
 bash scripts/update_pipeline.sh --pipeline-only
 ```
 
-To update only the pipeline scripts and not the underlying packages
+to update only the pipeline code and not the underlying packages. This is much
+faster, and is what you want most of the time.
+
+```{note}
+Running the pipeline no longer updates it for you. Since the refactor,
+`scripts/run_pipeline.sh` never touches your working copy — updating is always
+an explicit choice.
+```
 
 ## Longer explanation
 
-Updating the pipeline is done in two parts. First, update the repository using the source on github. This can be done different ways:
-1. using git pull
-2. by resetting the repository based on the upstream content, using
+Updating is done in two parts.
+
+First, the repository is updated from the source on GitHub. This can be done in
+two ways:
+
+1. using `git pull`
+2. by resetting the repository to the upstream content:
 
 ```bash
 git fetch origin
@@ -32,18 +44,35 @@ git checkout main
 git reset --hard origin/main
 ```
 
-If what you want is to reset the repository to how it is on github, use option 2.
+If what you want is to reset the repository to how it is on GitHub, use option 2.
+**This is what the update script does**, so any local modification you made to the
+pipeline files will be lost.
 
-Then, you need to update the packages. For consistency's sake, the pipeline uses conda lock files. They ensure that the package versions you end up having is exactly the same as what was tested during development. To update your environment according to a lock file, run
+Then, the packages are updated. For consistency's sake, the pipeline uses conda
+lock files. They ensure that the package versions you end up with are exactly the
+same as what was tested during development. To update your environment according
+to the lock file, run:
 
 ```bash
 cd ~/towbintools_pipeline
 micromamba run -n towbintools conda-lock install --name towbintools ./env/conda-lock.yml
 ```
 
+Finally, the pipeline package itself is registered in the fresh environment:
+
+```bash
+micromamba run -n towbintools pip install -e . --no-deps
+```
+
+This last step is only needed when the environment was rebuilt. The pipeline is
+installed in "editable" mode, which means it always follows the files in your
+`towbintools_pipeline` folder — a `--pipeline-only` update therefore needs
+nothing more than the `git` step.
+
 ## Troubleshooting
 
-If for some weird reason, you end up with a broken environment, you can always delete it and create it again using the lock file. To do so, run:
+If for some reason you end up with a broken environment, you can always delete it
+and create it again. To do so, run:
 
 ```bash
 micromamba env remove -n towbintools
@@ -51,8 +80,20 @@ cd ~/towbintools_pipeline
 bash scripts/install_pipeline.sh
 ```
 
-You may also want to update the towbintools package itself manually. To do so, run:
+You may also want to update the towbintools package itself manually. To do so,
+run:
 
 ```bash
 micromamba run -n towbintools pip install -U towbintools
+```
+
+## Updating a local install
+
+On a local (conda) install, update the repository and reinstall the package:
+
+```bash
+cd ~/towbintools_pipeline
+git pull
+conda activate towbintools_local
+pip install -e ".[dev]"
 ```
